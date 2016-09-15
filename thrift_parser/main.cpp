@@ -20,24 +20,42 @@ int main(int argc, char *argv[])
 
         Lexer * lexer = new Lexer(&app);
         QDir dir(thriftDir);
-        for(QString thriftFile : dir.entryList(QStringList() << "*.thrift", QDir::Files, QDir::Name)) {
-            lexer->feedFile(dir.absoluteFilePath(thriftFile));
+
+        QStringList thriftFilesMask;
+        thriftFilesMask << "*.thrift";
+
+        QStringList thriftFiles = dir.entryList(thriftFilesMask, QDir::Files, QDir::Name);
+        for(auto it = thriftFiles.constBegin(), end = thriftFiles.constEnd(); it != end; ++it) {
+            QString thriftFileAbsolutePath = dir.absoluteFilePath(*it);
+            lexer->feedFile(thriftFileAbsolutePath);
         }
 
         Parser * parser = new Parser(&app);
-        for(const Lexer::TerminalSymbol & term : lexer->terminals())
+
+        QList<Lexer::TerminalSymbol> terminals = lexer->terminals();
+        for(auto it = terminals.constBegin(), end = terminals.constEnd(); it != end; ++it)
         {
+            const Lexer::TerminalSymbol & term = *it;
+
             parser->setFile(term.file);
-            //qDebug() << term.file << term.line << term.data;
             parser->feed(term.type, term.data);
-            if(parser->isError()) {
-                throw std::runtime_error(QString("%4 in file %1 at line %2: %3\ndetected token type: %5").arg(term.file).arg(term.line).arg(term.data)
-                                         .arg(parser->errorMessage()).arg(static_cast<int>(term.type)).toStdString());
+            if (parser->isError())
+            {
+                QString error = parser->errorMessage();
+                error += " in file ";
+                error += term.file;
+                error += " at line ";
+                error += QString::number(term.line);
+                error += ": ";
+                error += term.data;
+                error += "\ndetected token type: ";
+                error += QString::number(static_cast<int>(term.type));
+                throw std::runtime_error(error.toStdString());
             }
         }
 
         parser->complete();
-        if(parser->isError()) {
+        if (parser->isError()) {
             throw std::runtime_error(QString("Parser error at completion: %1").arg(parser->errorMessage()).toStdString());
         }
 

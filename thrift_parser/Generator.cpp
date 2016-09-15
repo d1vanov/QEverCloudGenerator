@@ -58,8 +58,9 @@ namespace {
 
 QString clearInclude(QString s)
 {
-    for(const QString & inc : includeList)
+    for(auto it = includeList.constBegin(), end = includeList.constEnd(); it != end; ++it)
     {
+        const QString & inc = *it;
         if (s.startsWith(inc)) {
             return s.mid(inc.length());
         }
@@ -98,8 +99,9 @@ void writeHeaderHeader(QTextStream & out, QString fileName,
             out << "#include <Optional.h>" << endl;
         }
 
-        for(const QString & include: additionalPreIncludes)
+        for(auto it = additionalPreIncludes.constBegin(), end = additionalPreIncludes.constEnd(); it != end; ++it)
         {
+            const QString & include = *it;
             if(include.startsWith('<')) {
                 out << "#include " << include << endl;
             }
@@ -111,12 +113,13 @@ void writeHeaderHeader(QTextStream & out, QString fileName,
         QStringList includes;
         includes << "QMap" << "QList" << "QSet" << "QString" << "QStringList"
                  << "QByteArray" << "QDateTime" << "QMetaType";
-        for(const QString & include: includes) {
-            out << "#include <" << include << ">" << endl;
+        for(auto it = includes.constBegin(), end = includes.constEnd(); it != end; ++it) {
+            out << "#include <" << *it << ">" << endl;
         }
 
-        for(const QString & include : additionalPostIncludes)
+        for(auto it = additionalPostIncludes.constBegin(), end = additionalPostIncludes.constEnd(); it != end; ++it)
         {
+            const QString & include = *it;
             if(include.startsWith('<')) {
                 out << "#include " << include << endl;
             }
@@ -142,8 +145,9 @@ void writeHeaderFooter(QTextStream & out, QString fileName, QStringList extraCon
 {
     out << "} // namespace qevercloud" << endl;
 
-    for(const QString & extraContentLine: extraContent)
+    for(auto it = extraContent.constBegin(), end = extraContent.constEnd(); it != end; ++it)
     {
+        const QString & extraContentLine = *it;
         if (!extraContentLine.isEmpty()) {
             out << extraContentLine << endl;
         }
@@ -161,8 +165,9 @@ void writeBodyHeader(QTextStream& out, QString headerFileName, QStringList moreI
     out << "#include <generated/" << headerFileName << ">" << endl;
     out << "#include \"../impl.h\"" << endl;
 
-    for(const QString & include : moreIncludes)
+    for(auto it = moreIncludes.constBegin(), end = moreIncludes.constEnd(); it != end; ++it)
     {
+        const QString & include = *it;
         if(include.startsWith('<')) {
             out << "#include " << include << endl;
         }
@@ -608,7 +613,8 @@ QString valueToStr(QSharedPointer<Parser::ConstValue> value, QSharedPointer<Pars
         }
 
         result = typeToStr(type, identifier) + "()";
-        for(QSharedPointer<Parser::ConstValue> v: listvalue->values) {
+        for(auto it = listvalue->values.constBegin(), end = listvalue->values.constEnd(); it != end; ++it) {
+            const QSharedPointer<Parser::ConstValue> & v = *it;
             result += " << " + valueToStr(v, QSharedPointer<Parser::Type>(nullptr), identifier);
         }
     }
@@ -640,8 +646,11 @@ void generateConstants(Parser * parser, const QString & outPath)
     writeHeaderHeader(hout, headerFileName);
 
     QString file;
-    for(const Parser::Constant & c: parser->constants())
+    QList<Parser::Constant> constants = parser->constants();
+    for(auto it = constants.constBegin(), end = constants.constEnd(); it != end; ++it)
     {
+        const Parser::Constant & c = *it;
+
         if (file != c.file)
         {
             bool first = file.isEmpty();
@@ -678,8 +687,10 @@ void generateConstants(Parser * parser, const QString & outPath)
     writeBodyHeader(bout, headerFileName);
 
     file = "";
-    for(const Parser::Constant & c: parser->constants())
+    for(auto it = constants.constBegin(), end = constants.constEnd(); it != end; ++it)
     {
+        const Parser::Constant & c = *it;
+
         if (file != c.file) {
             file = c.file;
             bout << endl << "// " << c.file << endl << endl;
@@ -743,10 +754,9 @@ void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString
             QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::ListType>()->valueType;
             out << ident << "    w.writeListBegin(" << typeToStr(valueType, identPrefix + "," + field.name, MethodType::ThriftFieldType)
                 << ", " << fieldMoniker << ".length());" << endl;
-            out << ident << "    Q_FOREACH(const " + typeToStr(valueType, identPrefix + "," + field.name) + "& elem, "
-                << fieldMoniker << ") {" << endl;
+            out << ident << "    for(auto it = " << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
             QString writeMethod = typeToStr(valueType, identPrefix + "," + field.name, MethodType::WriteMethod);
-            out << ident << "        " << writeMethod << "elem" << (writeMethod.contains("static_cast<") ? ")" : "")
+            out << ident << "        " << writeMethod << "*it" << (writeMethod.contains("static_cast<") ? ")" : "")
                 << ");" << endl;
             out << ident << "    }" << endl;
             out << ident << "    w.writeListEnd();" << endl;
@@ -756,10 +766,9 @@ void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString
             QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::SetType>()->valueType;
             out << ident << "    w.writeSetBegin(" << typeToStr(valueType, identPrefix + "," + field.name, MethodType::ThriftFieldType)
                 << ", " << fieldMoniker << ".count());" << endl;
-            out << ident << "    Q_FOREACH(const " + typeToStr(valueType, identPrefix + "," + field.name) + "& elem,  "
-                << fieldMoniker << ") {" << endl;
+            out << ident << "    for(auto it = " << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
             QString writeMethod = typeToStr(valueType, identPrefix + "," + field.name, MethodType::WriteMethod);
-            out << ident << "        " << writeMethod << "elem" << (writeMethod.contains("static_cast<") ? ")" : "")
+            out << ident << "        " << writeMethod << "*it" << (writeMethod.contains("static_cast<") ? ")" : "")
                 << ");" << endl;
             out << ident << "    }" << endl;
             out << ident << "    w.writeSetEnd();" << endl;
@@ -770,14 +779,13 @@ void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString
             QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::MapType>()->valueType;
             out << ident << "    w.writeMapBegin(" << typeToStr(keyType, identPrefix + "," + field.name, MethodType::ThriftFieldType)
                 << ", " << typeToStr(valueType, identPrefix + "," + field.name, MethodType::ThriftFieldType) << ", "
-                << fieldMoniker << ".keys().length());" << endl;
-            out << ident << "    Q_FOREACH(const " + typeToStr(keyType, identPrefix + "," + field.name) + "& elem, "
-                << fieldMoniker << ".keys()) {" << endl;
+                << fieldMoniker << ".size());" << endl;
+            out << ident << "    for(auto it = " << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
             QString keyWriteMethod = typeToStr(keyType, identPrefix + "," + field.name, MethodType::WriteMethod);
             QString valueWriteMethod = typeToStr(valueType, identPrefix + "," + field.name, MethodType::WriteMethod);
-            out << ident << "        " << keyWriteMethod << "elem" << (keyWriteMethod.contains("static_cast<") ? ")" : "")
+            out << ident << "        " << keyWriteMethod << "it.key()" << (keyWriteMethod.contains("static_cast<") ? ")" : "")
                 << ");" << endl;
-            out << ident << "        " << valueWriteMethod << fieldMoniker << ".value(elem)" << (valueWriteMethod.contains("static_cast<") ? ")" : "")
+            out << ident << "        " << valueWriteMethod << "it.value()" << (valueWriteMethod.contains("static_cast<") ? ")" : "")
                 << ");" << endl;
             out << ident << "    }" << endl;
             out << ident << "    w.writeMapEnd();" << endl;
@@ -897,8 +905,11 @@ void generateTypes(Parser * parser, const QString & outPath)
 
     writeHeaderHeader(houtEDAMErrorCode, EDAMErrorCodeHeaderFileName);
 
-    for(const Parser::Enumeration & e: parser->enumerations())
+    QList<Parser::Enumeration> enumerations = parser->enumerations();
+    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it)
     {
+        const Parser::Enumeration & e = *it;
+
         if (e.name == "EDAMErrorCode")
         {
             if (!e.docComment.isEmpty()) {
@@ -960,8 +971,11 @@ void generateTypes(Parser * parser, const QString & outPath)
     hout << endl;
     houtEDAMErrorCode << endl;
 
-    for(const Parser::TypeDefinition & t : parser->typedefs())
+    QList<Parser::TypeDefinition> typedefs = parser->typedefs();
+    for(auto it = typedefs.constBegin(), end = typedefs.constEnd(); it != end; ++it)
     {
+        const Parser::TypeDefinition & t = *it;
+
         if (!t.docComment.isEmpty()) {
             hout << t.docComment << endl;
         }
@@ -974,8 +988,9 @@ void generateTypes(Parser * parser, const QString & outPath)
     QList<Parser::Structure> ordered;
 
     QSet<QString> exceptions;
-    for(const Parser::Structure & e: parser->exceptions()) {
-        exceptions.insert(e.name);
+    QList<Parser::Structure> parserExceptions = parser->exceptions();
+    for(auto it = parserExceptions.constBegin(), end = parserExceptions.constEnd(); it != end; ++it) {
+        exceptions.insert(it->name);
     }
 
     QList<Parser::Structure> heap = parser->structures();
@@ -1033,8 +1048,9 @@ void generateTypes(Parser * parser, const QString & outPath)
         }
     }
 
-    for(const Parser::Structure & s : ordered)
+    for(auto it = ordered.constBegin(), end = ordered.constEnd(); it != end; ++it)
     {
+        const Parser::Structure & s = *it;
         if (!s.docComment.isEmpty()) {
             hout << s.docComment << endl;
         }
@@ -1066,15 +1082,19 @@ void generateTypes(Parser * parser, const QString & outPath)
         else
         {
             hout << "struct QEVERCLOUD_EXPORT " << s.name << " {" << endl;
-            for(const Parser::Field & f : s.fields)
+            for(auto fit = s.fields.begin(), fend = s.fields.end(); fit != fend; ++fit)
             {
-                if (s.fieldComments.contains(f.name)) {
+                const Parser::Field & f = *fit;
+
+                if (s.fieldComments.contains(f.name))
+                {
                     QStringList lines = s.fieldComments[f.name].split('\n');
-                    for(QString line : lines) {
-                        hout << "    " << line << endl;
+                    for(auto lit = lines.constBegin(), lend = lines.constEnd(); lit != lend; ++lit) {
+                        hout << "    " << *lit << endl;
                     }
                 }
-                else {
+                else
+                {
                     hout << "    " << "/** NOT DOCUMENTED */" << endl;
                 }
 
@@ -1120,8 +1140,8 @@ void generateTypes(Parser * parser, const QString & outPath)
     hout << endl;
     hout << "} // namespace qevercloud" << endl<< endl;
 
-    for(const Parser::Structure & s : ordered) {
-        hout << "Q_DECLARE_METATYPE(qevercloud::" << s.name << ")" << endl;
+    for(auto it = ordered.constBegin(), end = ordered.constEnd(); it != end; ++it) {
+        hout << "Q_DECLARE_METATYPE(qevercloud::" << it->name << ")" << endl;
     }
     hout << endl;
 
@@ -1145,13 +1165,15 @@ void generateTypes(Parser * parser, const QString & outPath)
     QList<Parser::Structure> structuresAndExceptions = parser->structures();
     structuresAndExceptions << parser->exceptions();
 
-    for(const Parser::Structure & s : structuresAndExceptions) {
+    for(auto it = structuresAndExceptions.constBegin(), end = structuresAndExceptions.constEnd(); it != end; ++it) {
+        const Parser::Structure & s = *it;
         hout2 << "void write" << s.name << "(ThriftBinaryBufferWriter & w, const " << s.name << " & s);" << endl;
         hout2 << "void read" << s.name << "(ThriftBinaryBufferReader & r, " << s.name << " & s);" << endl;
     }
     hout2 << endl;
 
-    for(const Parser::Enumeration & e : parser->enumerations()) {
+    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it) {
+        const Parser::Enumeration & e = *it;
         hout2 << "void readEnum" << e.name << "(ThriftBinaryBufferReader & r, " << e.name << "::type & e);" << endl;
     }
     hout2 << endl;
@@ -1172,8 +1194,10 @@ void generateTypes(Parser * parser, const QString & outPath)
 
     bout << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
 
-    for(const Parser::Enumeration & e : parser->enumerations())
+    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it)
     {
+        const Parser::Enumeration & e = *it;
+
         bout <<  "void readEnum" << e.name << "(ThriftBinaryBufferReader & r, " << e.name << "::type & e) {" << endl;
         bout << "    qint32 i;" << endl;
         bout << "    r.readI32(i);" << endl;
@@ -1190,8 +1214,10 @@ void generateTypes(Parser * parser, const QString & outPath)
         bout << "}" << endl << endl;
     }
 
-    for(const Parser::Structure & s : structuresAndExceptions)
+    for(auto it = structuresAndExceptions.constBegin(), end = structuresAndExceptions.constEnd(); it != end; ++it)
     {
+        const Parser::Structure & s = *it;
+
         if (exceptions.contains(s.name))
         {
             bout << s.name << QStringLiteral("::") << s.name << QStringLiteral("() {}") << endl;
@@ -1299,8 +1325,11 @@ void generateServices(Parser * parser, const QString & outPath)
 
     writeHeaderHeader(hout, headerFileName, additionalPreIncludes, additionalPostIncludes);
 
-    for(const Parser::Service & s : parser->services())
+    QList<Parser::Service> services = parser->services();
+    for(auto it = services.constBegin(), end = services.constEnd(); it != end; ++it)
     {
+        const Parser::Service & s = *it;
+
         if (!s.extends.isEmpty()) {
             throw std::runtime_error("extending services are not supported");
         }
@@ -1336,8 +1365,8 @@ void generateServices(Parser * parser, const QString & outPath)
             if (!func.docComment.isEmpty())
             {
                 QStringList lines = func.docComment.split('\n');
-                for(const QString & line : lines) {
-                    hout << "    " << line << endl;
+                for(auto lit = lines.constBegin(), lend = lines.constEnd(); lit != lend; ++lit) {
+                    hout << "    " << *lit << endl;
                 }
             }
 
@@ -1429,8 +1458,10 @@ void generateServices(Parser * parser, const QString & outPath)
 
     writeBodyHeader(bout, headerFileName, QStringList() << "../impl.h" << "types_impl.h");
 
-    for(const Parser::Service & s : parser->services())
+    for(auto it = services.constBegin(), end = services.constEnd(); it != end; ++it)
     {
+        const Parser::Service & s = *it;
+
         for(const Parser::Function & func : s.functions)
         {
             QString prepareParamsName = s.name + "_" + func.name + "_prepareParams";
@@ -1664,29 +1695,35 @@ void generateSources(Parser * parser, QString outPath)
 
     baseTypes << "bool" << "byte" << "i16" << "i32" << "i64" << "double" << "string" << "binary";
 
-    for(const Parser::Structure & s : parser->structures()) {
-        allstructs << s.name;
+    QList<Parser::Structure> structures = parser->structures();
+    for(auto it = structures.constBegin(), end = structures.constEnd(); it != end; ++it) {
+        allstructs << it->name;
     }
 
-    for(const Parser::Structure & e : parser->exceptions()) {
-        allexceptions << e.name;
+    QList<Parser::Structure> exceptions = parser->exceptions();
+    for(auto it = exceptions.constBegin(), end = exceptions.constEnd(); it != end; ++it) {
+        allexceptions << it->name;
     }
 
-    for(const Parser::Enumeration & e : parser->enumerations()) {
-        allenums << e.name;
+    QList<Parser::Enumeration> enumerations = parser->enumerations();
+    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it) {
+        allenums << it->name;
     }
 
-    for(const Parser::Include & inc : parser->includes()) {
-        QString s = inc.name;
+    QList<Parser::Include> includes = parser->includes();
+    for(auto it = includes.constBegin(), end = includes.constEnd(); it != end; ++it) {
+        QString s = it->name;
         s.replace(QChar('\"'), QString(""));
         s.chop(QString("thrift").length());
         includeList << s;
     }
 
-    for(const Parser::TypeDefinition & td : parser->typedefs())
+    QList<Parser::TypeDefinition> typedefs = parser->typedefs();
+    for(auto it = typedefs.constBegin(), end = typedefs.constEnd(); it != end; ++it)
     {
-        if (td.type.dynamicCast<Parser::BaseType>()) {
-            typedefMap[td.name] = td.type.dynamicCast<Parser::BaseType>()->basetype;
+        auto casted = it->type.dynamicCast<Parser::BaseType>();
+        if (!casted.isNull()) {
+            typedefMap[it->name] = casted->basetype;
         }
     }
 

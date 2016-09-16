@@ -448,7 +448,7 @@ QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodT
             if (nameOfType2 != nameOfType)
             {
                 if (!baseTypes.contains(nameOfType2)) {
-                    throw std::runtime_error("typdefs are supported for base types only");
+                    throw std::runtime_error("typedefs are supported for base types only");
                 }
 
                 QSharedPointer<Parser::BaseType> type2(new Parser::BaseType);
@@ -732,8 +732,10 @@ QString getIdentifier(const QSharedPointer<Parser::Type> & type)
 
 void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString identPrefix, QString fieldPrefix)
 {
-    for(const Parser::Field & field : fields)
+    for(auto it = fields.constBegin(), end = fields.constEnd(); it != end; ++it)
     {
+        const Parser::Field & field = *it;
+
         QString ident = "";
 
         bool optional = (field.required == Parser::Field::RequiredFlag::Optional);
@@ -754,7 +756,8 @@ void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString
             QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::ListType>()->valueType;
             out << ident << "    w.writeListBegin(" << typeToStr(valueType, identPrefix + "," + field.name, MethodType::ThriftFieldType)
                 << ", " << fieldMoniker << ".length());" << endl;
-            out << ident << "    for(auto it = " << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
+            out << ident << "    for(" << typeToStr(field.type, QString(), MethodType::TypeName) << "::const_iterator it = "
+                << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
             QString writeMethod = typeToStr(valueType, identPrefix + "," + field.name, MethodType::WriteMethod);
             out << ident << "        " << writeMethod << "*it" << (writeMethod.contains("static_cast<") ? ")" : "")
                 << ");" << endl;
@@ -766,7 +769,8 @@ void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString
             QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::SetType>()->valueType;
             out << ident << "    w.writeSetBegin(" << typeToStr(valueType, identPrefix + "," + field.name, MethodType::ThriftFieldType)
                 << ", " << fieldMoniker << ".count());" << endl;
-            out << ident << "    for(auto it = " << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
+            out << ident << "    for(" << typeToStr(field.type, QString(), MethodType::TypeName) << "::const_iterator it = "
+                << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
             QString writeMethod = typeToStr(valueType, identPrefix + "," + field.name, MethodType::WriteMethod);
             out << ident << "        " << writeMethod << "*it" << (writeMethod.contains("static_cast<") ? ")" : "")
                 << ");" << endl;
@@ -780,7 +784,8 @@ void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString
             out << ident << "    w.writeMapBegin(" << typeToStr(keyType, identPrefix + "," + field.name, MethodType::ThriftFieldType)
                 << ", " << typeToStr(valueType, identPrefix + "," + field.name, MethodType::ThriftFieldType) << ", "
                 << fieldMoniker << ".size());" << endl;
-            out << ident << "    for(auto it = " << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
+            out << ident << "    for(" << typeToStr(field.type, QString(), MethodType::TypeName) << "::const_iterator it = "
+                << fieldMoniker << ".constBegin(), end = " << fieldMoniker << ".constEnd(); it != end; ++it) {" << endl;
             QString keyWriteMethod = typeToStr(keyType, identPrefix + "," + field.name, MethodType::WriteMethod);
             QString valueWriteMethod = typeToStr(valueType, identPrefix + "," + field.name, MethodType::WriteMethod);
             out << ident << "        " << keyWriteMethod << "it.key()" << (keyWriteMethod.contains("static_cast<") ? ")" : "")

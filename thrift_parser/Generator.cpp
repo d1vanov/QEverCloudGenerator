@@ -1231,7 +1231,7 @@ void generateTypes(Parser * parser, const QString & outPath)
             if (!s.fields.isEmpty())
             {
                 bout << s.name << QStringLiteral("::") << s.name << QStringLiteral("(const ") << s.name
-                    << QStringLiteral("& other)") << endl;
+                    << QStringLiteral("& other) : EvernoteException(other)") << endl;
                 bout << "{" << endl;
                 for(const Parser::Field & f : s.fields) {
                     bout << QStringLiteral("   ") << f.name << QStringLiteral(" = other.") << f.name << QStringLiteral(";") << endl;

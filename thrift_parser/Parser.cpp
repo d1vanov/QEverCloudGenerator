@@ -20,54 +20,49 @@ Parser::~Parser()
     ParseFree(parser, std::free);
 }
 
-namespace {
-    QMap<QString, int> delims;
-    QMap<QString, int> reserved;
-}
-
 void Parser::feed(Lexer::TerminalSymbolType type, QString value)
 {
-    if(delims.isEmpty()) {
-        delims["("] = TERM_PAREN_OPEN;
-        delims[")"] = TERM_PAREN_CLOSE;
-        delims[":"] = TERM_COLON;
-        delims["="] = TERM_EQ;
-        delims["{"] = TERM_CURLY_OPEN;
-        delims["}"] = TERM_CURLY_CLOSE;
-        delims[","] = TERM_LISTSEP;
-        delims[";"] = TERM_LISTSEP;
-        delims["<"] = TERM_LT;
-        delims[">"] = TERM_GT;
-        delims["["] = TERM_BRACKET_OPEN;
-        delims["]"] = TERM_BRACKET_CLOSE;
+    if(delims_.isEmpty()) {
+        delims_["("] = TERM_PAREN_OPEN;
+        delims_[")"] = TERM_PAREN_CLOSE;
+        delims_[":"] = TERM_COLON;
+        delims_["="] = TERM_EQ;
+        delims_["{"] = TERM_CURLY_OPEN;
+        delims_["}"] = TERM_CURLY_CLOSE;
+        delims_[","] = TERM_LISTSEP;
+        delims_[";"] = TERM_LISTSEP;
+        delims_["<"] = TERM_LT;
+        delims_[">"] = TERM_GT;
+        delims_["["] = TERM_BRACKET_OPEN;
+        delims_["]"] = TERM_BRACKET_CLOSE;
 
-        reserved["include"] = TERM_INCLUDE;
-        reserved["cpp_include"] = TERM_CPP_INCLUDE;
-        reserved["namespace"] = TERM_NAMESPACE;
-        reserved["const"] = TERM_CONST;
-        reserved["typedef"] = TERM_TYPEDEF;
-        reserved["enum"] = TERM_ENUM;
-        reserved["struct"] = TERM_STRUCT;
-        reserved["union"] = TERM_UNION;
-        reserved["exception"] = TERM_EXCEPTION;
-        reserved["service"] = TERM_SERVICE;
-        reserved["extends"] = TERM_EXTENDS;
-        reserved["required"] = TERM_REQUIRED;
-        reserved["optional"] = TERM_OPTIONAL;
-        reserved["oneway"] = TERM_ONEWAY;
-        reserved["void"] = TERM_VOID;
-        reserved["throws"] = TERM_THROWS;
-        reserved["bool"] = TERM_BOOL;
-        reserved["byte"] = TERM_BYTE;
-        reserved["i16"] = TERM_I16;
-        reserved["i32"] = TERM_I32;
-        reserved["i64"] = TERM_I64;
-        reserved["double"] = TERM_DOUBLE;
-        reserved["string"] = TERM_STRING;
-        reserved["binary"] = TERM_BINARY;
-        reserved["map"] = TERM_MAP;
-        reserved["set"] = TERM_SET;
-        reserved["list"] = TERM_LIST;
+        reserved_["include"] = TERM_INCLUDE;
+        reserved_["cpp_include"] = TERM_CPP_INCLUDE;
+        reserved_["namespace"] = TERM_NAMESPACE;
+        reserved_["const"] = TERM_CONST;
+        reserved_["typedef"] = TERM_TYPEDEF;
+        reserved_["enum"] = TERM_ENUM;
+        reserved_["struct"] = TERM_STRUCT;
+        reserved_["union"] = TERM_UNION;
+        reserved_["exception"] = TERM_EXCEPTION;
+        reserved_["service"] = TERM_SERVICE;
+        reserved_["extends"] = TERM_EXTENDS;
+        reserved_["required"] = TERM_REQUIRED;
+        reserved_["optional"] = TERM_OPTIONAL;
+        reserved_["oneway"] = TERM_ONEWAY;
+        reserved_["void"] = TERM_VOID;
+        reserved_["throws"] = TERM_THROWS;
+        reserved_["bool"] = TERM_BOOL;
+        reserved_["byte"] = TERM_BYTE;
+        reserved_["i16"] = TERM_I16;
+        reserved_["i32"] = TERM_I32;
+        reserved_["i64"] = TERM_I64;
+        reserved_["double"] = TERM_DOUBLE;
+        reserved_["string"] = TERM_STRING;
+        reserved_["binary"] = TERM_BINARY;
+        reserved_["map"] = TERM_MAP;
+        reserved_["set"] = TERM_SET;
+        reserved_["list"] = TERM_LIST;
     }
 
     int yymajor = 0;
@@ -78,8 +73,8 @@ void Parser::feed(Lexer::TerminalSymbolType type, QString value)
         sendValue = true;
         break;
     case Lexer::TerminalSymbolType::Identifier:
-        if(reserved.contains(value)) {
-            yymajor = reserved.value(value);
+        if(reserved_.contains(value)) {
+            yymajor = reserved_.value(value);
         } else {
             yymajor = TERM_IDENTIFIER;
             sendValue = true;
@@ -98,8 +93,8 @@ void Parser::feed(Lexer::TerminalSymbolType type, QString value)
         sendValue = true;
         break;
     case Lexer::TerminalSymbolType::Delimiter:
-        if(delims.contains(value)) {
-            yymajor = delims.value(value);
+        if(delims_.contains(value)) {
+            yymajor = delims_.value(value);
         } else {
             throw std::runtime_error("Incorrect delimeter from lexer");
         }

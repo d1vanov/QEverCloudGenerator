@@ -211,7 +211,8 @@ private:
     QList<Service> services_;
     QList<Constant> constants_;
     QList<Structure> unions_;
-
+    QMap<QString, int> delims_;
+    QMap<QString, int> reserved_;
 };
 
 inline Parser::Type::~Type() {}

@@ -15,7 +15,7 @@ static const char * disclaimer = "/**\n"
                                  " * This file was generated from Evernote Thrift API\n"
                                  " */\n";
 
-QString generatedHeaderOutputPath(const QString & outPath)
+QString Generator::generatedHeaderOutputPath(const QString & outPath)
 {
     QString headerOutPath = outPath + QStringLiteral("/headers/generated");
 
@@ -31,7 +31,7 @@ QString generatedHeaderOutputPath(const QString & outPath)
     return headerOutPath;
 }
 
-QString generatedSourceOutputPath(const QString & outPath)
+QString Generator::generatedSourceOutputPath(const QString & outPath)
 {
     QString sourceOutPath = outPath + QStringLiteral("/src/generated");
 
@@ -47,18 +47,9 @@ QString generatedSourceOutputPath(const QString & outPath)
     return sourceOutPath;
 }
 
-namespace {
-    QStringList includeList;
-    QMap<QString, QString> typedefMap;
-    QStringList baseTypes;
-    QSet<QString> allstructs;
-    QSet<QString> allexceptions;
-    QSet<QString> allenums;
-}
-
-QString clearInclude(QString s)
+QString Generator::clearInclude(QString s)
 {
-    for(auto it = includeList.constBegin(), end = includeList.constEnd(); it != end; ++it)
+    for(auto it = includeList_.constBegin(), end = includeList_.constEnd(); it != end; ++it)
     {
         const QString & inc = *it;
         if (s.startsWith(inc)) {
@@ -69,18 +60,18 @@ QString clearInclude(QString s)
     return s;
 }
 
-QString clearTypedef(QString s)
+QString Generator::clearTypedef(QString s)
 {
-    if (typedefMap.contains(s)) {
-        return typedefMap.value(s);
+    if (typedefMap_.contains(s)) {
+        return typedefMap_.value(s);
     }
 
     return s;
 }
 
-void writeHeaderHeader(QTextStream & out, QString fileName,
-                       QStringList additionalPreIncludes = QStringList(),
-                       QStringList additionalPostIncludes = QStringList())
+void Generator::writeHeaderHeader(QTextStream & out, QString fileName,
+                                  QStringList additionalPreIncludes,
+                                  QStringList additionalPostIncludes)
 {
     out << disclaimer << endl;
     out << endl;
@@ -141,7 +132,7 @@ void writeHeaderHeader(QTextStream & out, QString fileName,
     out << endl;
 }
 
-void writeHeaderFooter(QTextStream & out, QString fileName, QStringList extraContent = QStringList())
+void Generator::writeHeaderFooter(QTextStream & out, QString fileName, QStringList extraContent)
 {
     out << "} // namespace qevercloud" << endl;
 
@@ -158,7 +149,7 @@ void writeHeaderFooter(QTextStream & out, QString fileName, QStringList extraCon
     out << "#endif // " << guard << endl;
 }
 
-void writeBodyHeader(QTextStream& out, QString headerFileName, QStringList moreIncludes = QStringList())
+void Generator::writeHeaderBody(QTextStream& out, QString headerFileName, QStringList moreIncludes)
 {
     out << disclaimer << endl;
     out << endl;
@@ -181,14 +172,13 @@ void writeBodyHeader(QTextStream& out, QString headerFileName, QStringList moreI
     out << endl;
 }
 
-void writeBodyFooter(QTextStream & out)
+void Generator::writeBodyFooter(QTextStream & out)
 {
     out << endl;
     out << "} // namespace qevercloud" << endl;
 }
 
-enum class MethodType {TypeName, WriteMethod, ReadMethod, ThriftFieldType, ReadTypeName, FuncParamType};
-QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodType methodType = MethodType::TypeName)
+QString Generator::typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodType methodType)
 {
     QSharedPointer<Parser::BaseType>        basetype        = type.dynamicCast<Parser::BaseType>();
     QSharedPointer<Parser::VoidType>        voidtype        = type.dynamicCast<Parser::VoidType>();
@@ -413,7 +403,7 @@ QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodT
         QString nameOfType = clearInclude(identifiertype->identifier);
         if (methodType == MethodType::FuncParamType)
         {
-            if (allenums.contains(nameOfType))
+            if (allenums_.contains(nameOfType))
             {
                 result = justTypeName;
             }
@@ -431,14 +421,14 @@ QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodT
         else if (methodType == MethodType::TypeName)
         {
             result = nameOfType;
-            if (allenums.contains(result)) {
+            if (allenums_.contains(result)) {
                 result = result + "::type";
             }
         }
         else if(methodType == MethodType::ReadTypeName)
         {
             result = nameOfType == "Timestamp" ? "qint64" : nameOfType;
-            if (allenums.contains(result)) {
+            if (allenums_.contains(result)) {
                 result = result + "::type";
             }
         }
@@ -447,7 +437,7 @@ QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodT
             QString nameOfType2 = clearTypedef(nameOfType);
             if (nameOfType2 != nameOfType)
             {
-                if (!baseTypes.contains(nameOfType2)) {
+                if (!baseTypes_.contains(nameOfType2)) {
                     throw std::runtime_error("typedefs are supported for base types only");
                 }
 
@@ -457,7 +447,7 @@ QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodT
             }
             else
             {
-                if (allstructs.contains(nameOfType) || allexceptions.contains(nameOfType))
+                if (allstructs_.contains(nameOfType) || allexceptions_.contains(nameOfType))
                 {
                     switch(methodType)
                     {
@@ -474,7 +464,7 @@ QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodT
                         result = "";
                     }
                 }
-                else if (allenums.contains(nameOfType))
+                else if (allenums_.contains(nameOfType))
                 {
                     switch(methodType)
                     {
@@ -587,7 +577,7 @@ QString typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodT
     return result;
 }
 
-QString valueToStr(QSharedPointer<Parser::ConstValue> value, QSharedPointer<Parser::Type> type, QString identifier)
+QString Generator::valueToStr(QSharedPointer<Parser::ConstValue> value, QSharedPointer<Parser::Type> type, QString identifier)
 {
     if (value.isNull()) {
         return QString();
@@ -629,7 +619,7 @@ QString valueToStr(QSharedPointer<Parser::ConstValue> value, QSharedPointer<Pars
     return result;
 }
 
-void generateConstants(Parser * parser, const QString & outPath)
+void Generator::generateConstants(Parser * parser, const QString & outPath)
 {
     const QString headerOutPath = generatedHeaderOutputPath(outPath);
     const QString headerFileName = "constants.h";
@@ -684,7 +674,7 @@ void generateConstants(Parser * parser, const QString & outPath)
     QTextStream bout(&bodyFile);
     bout.setCodec("UTF-8");
 
-    writeBodyHeader(bout, headerFileName);
+    writeHeaderBody(bout, headerFileName);
 
     file = "";
     for(auto it = constants.constBegin(), end = constants.constEnd(); it != end; ++it)
@@ -707,7 +697,7 @@ void generateConstants(Parser * parser, const QString & outPath)
     writeBodyFooter(bout);
 }
 
-QString fieldToStr(const Parser::Field & field)
+QString Generator::fieldToStr(const Parser::Field & field)
 {
    QString s = typeToStr(field.type, field.name);
    if (field.required == Parser::Field::RequiredFlag::Optional) {
@@ -722,7 +712,7 @@ QString fieldToStr(const Parser::Field & field)
    return s;
 }
 
-QString getIdentifier(const QSharedPointer<Parser::Type> & type)
+QString Generator::getIdentifier(const QSharedPointer<Parser::Type> & type)
 {
     auto it = type.dynamicCast<Parser::IdentifierType>();
     return (it
@@ -730,7 +720,7 @@ QString getIdentifier(const QSharedPointer<Parser::Type> & type)
             : QString());
 }
 
-void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString identPrefix, QString fieldPrefix)
+void Generator::writeThriftWriteFields(QTextStream & out, const QList<Parser::Field> & fields, QString identPrefix, QString fieldPrefix)
 {
     for(auto it = fields.constBegin(), end = fields.constEnd(); it != end; ++it)
     {
@@ -808,7 +798,7 @@ void writeFields(QTextStream & out, const QList<Parser::Field> & fields, QString
     }
 }
 
-void readField(QTextStream & out, const Parser::Field & field, QString identPrefix, QString fieldParent)
+void Generator::writeThriftReadField(QTextStream & out, const Parser::Field & field, QString identPrefix, QString fieldParent)
 {
     const char * indent = "                ";
     out << indent << typeToStr(field.type, identPrefix + field.name, MethodType::ReadTypeName) << " v;" << endl;
@@ -882,7 +872,7 @@ void readField(QTextStream & out, const Parser::Field & field, QString identPref
     out << indent << fieldParent << field.name << " = v;" << endl;
 }
 
-void generateTypes(Parser * parser, const QString & outPath)
+void Generator::generateTypes(Parser * parser, const QString & outPath)
 {
     const QString headerOutPath = generatedHeaderOutputPath(outPath);
     const QString headerFileName = "types.h";
@@ -1027,12 +1017,12 @@ void generateTypes(Parser * parser, const QString & outPath)
                     }
                 }
 
-                if (!typeName.isEmpty() && (allstructs.contains(typeName) || allexceptions.contains(typeName)) && !safe.contains(typeName)) {
+                if (!typeName.isEmpty() && (allstructs_.contains(typeName) || allexceptions_.contains(typeName)) && !safe.contains(typeName)) {
                     safeStruct = false;
                     break;
                 }
 
-                if (!typeName2.isEmpty() && (allstructs.contains(typeName2) || allexceptions.contains(typeName2)) && !safe.contains(typeName2)) {
+                if (!typeName2.isEmpty() && (allstructs_.contains(typeName2) || allexceptions_.contains(typeName2)) && !safe.contains(typeName2)) {
                     safeStruct = false;
                     break;
                 }
@@ -1195,7 +1185,7 @@ void generateTypes(Parser * parser, const QString & outPath)
     QTextStream bout(&bodyFile);
     bout.setCodec("UTF-8");
 
-    writeBodyHeader(bout, headerFileName, QStringList() << "../impl.h" << "types_impl.h");
+    writeHeaderBody(bout, headerFileName, QStringList() << "../impl.h" << "types_impl.h");
 
     bout << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
 
@@ -1242,7 +1232,7 @@ void generateTypes(Parser * parser, const QString & outPath)
 
         bout << "void write" << s.name << "(ThriftBinaryBufferWriter & w, const " << s.name << " & s) {" << endl;
         bout << "    w.writeStructBegin(\"" << s.name  << "\");" << endl;
-        writeFields(bout, s.fields, s.name, "s.");
+        writeThriftWriteFields(bout, s.fields, s.name, "s.");
         bout << "    w.writeFieldStop();" << endl;
         bout << "    w.writeStructEnd();" << endl;
         bout << "}" << endl << endl;
@@ -1276,7 +1266,7 @@ void generateTypes(Parser * parser, const QString & outPath)
                 bout << "                " << field.name << "_isset = true;" << endl;
             }
 
-            readField(bout, field, s.name + ".", "s.");
+            writeThriftReadField(bout, field, s.name + ".", "s.");
             bout << "            } else {" << endl;
             bout << "                r.skip(fieldType);" << endl;
             bout << "            }" << endl;
@@ -1309,7 +1299,7 @@ void generateTypes(Parser * parser, const QString & outPath)
     writeBodyFooter(bout);
 }
 
-void generateServices(Parser * parser, const QString & outPath)
+void Generator::generateServices(Parser * parser, const QString & outPath)
 {
     // Generate header
 
@@ -1344,6 +1334,7 @@ void generateServices(Parser * parser, const QString & outPath)
         }
 
         hout << "class QEVERCLOUD_EXPORT " << s.name << ": public QObject" << endl << "{" << endl;
+        hout << "    Q_OBJECT" << endl;
         hout << "    Q_DISABLE_COPY(" << s.name << ")"<< endl;
         hout << "public:" << endl;
 
@@ -1461,7 +1452,7 @@ void generateServices(Parser * parser, const QString & outPath)
     QTextStream bout(&bodyFile);
     bout.setCodec("UTF-8");
 
-    writeBodyHeader(bout, headerFileName, QStringList() << "../impl.h" << "types_impl.h");
+    writeHeaderBody(bout, headerFileName, QStringList() << "../impl.h" << "types_impl.h");
 
     for(auto it = services.constBegin(), end = services.constEnd(); it != end; ++it)
     {
@@ -1489,7 +1480,7 @@ void generateServices(Parser * parser, const QString & outPath)
             bout << "    qint32 cseqid = 0;" << endl;
             bout << "    w.writeMessageBegin(\"" << func.name << "\", ThriftMessageType::T_CALL, cseqid);" << endl;
             bout << "    w.writeStructBegin(\"" << s.name << "_" << func.name << "_pargs" << "\");" << endl;
-            writeFields(bout, func.params, func.name, "");
+            writeThriftWriteFields(bout, func.params, func.name, "");
             bout << "    w.writeFieldStop();" << endl;
             bout << "    w.writeStructEnd();" << endl;
             bout << "    w.writeMessageEnd();" << endl;
@@ -1543,7 +1534,7 @@ void generateServices(Parser * parser, const QString & outPath)
                 bout << "        if(fieldId == 0) {" << endl;
                 bout << "            if(fieldType == " << typeToStr(func.type, func.name, MethodType::ThriftFieldType) << ") {" << endl;
                 bout << "                resultIsSet = true;" << endl;
-                readField(bout, result, func.name + ".", "");
+                writeThriftReadField(bout, result, func.name + ".", "");
                 bout << "            } else {" << endl;
                 bout << "                r.skip(fieldType);" << endl;
                 bout << "            }" << endl;
@@ -1692,27 +1683,27 @@ void generateServices(Parser * parser, const QString & outPath)
     writeBodyFooter(bout);
 }
 
-void generateSources(Parser * parser, QString outPath)
+void Generator::generateSources(Parser * parser, QString outPath)
 {
     if (parser->unions().count() > 0) {
         throw std::runtime_error("unions are not suported.");
     }
 
-    baseTypes << "bool" << "byte" << "i16" << "i32" << "i64" << "double" << "string" << "binary";
+    baseTypes_ << "bool" << "byte" << "i16" << "i32" << "i64" << "double" << "string" << "binary";
 
     QList<Parser::Structure> structures = parser->structures();
     for(auto it = structures.constBegin(), end = structures.constEnd(); it != end; ++it) {
-        allstructs << it->name;
+        allstructs_ << it->name;
     }
 
     QList<Parser::Structure> exceptions = parser->exceptions();
     for(auto it = exceptions.constBegin(), end = exceptions.constEnd(); it != end; ++it) {
-        allexceptions << it->name;
+        allexceptions_ << it->name;
     }
 
     QList<Parser::Enumeration> enumerations = parser->enumerations();
     for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it) {
-        allenums << it->name;
+        allenums_ << it->name;
     }
 
     QList<Parser::Include> includes = parser->includes();
@@ -1720,7 +1711,7 @@ void generateSources(Parser * parser, QString outPath)
         QString s = it->name;
         s.replace(QChar('\"'), QString(""));
         s.chop(QString("thrift").length());
-        includeList << s;
+        includeList_ << s;
     }
 
     QList<Parser::TypeDefinition> typedefs = parser->typedefs();
@@ -1728,7 +1719,7 @@ void generateSources(Parser * parser, QString outPath)
     {
         auto casted = it->type.dynamicCast<Parser::BaseType>();
         if (!casted.isNull()) {
-            typedefMap[it->name] = casted->basetype;
+            typedefMap_[it->name] = casted->basetype;
         }
     }
 

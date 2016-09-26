@@ -59,7 +59,8 @@ int main(int argc, char *argv[])
             throw std::runtime_error(QString("Parser error at completion: %1").arg(parser->errorMessage()).toStdString());
         }
 
-        generateSources(parser, generatedDir);
+        Generator generator;
+        generator.generateSources(parser, generatedDir);
     }
     catch(const std::exception & e)
     {

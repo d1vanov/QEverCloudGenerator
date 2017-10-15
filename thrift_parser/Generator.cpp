@@ -697,7 +697,7 @@ void Generator::generateConstants(Parser * parser, const QString & outPath)
             throw std::runtime_error(QString("Constant without a value: %1").arg(c.name).toStdString());
         }
 
-        bout << "QEVERCLOUD_EXPORT const " << typeToStr(c.type, c.name) << " "
+        bout << "const " << typeToStr(c.type, c.name) << " "
              << c.name << " = " << valueToStr(c.value, c.type, c.name) << ";" << endl;
     }
 

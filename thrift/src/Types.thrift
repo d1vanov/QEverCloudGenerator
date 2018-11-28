@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2016 Evernote Corporation. All rights reserved.
+ * Copyright 2007-2018 Evernote Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,6 +41,7 @@ namespace rb Evernote.EDAM.Type
 namespace php EDAM.Types
 namespace cocoa EDAM
 namespace perl EDAMTypes
+namespace go edam
 
 
 // =============================== typedefs ====================================
@@ -126,12 +127,15 @@ enum PrivilegeLevel {
 }
 
 /**
- * This enumeration defines the possible tiers of service that a user may have.
+ * This enumeration defines the possible tiers of service that a user may have. A
+ * ServiceLevel of BUSINESS signifies a business-only account, which can never be any
+ * other ServiceLevel.
  */
 enum ServiceLevel {
   BASIC = 1,
   PLUS = 2,
-  PREMIUM = 3
+  PREMIUM = 3,
+  BUSINESS = 4
 }
 
 /**
@@ -168,9 +172,8 @@ enum NoteSortOrder {
  * ACTIVE:  the user has been charged and their premium account is in good
  *  standing
  *
- * FAILED:  the system attempted to charge the was denied. Their premium
- *   privileges have been revoked. We will periodically attempt to re-validate
- *   their order.
+ * FAILED:  the system attempted to charge the was denied. We will periodically attempt to
+ *  re-validate their order.
  *
  * CANCELLATION_PENDING: the user has requested that no further charges be made
  *   but the current account is still active.
@@ -279,6 +282,24 @@ enum BusinessUserRole {
 }
 
 /**
+ * The BusinessUserStatus indicates the status of the user in the business.
+ *
+ * A BusinessUser will typically start as ACTIVE.
+ * Only ACTIVE users can authenticate to the Business.
+ *
+ * <dl>
+ * <dt>ACTIVE<dt>
+ * <dd>The business user can authenticate to and access the business.</dd>
+ * <dt>DEACTIVATED<dt>
+ * <dd>The business user has been deactivated and cannot access the business</dd>
+ * </dl>
+ */
+enum BusinessUserStatus {
+  ACTIVE = 1,
+  DEACTIVATED = 2,
+}
+
+/**
  * An enumeration describing restrictions on the domain of shared notebook
  * instances that are valid for a given operation, as used, for example, in
  * NotebookRestrictions.
@@ -345,6 +366,15 @@ enum ContactType {
   EMAIL = 4,
   TWITTER = 5,
   LINKEDIN = 6,
+}
+
+/**
+ * Entity types
+ */
+enum EntityType {
+  NOTE = 1,
+  NOTEBOOK = 2,
+  WORKSPACE = 3
 }
 
 
@@ -616,9 +646,15 @@ struct Data {
  *       changed their passwords since the addition of this field.
  *   </dd>
  *
- * <dt>shouldLogClientEvent/dt>
- *   </dd>If set to True, the server will record LogRequest send from clients of this
+ * <dt>shouldLogClientEvent</dt>
+ *   <dd>If set to True, the server will record LogRequest send from clients of this
  *        user as ClientEventLog.
+ *   </dd>
+ *
+ * <dt>optOutMachineLearning</dt>
+ *   <dd>If set to True, no Machine Learning nor human review will be done to this
+ *        user's note contents.
+ *   </dd>
  *   </dl>
  */
 struct UserAttributes {
@@ -655,7 +691,8 @@ struct UserAttributes {
   35: optional  Timestamp emailAddressLastConfirmed,
   36: optional  Timestamp passwordUpdated,
   37: optional  bool salesforcePushEnabled,
-  38: optional  bool shouldLogClientEvent
+  38: optional  bool shouldLogClientEvent,
+  39: optional  bool optOutMachineLearning
 }
 
 /**
@@ -1384,7 +1421,7 @@ struct ResourceAttributes {
  *   </dd>
  *
  * <dt>active</dt>
- *   <dd>DEPRECATED: ignored.
+ *   <dd>If the resource is active or not.
  *   </dd>
  *
  * <dt>recognition</dt>
@@ -2142,6 +2179,26 @@ struct SharedNotebookRecipientSettings {
 }
 
 /**
+ * This enumeration defines the possible states that a notebook can be in for a recipient.
+ * It encompasses the "inMyList" boolean and default notebook status.
+ *
+ * <dl>
+ * <dt>NOT_IN_MY_LIST</dt>
+ * <dd>The notebook is not in the recipient's list (not "joined").</dd>
+ * <dt>IN_MY_LIST</dt>
+ * <dd>The notebook is in the recipient's notebook list (formerly, we would say
+ *     that the recipient has "joined" the notebook)</dd>
+ * <dt>IN_MY_LIST_AND_DEFAULT_NOTEBOOK</dt>
+ * <dd>The same as IN_MY_LIST and this notebook is the user's default notebook.</dd>
+ * </dl>
+ */
+enum RecipientStatus {
+  NOT_IN_MY_LIST = 1,
+  IN_MY_LIST = 2,
+  IN_MY_LIST_AND_DEFAULT_NOTEBOOK = 3,
+}
+
+/**
  * Settings meant for the recipient of a notebook share.
  *
  * Some of these fields have a 3-state read value but a 2-state write value.
@@ -2164,8 +2221,13 @@ struct SharedNotebookRecipientSettings {
  *     by the individual applications. This value will initially be unset.</dd>
  * </dl>
  * <dt>inMyList</dt>
- * <dd>The notebook is on the recipient's notebook list (formerly, we would say
+ * <dd>DEPRECATED: Use recipientStatus instead.
+ *     The notebook is on the recipient's notebook list (formerly, we would say
  *     that the recipient has "joined" the notebook)</dd>
+ * <dt>recipientStatus</dt>
+ * <dd>The notebook is on/off the recipient's notebook list (formerly, we would say
+ *     that the recipient has "joined" the notebook) and perhaps also their
+ *     default notebook</dd>
  * <dt>stack</dt>
  * <dd>The stack the recipient has put this notebook into. See Notebook.stack
  * for a definition. Every recipient can have their own stack value for the same
@@ -2176,7 +2238,8 @@ struct NotebookRecipientSettings {
  1:  optional bool reminderNotifyEmail,
  2:  optional bool reminderNotifyInApp,
  3:  optional bool inMyList,
- 4:  optional string stack
+ 4:  optional string stack,
+ 5:  optional RecipientStatus recipientStatus,
 }
 
 /**
@@ -2298,6 +2361,37 @@ struct SharedNotebook {
 }
 
 /**
+ * This enumeration defines the possible types of canMoveToContainer outcomes.
+ * <p />
+ * An outdated client is expected to signal a "Cannot Move, Please Upgrade To Learn Why"
+ * like response to the user if an unknown enumeration value is received.
+ * <dl>
+ * <dt>CAN_BE_MOVED</dt>
+ * <dd>Can move Notebook to Workspace.</dd>
+ * <dt>INSUFFICIENT_ENTITY_PRIVILEGE</dt>
+ * <dd>Can not move Notebook to Workspace, because either:
+ *  a) Notebook not in Workspace and insufficient privilege on Notebook
+ *  or b) Notebook in Workspace and membership on Workspace with insufficient privilege
+ *  for move</dd>
+ * <dt>INSUFFICIENT_CONTAINER_PRIVILEGE</dt>
+ * <dd>Notebook in Workspace and no membership on Workspace.
+ * </dd>
+ * </dl>
+ */
+enum CanMoveToContainerStatus {
+  CAN_BE_MOVED = 1,
+  INSUFFICIENT_ENTITY_PRIVILEGE = 2,
+  INSUFFICIENT_CONTAINER_PRIVILEGE = 3
+}
+
+/**
+ * Specifies if the client can move a Notebook to a Workspace.
+ */
+struct CanMoveToContainerRestrictions {
+  1:  optional CanMoveToContainerStatus canMoveToContainer
+}
+
+/**
  * This structure captures information about the types of operations
  * that cannot be performed on a given notebook with a type of
  * authenticated access and credentials.  The values filled into this
@@ -2341,8 +2435,9 @@ struct SharedNotebook {
  *   shareNote or createOrUpdateSharedNotes methods.
  *   </dd>
  * <dt>noEmailNotes</dt>
- *   <dd>The client may not e-mail notes via the Evernote service by
- *   using the emailNote method.
+ *   <dd>The client may not e-mail notes by guid via the Evernote
+ *   service by using the emailNote method.  Email notes by value
+ *   by populating the note parameter instead.
  *   </dd>
  * <dt>noSendMessageToRecipients</dt>
  *   <dd>The client may not send messages to the share recipients of
@@ -2405,8 +2500,18 @@ struct SharedNotebook {
  *   method.
  *   </dd>
  * <dt>noRenameNotebook</dt>
- *   <dd>The client may not rename this notebook</dd>
- *
+ *   <dd>The client may not rename this notebook.</dd>
+ * <dt>noSetInMyList</dt>
+ *   <dd>clients may not change the NotebookRecipientSettings.inMyList settings for
+ *   this notebook.</dd>
+ * <dt>noSetContact</dt>
+ *   <dd>The contact for this notebook may not be changed.</dd>
+ * </dl>
+ * <dt>canMoveToContainerRestrictions</dt>
+ *   <dd>Specifies if the client can move this notebook to a container and if not,
+ *   the reason why.</dd>
+ * <dt>noCanMoveNote</dt>
+ *   <dd>If set, the client cannot move a Note into or out of the Notebook.</dd>
  * </dl>
  */
 struct NotebookRestrictions {
@@ -2431,7 +2536,14 @@ struct NotebookRestrictions {
   19: optional SharedNotebookInstanceRestrictions updateWhichSharedNotebookRestrictions,
   20: optional SharedNotebookInstanceRestrictions expungeWhichSharedNotebookRestrictions,
   21: optional bool noShareNotesWithBusiness,
-  22: optional bool noRenameNotebook
+  22: optional bool noRenameNotebook,
+  23: optional bool noSetInMyList,
+  24: optional bool noChangeContact,
+  26: optional CanMoveToContainerRestrictions canMoveToContainerRestrictions,
+  27: optional bool noSetReminderNotifyEmail,
+  28: optional bool noSetReminderNotifyInApp,
+  29: optional bool noSetRecipientSettingsStack,
+  30: optional bool noCanMoveNote
 }
 
 /**
@@ -2710,7 +2822,7 @@ struct NotebookDescriptor {
  *
  * <dt>email</dt>
  * <dd>The user's business email address. If the user has not registered their business
- *   email address, this field will contain the user's personal email address.
+ *   email address, this field will be empty.
  * </dd>
  *
  * <dt>username</dt>
@@ -2731,6 +2843,9 @@ struct NotebookDescriptor {
  * <dt>role</dt>
  * <dd>The BusinessUserRole for the user</dd>
  *
+ * <dt>status</dt>
+ * <dd>The BusinessUserStatus for the user</dd>
+ *
  * </dl>
  */
 struct UserProfile {
@@ -2742,7 +2857,8 @@ struct UserProfile {
   6: optional Timestamp joined
   7: optional Timestamp photoLastUpdated,
   8: optional string photoUrl,
-  9: optional BusinessUserRole role
+  9: optional BusinessUserRole role,
+  10: optional BusinessUserStatus status
 }
 
 /**
@@ -2776,7 +2892,7 @@ enum RelatedContentType {
  * DIRECT_LINK_EMBEDDED_VIEW: The content is accessible directly, and should be shown in
  *     an embedded web view.
  *     If the URL refers to a secured location under our control (for example,
- *     https://www.evernote.com/<smth>), the client may include user-specific authentication
+ *     https://www.evernote.com/*), the client may include user-specific authentication
  *     credentials with the request.
  */
 enum RelatedContentAccess {
@@ -2934,6 +3050,10 @@ struct RelatedContent {
  *     <dd>
  *       The timestamp at which this invitation was created.
  *     </dd>
+ *   <dt>mostRecentReminder</dt>
+ *     <dd>
+ *       The timestamp at which the most recent reminder was sent.
+ *     </dd>
  * </dl>
  */
 struct BusinessInvitation {
@@ -2943,7 +3063,8 @@ struct BusinessInvitation {
   4: optional BusinessInvitationStatus status,
   5: optional UserID requesterId,
   6: optional bool fromWorkChat,
-  7: optional Timestamp created
+  7: optional Timestamp created,
+  8: optional Timestamp mostRecentReminder
 }
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2016 Evernote Corporation. All rights reserved.
+ * Copyright 2007-2018 Evernote Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@ namespace cpp evernote.edam
 namespace rb Evernote.EDAM.Error
 namespace php EDAM.Error
 namespace perl EDAMErrors
+namespace go edam
 
 /**
  * Numeric codes indicating the type of error that occurred on the
@@ -93,7 +94,29 @@ namespace perl EDAMErrors
  *   <dt>DEVICE_LIMIT_REACHED</dt>
  *     <dd>Operation denied because the user has exceeded their maximum allowed
  *        number of devices.</dd>
- * </dl>
+ *   <dt>OPENID_ALREADY_TAKEN</dt>
+ *     <dd>Operation failed because the Open ID is already associated with another user.</dd>
+ *   <dt>INVALID_OPENID_TOKEN</dt>
+ *     <dd>Operation denied because the Open ID token is invalid. Please re-issue a valid
+ *        token.</dd>
+ *	 <dt>USER_NOT_REGISTERED</dt>
+ *     <dd>There is no Evernote user associated with this OpenID account,
+ *     	   and no Evernote user with a matching email</dd>
+ *	 <dt>USER_NOT_ASSOCIATED</dt>
+ *     <dd>There is no Evernote user associated with this OpenID account,
+ *		   but Evernote user with matching email exists</dd>
+ *	 <dt>USER_ALREADY_ASSOCIATED</dt>
+ * 	   <dd>Evernote user is already associated with this provider
+ *		   using a different email address.</dd>
+ *	 <dt>ACCOUNT_CLEAR</dt>
+ *     <dd>The user's account has been disabled. Clients should deal with this errorCode
+ *       by logging the user out and purging all locally saved content, including local
+ *       edits not yet pushed to the server.</dd>
+ *	 <dt>SSO_AUTHENTICATION_REQUIRED</dt>
+  *     <dd>SSO authentication is the only type of authentication allowed for the user's
+  *     account. This error is thrown when the user attempts to authenticate by another
+   *     method (password, OpenId, etc).</dd>
+  * </dl>
  */
 enum EDAMErrorCode {
   UNKNOWN = 1,
@@ -117,6 +140,13 @@ enum EDAMErrorCode {
   RATE_LIMIT_REACHED = 19,
   BUSINESS_SECURITY_LOGIN_REQUIRED = 20,
   DEVICE_LIMIT_REACHED = 21,
+  OPENID_ALREADY_TAKEN = 22,
+  INVALID_OPENID_TOKEN = 23,
+  USER_NOT_ASSOCIATED = 24,
+  USER_NOT_REGISTERED = 25,
+  USER_ALREADY_ASSOCIATED = 26,
+  ACCOUNT_CLEAR = 27,
+  SSO_AUTHENTICATION_REQUIRED = 28
 }
 
 
@@ -175,7 +205,8 @@ enum EDAMInvalidContactReason {
  *   must be one of the values of EDAMErrorCode.
  *
  * parameter:  If the error applied to a particular input parameter, this will
- *   indicate which parameter.
+ *   indicate which parameter. For some errors (USER_NOT_ASSOCIATED, USER_NOT_REGISTERED,
+ *   SSO_AUTHENTICATION_REQUIRED), this is the user's email.
  */
 exception EDAMUserException {
   1:  required  EDAMErrorCode errorCode,

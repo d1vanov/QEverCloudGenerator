@@ -34,6 +34,9 @@ list(APPEND IDL_COMPILED_FILES "${CMAKE_CURRENT_BINARY_DIR}/thrift_lemon.cpp")
 
 set_source_files_properties(${IDL_COMPILED_FILES} PROPERTIES GENERATED TRUE)
 
+set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/thrift_lemon.h" PROPERTY SKIP_AUTOMOC ON)
+set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/thrift_lemon.cpp" PROPERTY SKIP_AUTOMOC ON)
+
 add_executable(QEverCloudGenerator ${HEADERS} ${SOURCES} ${IDL_COMPILED_FILES})
 target_link_libraries(QEverCloudGenerator ${QT_LIBRARIES})
 

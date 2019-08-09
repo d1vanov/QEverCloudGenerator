@@ -366,7 +366,7 @@ throws(A)  ::=  THROWS PAREN_OPEN fieldlist(B) PAREN_CLOSE.
 %destructor fieldtype {delete $$; }
 fieldtype(A)    ::=  IDENTIFIER(B).
 {
-  Identifier_Fieldtype* p = new Identifier_Fieldtype();
+  IdentifierFieldType* p = new IdentifierFieldType();
   p->identifier = *B;
   A = p;
   delete B;
@@ -377,18 +377,18 @@ fieldtype(A)    ::=  definitiontype(B) .
 }
 
 
-%type definitiontype {Definitiontype*}
+%type definitiontype {DefinitionType*}
 %destructor definitiontype {delete $$; }
 definitiontype(A)  ::=  basetype(B) .
 {
-  Basename_Definitiontype* p = new Basename_Definitiontype();
+  BasenameDefinitiontype* p = new BasenameDefinitiontype();
   p->basetype = *B;
   A = p;
   delete B;
 }
 definitiontype(A)  ::=  containertype(B) .
 {
-  Containertype_Definitiontype* p = new Containertype_Definitiontype();
+  ContainerTypeDefinitionType* p = new ContainerTypeDefinitionType();
   p->containertype = B;
   A = p;
 }
@@ -404,7 +404,7 @@ basetype(A)        ::=  DOUBLE. {A = new QString("double");}
 basetype(A)        ::=  STRING. {A = new QString("string");}
 basetype(A)        ::=  BINARY. {A = new QString("binary");}
 
-%type containertype {Containertype*}
+%type containertype {ContainerType*}
 //%destructor containertype {delete $$;}
 containertype(A)   ::=  maptype(B) .
 {
@@ -419,31 +419,31 @@ containertype(A)   ::=  listtype(B).
   A = B;
 }
 
-%type maptype {Maptype*}
+%type maptype {MapType*}
 %destructor maptype {delete $$;}
 maptype(A)         ::=  MAP LT fieldtype(B) LISTSEP fieldtype(C) GT.
 {
-  A = new Maptype();
+  A = new MapType();
   A->keyType = B->type();
   A->valueType = C->type();
   delete B;
   delete C;
 }
 
-%type settype {Settype*}
+%type settype {SetType*}
 %destructor settype {delete $$;}
 settype(A)         ::=  SET LT fieldtype(B) GT.
 {
-  A = new Settype();
+  A = new SetType();
   A->valueType = B->type();
   delete B;
 }
 
-%type listtype {Listtype*}
+%type listtype {ListType*}
 %destructor listtype {delete $$;}
 listtype(A)         ::=  LIST LT fieldtype(B) GT.
 {
-  A = new Listtype();
+  A = new ListType();
   A->valueType = B->type();
   delete B;
 }

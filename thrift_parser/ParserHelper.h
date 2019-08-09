@@ -1,106 +1,194 @@
+/**
+ *
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2019 Dmitry Ivanov
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #ifndef QEVERCLOUD_GENERATOR_THRIFT_PARSER_PARSER_HELPER_H
 #define QEVERCLOUD_GENERATOR_THRIFT_PARSER_PARSER_HELPER_H
 
-#include <QString>
 #include "Parser.h"
 
-class AbstratNoterminal {
+#include <QString>
+
+////////////////////////////////////////////////////////////////////////////////
+
+class AbstractNoterminal
+{
 public:
-    virtual ~AbstratNoterminal() = 0;
+    virtual ~AbstractNoterminal() = 0;
 };
 
-inline AbstratNoterminal::~AbstratNoterminal() {}
+inline AbstractNoterminal::~AbstractNoterminal() {}
 
-class Fieldtype: public AbstratNoterminal {
+////////////////////////////////////////////////////////////////////////////////
+
+class Fieldtype: public AbstractNoterminal
+{
 public:
     virtual QSharedPointer<Parser::Type> type() = 0;
 };
 
-class VoidType: public Fieldtype {
+////////////////////////////////////////////////////////////////////////////////
+
+class VoidType: public Fieldtype
+{
 public:
-    QSharedPointer<Parser::Type> type() override {
+    QSharedPointer<Parser::Type> type() override
+    {
         QSharedPointer<Parser::VoidType> p(new Parser::VoidType);
         return p;
     }
 };
 
-class Identifier_Fieldtype: public Fieldtype {
+////////////////////////////////////////////////////////////////////////////////
+
+class IdentifierFieldType: public Fieldtype
+{
 public:
-    ~Identifier_Fieldtype() override {}
-    QString identifier;
+    ~IdentifierFieldType() override {}
+
     QSharedPointer<Parser::Type> type() override
     {
         QSharedPointer<Parser::IdentifierType> p(new Parser::IdentifierType);
         p->identifier = identifier;
         return p;
     }
+
+public:
+    QString identifier;
 };
 
-class Definitiontype: public Fieldtype {
-public:
-};
+////////////////////////////////////////////////////////////////////////////////
 
-class Basename_Definitiontype: public Definitiontype {
+class DefinitionType: public Fieldtype
+{};
+
+////////////////////////////////////////////////////////////////////////////////
+
+class BasenameDefinitiontype: public DefinitionType
+{
 public:
-    ~Basename_Definitiontype() override {}
-    QString basetype;
+    ~BasenameDefinitiontype() override {}
+
     QSharedPointer<Parser::Type> type() override
     {
         QSharedPointer<Parser::BaseType> p(new Parser::BaseType);
         p->basetype = basetype;
         return p;
     }
+
+public:
+    QString basetype;
 };
 
-class Containertype: public AbstratNoterminal {
+////////////////////////////////////////////////////////////////////////////////
+
+class ContainerType: public AbstractNoterminal
+{
 public:
     virtual QSharedPointer<Parser::Type> type() = 0;
 };
 
-class Containertype_Definitiontype: public Definitiontype {
+////////////////////////////////////////////////////////////////////////////////
+
+class ContainerTypeDefinitionType: public DefinitionType
+{
 public:
-    Containertype_Definitiontype(): containertype(nullptr) {}
-    ~Containertype_Definitiontype() override { delete containertype;}
-    Containertype* containertype;
+    ContainerTypeDefinitionType() :
+        containertype(nullptr)
+    {}
+
+    ~ContainerTypeDefinitionType() override
+    {
+        delete containertype;
+    }
+
     QSharedPointer<Parser::Type> type() override
     {
-        if(containertype) return containertype->type();
+        if (containertype) {
+            return containertype->type();
+        }
+
         throw std::runtime_error("containertype == nullptr");
     }
+
+public:
+    ContainerType* containertype;
 };
 
-class Maptype: public Containertype {
+////////////////////////////////////////////////////////////////////////////////
+
+class MapType: public ContainerType
+{
 public:
-    ~Maptype() override {}
-    QSharedPointer<Parser::Type> type() override {
+    ~MapType() override {}
+
+    QSharedPointer<Parser::Type> type() override
+    {
         QSharedPointer<Parser::MapType> p(new Parser::MapType);
         p->keyType = keyType;
         p->valueType = valueType;
         return p;
     }
+
+public:
     QSharedPointer<Parser::Type> keyType;
     QSharedPointer<Parser::Type> valueType;
 };
 
-class Listtype: public Containertype {
+////////////////////////////////////////////////////////////////////////////////
+
+class ListType: public ContainerType
+{
 public:
-    ~Listtype() override {}
-    QSharedPointer<Parser::Type> type() override {
+    ~ListType() override {}
+
+    QSharedPointer<Parser::Type> type() override
+    {
         QSharedPointer<Parser::ListType> p(new Parser::ListType);
         p->valueType = valueType;
         return p;
     }
+
+public:
     QSharedPointer<Parser::Type> valueType;
 };
 
-class Settype: public Containertype {
+////////////////////////////////////////////////////////////////////////////////
+
+class SetType: public ContainerType
+{
 public:
-    ~Settype() override {}
-    QSharedPointer<Parser::Type> type() override {
+    ~SetType() override {}
+
+    QSharedPointer<Parser::Type> type() override
+    {
         QSharedPointer<Parser::SetType> p(new Parser::SetType);
         p->valueType = valueType;
         return p;
     }
+
+public:
     QSharedPointer<Parser::Type> valueType;
 };
 

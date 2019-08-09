@@ -29,12 +29,21 @@ elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
       add_definitions("-DHAVELIBCPP")
     endif()
   endif()
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC12")
-  message(STATUS "Visual C++ 2013 compiler supports C++11 standard.")
-  add_definitions("-DCPP11_COMPLIANT=1")
-elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC14")
-  message(STATUS "Visual C++ 2015 compiler supports C++11 standard.")
-  add_definitions("-DCPP11_COMPLIANT=1")
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+  if(MSVC_VERSION GREATER_EQUAL 1800)
+    message(STATUS "This version of Visual C++ compiler supports C++11 standard.")
+    add_definitions("-DCPP11_COMPLIANT")
+  elseif(MSVC_VERSION GREATER_EQUAL 1600)
+    message(STATUS "This version of Visual C++ compiler only partially supports
+                    C++11 standard but it is capable of building QEverCloud")
+  else()
+    message(STATUS "This version of Visual C++ compiler might not be standard
+                    compliant enough to build QEverCloud.
+                    If you get any compilation errors, consider upgrading to
+                    a compiler version which fully supports C++11 standard.")
+  endif()
+  set(CMAKE_CXX_FLAGS "-D_SCL_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS ${CMAKE_CXX_FLAGS}")
+  add_definitions("-DUNICODE -D_UNICODE")
 else()
   message(WARNING "Your C++ compiler is not recognized as the one compliant with C++11 standard.
                    If you get any compilation errors, consider either switching to

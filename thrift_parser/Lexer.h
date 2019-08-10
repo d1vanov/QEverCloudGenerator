@@ -54,8 +54,8 @@ public:
         QString file;
         int line;
 
-        TerminalSymbol(
-                TerminalSymbolType type, QString data, QString file, int line) :
+        TerminalSymbol(TerminalSymbolType type, QString data, QString file,
+                       int line) :
             type(type),
             data(data),
             file(file),
@@ -75,9 +75,33 @@ public:
 
 private:
 
-    void lex(QString fileName, const QString &text);
-    bool isNextChar(QChar testChar, QString text, int pos);
-    bool isNextNextChar(QChar testChar, QString text, int pos);
+    void lex(QString fileName, const QString & text);
+
+    struct LexContext
+    {
+        LexContext(const QString & fileName, const QString & text) :
+            m_fileName(fileName),
+            m_state(TerminalSymbolType::NoState),
+            m_pos(0),
+            m_lineNum(1),
+            m_savedLineNum(0),
+            m_text(&text)
+        {}
+
+        QString m_fileName;
+        TerminalSymbolType m_state;
+
+        int m_pos;
+        int m_lineNum;
+        int m_savedLineNum;
+
+        QStringRef m_text;
+    };
+
+    void lexChar(const QChar ch, LexContext & ctx, QString & data);
+
+    bool isNextChar(const QChar testChar, const QStringRef & text, int pos);
+    bool isNextNextChar(const QChar testChar, const QStringRef & text, int pos);
 
 private:
     QList<TerminalSymbol> terminals_;

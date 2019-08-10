@@ -31,78 +31,83 @@
 #include <stdexcept>
 #include <cstdlib>
 
-void* ParseAlloc(void *(*mallocProc)(std::size_t));
+void * ParseAlloc(void *(*mallocProc)(std::size_t));
+
 void ParseFree(void *p, void (*freeProc)(void*));
-void Parse(void *lemon,  int yymajor, Term* yyminor, Parser* parser);
+
+void Parse(void * lemon, int yymajor, Term * yyminor, Parser * m_parser);
 
 Parser::Parser(QObject *parent) :
     QObject(parent)
 {
-    parser = ParseAlloc(std::malloc);
-    isError_ = false;
+    m_parser = ParseAlloc(std::malloc);
+    m_isError = false;
 }
 
 Parser::~Parser()
 {
-    ParseFree(parser, std::free);
+    ParseFree(m_parser, std::free);
 }
 
-void Parser::feed(Lexer::TerminalSymbolType type, QString value)
+void Parser::feed(Lexer::TerminalSymbolType type, const QString & value)
 {
-    if(delims_.isEmpty()) {
-        delims_["("] = TERM_PAREN_OPEN;
-        delims_[")"] = TERM_PAREN_CLOSE;
-        delims_[":"] = TERM_COLON;
-        delims_["="] = TERM_EQ;
-        delims_["{"] = TERM_CURLY_OPEN;
-        delims_["}"] = TERM_CURLY_CLOSE;
-        delims_[","] = TERM_LISTSEP;
-        delims_[";"] = TERM_LISTSEP;
-        delims_["<"] = TERM_LT;
-        delims_[">"] = TERM_GT;
-        delims_["["] = TERM_BRACKET_OPEN;
-        delims_["]"] = TERM_BRACKET_CLOSE;
+    if (m_delims.isEmpty())
+    {
+        m_delims["("] = TERM_PAREN_OPEN;
+        m_delims[")"] = TERM_PAREN_CLOSE;
+        m_delims[":"] = TERM_COLON;
+        m_delims["="] = TERM_EQ;
+        m_delims["{"] = TERM_CURLY_OPEN;
+        m_delims["}"] = TERM_CURLY_CLOSE;
+        m_delims[","] = TERM_LISTSEP;
+        m_delims[";"] = TERM_LISTSEP;
+        m_delims["<"] = TERM_LT;
+        m_delims[">"] = TERM_GT;
+        m_delims["["] = TERM_BRACKET_OPEN;
+        m_delims["]"] = TERM_BRACKET_CLOSE;
 
-        reserved_["include"] = TERM_INCLUDE;
-        reserved_["cpp_include"] = TERM_CPP_INCLUDE;
-        reserved_["namespace"] = TERM_NAMESPACE;
-        reserved_["const"] = TERM_CONST;
-        reserved_["typedef"] = TERM_TYPEDEF;
-        reserved_["enum"] = TERM_ENUM;
-        reserved_["struct"] = TERM_STRUCT;
-        reserved_["union"] = TERM_UNION;
-        reserved_["exception"] = TERM_EXCEPTION;
-        reserved_["service"] = TERM_SERVICE;
-        reserved_["extends"] = TERM_EXTENDS;
-        reserved_["required"] = TERM_REQUIRED;
-        reserved_["optional"] = TERM_OPTIONAL;
-        reserved_["oneway"] = TERM_ONEWAY;
-        reserved_["void"] = TERM_VOID;
-        reserved_["throws"] = TERM_THROWS;
-        reserved_["bool"] = TERM_BOOL;
-        reserved_["byte"] = TERM_BYTE;
-        reserved_["i16"] = TERM_I16;
-        reserved_["i32"] = TERM_I32;
-        reserved_["i64"] = TERM_I64;
-        reserved_["double"] = TERM_DOUBLE;
-        reserved_["string"] = TERM_STRING;
-        reserved_["binary"] = TERM_BINARY;
-        reserved_["map"] = TERM_MAP;
-        reserved_["set"] = TERM_SET;
-        reserved_["list"] = TERM_LIST;
+        m_reserved["include"] = TERM_INCLUDE;
+        m_reserved["cpp_include"] = TERM_CPP_INCLUDE;
+        m_reserved["namespace"] = TERM_NAMESPACE;
+        m_reserved["const"] = TERM_CONST;
+        m_reserved["typedef"] = TERM_TYPEDEF;
+        m_reserved["enum"] = TERM_ENUM;
+        m_reserved["struct"] = TERM_STRUCT;
+        m_reserved["union"] = TERM_UNION;
+        m_reserved["exception"] = TERM_EXCEPTION;
+        m_reserved["service"] = TERM_SERVICE;
+        m_reserved["extends"] = TERM_EXTENDS;
+        m_reserved["required"] = TERM_REQUIRED;
+        m_reserved["optional"] = TERM_OPTIONAL;
+        m_reserved["oneway"] = TERM_ONEWAY;
+        m_reserved["void"] = TERM_VOID;
+        m_reserved["throws"] = TERM_THROWS;
+        m_reserved["bool"] = TERM_BOOL;
+        m_reserved["byte"] = TERM_BYTE;
+        m_reserved["i16"] = TERM_I16;
+        m_reserved["i32"] = TERM_I32;
+        m_reserved["i64"] = TERM_I64;
+        m_reserved["double"] = TERM_DOUBLE;
+        m_reserved["string"] = TERM_STRING;
+        m_reserved["binary"] = TERM_BINARY;
+        m_reserved["map"] = TERM_MAP;
+        m_reserved["set"] = TERM_SET;
+        m_reserved["list"] = TERM_LIST;
     }
 
     int yymajor = 0;
     bool sendValue = false;
-    switch(type) {
+    switch(type)
+    {
     case Lexer::TerminalSymbolType::DocComment:
         yymajor = TERM_DOC_COMMENT;
         sendValue = true;
         break;
     case Lexer::TerminalSymbolType::Identifier:
-        if(reserved_.contains(value)) {
-            yymajor = reserved_.value(value);
-        } else {
+        if (m_reserved.contains(value)) {
+            yymajor = m_reserved.value(value);
+        }
+        else {
             yymajor = TERM_IDENTIFIER;
             sendValue = true;
         }
@@ -120,116 +125,122 @@ void Parser::feed(Lexer::TerminalSymbolType type, QString value)
         sendValue = true;
         break;
     case Lexer::TerminalSymbolType::Delimiter:
-        if(delims_.contains(value)) {
-            yymajor = delims_.value(value);
-        } else {
+        if (m_delims.contains(value)) {
+            yymajor = m_delims.value(value);
+        }
+        else {
             throw std::runtime_error("Incorrect delimeter from lexer");
         }
         break;
-    default: throw std::runtime_error("Incorrect lexer terminal type");
+    default:
+        throw std::runtime_error("Incorrect lexer terminal type");
     }
 
     QString* lemonValue = nullptr;
-    if(sendValue) {
+    if (sendValue) {
         lemonValue = new QString(value);
     }
-    Parse(parser, yymajor, lemonValue, this);
+    Parse(m_parser, yymajor, lemonValue, this);
 }
 
 void Parser::complete()
 {
-    Parse(parser, TERM_END_OF_FILE, nullptr, this);
+    Parse(m_parser, TERM_END_OF_FILE, nullptr, this);
 }
 
-void Parser::addTypedef(QString name, QSharedPointer<Type> type, QString docComment)
+void Parser::addTypedef(
+    QString name, QSharedPointer<Type> type, QString docComment)
 {
     TypeDefinition td;
-    td.file = file_;
+    td.file = m_fileName;
     td.name = name;
     td.type = type;
     td.docComment = docComment;
-    typedefs_.append(td);
+    m_typedefs.append(td);
 }
 
 void Parser::addNamespace(QString scope, QString name)
 {
     Namespace n;
-    n.file = file_;
+    n.file = m_fileName;
     n.name = name;
     n.scope = scope;
-    namespaces_.append(n);
+    m_namespaces.append(n);
 }
 
-void Parser::addConst(QSharedPointer<Type> type, QString name, QSharedPointer<ConstValue> value, QString docComment)
+void Parser::addConst(
+    QSharedPointer<Type> type, QString name, QSharedPointer<ConstValue> value,
+    QString docComment)
 {
     Constant c;
-    c.file = file_;
+    c.file = m_fileName;
     c.name = name;
     c.type = type;
     c.value = value;
     c.docComment = docComment;
-    constants_.append(c);
+    m_constants.append(c);
 }
 
 void Parser::addInclude(QString name)
 {
     Include i;
-    i.file = file_;
+    i.file = m_fileName;
     i.name = name;
-    includes_.append(i);
+    m_includes.append(i);
 }
 
 void Parser::addStructure(QString name, QList<Field> fields, QString docComment)
 {
    Structure s;
-   s.file = file_;
+   s.file = m_fileName;
    s.name = name;
    s.fields = fields;
    s.parseStuctComment(docComment);
-   structures_.append(s);
+   m_structures.append(s);
 }
 
 void Parser::addUnion(QString name, QList<Field> fields)
 {
     Structure s;
-    s.file = file_;
+    s.file = m_fileName;
     s.name = name;
     s.fields = fields;
-    unions_.append(s);
+    m_unions.append(s);
 }
 
 void Parser::addException(QString name, QList<Field> fields, QString docComment)
 {
     Structure s;
-    s.file = file_;
+    s.file = m_fileName;
     s.name = name;
     s.fields = fields;
     s.docComment = docComment;
-    exceptions_.append(s);
+    m_exceptions.append(s);
 }
 
-void Parser::addService(QString name, QString extends, QList<Parser::Function> functions, QString docComment)
+void Parser::addService(
+    QString name, QString extends, QList<Parser::Function> functions,
+    QString docComment)
 {
     Service s;
-    s.file = file_;
+    s.file = m_fileName;
     s.name = name;
     s.extends = extends;
     s.functions = functions;
     s.docComment = docComment;
-    services_.append(s);
+    m_services.append(s);
 }
 
-void Parser::addEnumeration(QString name, QList<QPair<QString, QString> > values, QString docComment)
+void Parser::addEnumeration(
+    QString name, QList<QPair<QString, QString> > values, QString docComment)
 {
     Enumeration e;
-    e.file = file_;
+    e.file = m_fileName;
     e.name = name;
     e.values = values;
     e.docComment = docComment;
-    enumerations_.append(e);
+    m_enumerations.append(e);
 }
-
-
 
 void Parser::Structure::parseStuctComment(QString rawComment)
 {
@@ -272,5 +283,4 @@ void Parser::Structure::parseStuctComment(QString rawComment)
         fieldComment = fieldComment.remove("</dd>").remove("<dd>").trimmed();
         this->fieldComments[fieldName] = "/**\n" + fieldComment + "\n*/";
     }
-
 }

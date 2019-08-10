@@ -74,8 +74,8 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
             break;
         }
         else if (ch == '/' &&
-           isNextChar('*', ctx.m_text, ctx.m_pos) &&
-           isNextNextChar('*', ctx.m_text, ctx.m_pos))
+                 isNextChar('*', ctx.m_text, ctx.m_pos) &&
+                 isNextNextChar('*', ctx.m_text, ctx.m_pos))
         {
             ctx.m_state = TerminalSymbolType::DocComment;
             data.append(ch);
@@ -112,7 +112,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                  ch == '{' || ch == '}' || ch == ',' || ch == '<' ||
                  ch == '>' || ch == '[' || ch == ']' || ch == ';')
         {
-            terminals_ << TerminalSymbol(
+            m_terminals << TerminalSymbol(
                 TerminalSymbolType::Delimiter, ch, ctx.m_fileName,
                 ctx.m_lineNum);
             break;
@@ -139,7 +139,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
         if (ch == '*' && isNextChar('/', ctx.m_text, ctx.m_pos)) {
             ++ctx.m_pos;
             data.append('/');
-            terminals_ << TerminalSymbol(
+            m_terminals << TerminalSymbol(
                 TerminalSymbolType::DocComment, data, ctx.m_fileName,
                 ctx.m_savedLineNum);
             data = "";
@@ -164,7 +164,8 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
             if (ch == '\n') {
                 --ctx.m_lineNum;
             }
-            terminals_ << TerminalSymbol(
+
+            m_terminals << TerminalSymbol(
                 TerminalSymbolType::Identifier, data, ctx.m_fileName,
                 ctx.m_savedLineNum);
             data = "";
@@ -174,8 +175,9 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
         data.append(ch);
         break;
     case TerminalSymbolType::String:
-        if (ch == '\"') {
-            terminals_ << TerminalSymbol(
+        if (ch == '\"')
+        {
+            m_terminals << TerminalSymbol(
                 TerminalSymbolType::String, "\"" + data + "\"", ctx.m_fileName,
                 ctx.m_savedLineNum);
             data = "";
@@ -185,8 +187,9 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
         data.append(ch);
         break;
     case TerminalSymbolType::String2:
-        if (ch == '\'') {
-            terminals_ << TerminalSymbol(
+        if (ch == '\'')
+        {
+            m_terminals << TerminalSymbol(
                 TerminalSymbolType::String, "\"" + data + "\"",
                 ctx.m_fileName, ctx.m_savedLineNum);
             data = "";
@@ -218,7 +221,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                     --ctx.m_lineNum;
                 }
 
-                terminals_ << TerminalSymbol(
+                m_terminals << TerminalSymbol(
                     TerminalSymbolType::IntegerNumber, data, ctx.m_fileName,
                     ctx.m_savedLineNum);
                 data = "";
@@ -249,7 +252,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                     --ctx.m_lineNum;
                 }
 
-                terminals_ << TerminalSymbol(
+                m_terminals << TerminalSymbol(
                     TerminalSymbolType::FloatNumber, data, ctx.m_fileName,
                     ctx.m_savedLineNum);
                 data = "";
@@ -267,7 +270,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                 --ctx.m_lineNum;
             }
 
-            terminals_ << TerminalSymbol(
+            m_terminals << TerminalSymbol(
                 TerminalSymbolType::FloatNumber, data, ctx.m_fileName,
                 ctx.m_savedLineNum);
             data = "";

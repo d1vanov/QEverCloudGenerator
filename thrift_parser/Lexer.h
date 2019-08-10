@@ -66,9 +66,9 @@ public:
 
     explicit Lexer(QObject * parent = nullptr);
 
-    QList<TerminalSymbol> terminals()
+    const QList<TerminalSymbol> & terminals()
     {
-        return terminals_;
+        return m_terminals;
     }
 
     void feedFile(QString fileName);
@@ -104,7 +104,7 @@ private:
     bool isNextNextChar(const QChar testChar, const QStringRef & text, int pos);
 
 private:
-    QList<TerminalSymbol> terminals_;
+    QList<TerminalSymbol> m_terminals;
 };
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_LEXER_H

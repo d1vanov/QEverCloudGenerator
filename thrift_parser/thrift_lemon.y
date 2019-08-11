@@ -7,7 +7,7 @@
 #include <assert.h>
 #include "Parser.h"
 #include "ParserHelper.h"
-#include <QtDebug>
+#include <QDebug>
 }
 
 %token_prefix TERM_
@@ -208,11 +208,11 @@ field(A) ::= fieldbody(B) LISTSEP . {A = B;}
 fieldbody(A) ::= fieldidoption(B) fieldreq(C) fieldtype(D) IDENTIFIER(E) fieldinitializer(F) .
 {
   A = new Parser::Field;
-  A->id = B;
-  A->required = C;
-  A->type = QSharedPointer<Parser::Type>(D->type());
-  A->name = *E;
-  A->initializer = QSharedPointer<Parser::ConstValue>(F);
+  A->m_id = B;
+  A->m_required = C;
+  A->m_type = QSharedPointer<Parser::Type>(D->type());
+  A->m_name = *E;
+  A->m_initializer = QSharedPointer<Parser::ConstValue>(F);
   delete E;
 }
 
@@ -309,12 +309,12 @@ function(A) ::= functionbody(B) LISTSEP. {A = B;}
 functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist(E) PAREN_CLOSE throws(F).
 {
   A = new Parser::Function;
-  A->isOneway = B;
-  A->type = C->type();
-  A->name = *D;
-  A->params = *E;
-  A->throws = *F;
-  A->docComment = "";
+  A->m_isOneway = B;
+  A->m_type = C->type();
+  A->m_name = *D;
+  A->m_params = *E;
+  A->m_throws = *F;
+  A->m_docComment = "";
   delete C;
   delete D;
   delete E;
@@ -323,12 +323,12 @@ functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist
 functionbody(A) ::= DOC_COMMENT(X) oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist(E) PAREN_CLOSE throws(F).
 {
   A = new Parser::Function;
-  A->isOneway = B;
-  A->type = C->type();
-  A->name = *D;
-  A->params = *E;
-  A->throws = *F;
-  A->docComment = *X;
+  A->m_isOneway = B;
+  A->m_type = C->type();
+  A->m_name = *D;
+  A->m_params = *E;
+  A->m_throws = *F;
+  A->m_docComment = *X;
   delete C;
   delete D;
   delete E;
@@ -367,7 +367,7 @@ throws(A)  ::=  THROWS PAREN_OPEN fieldlist(B) PAREN_CLOSE.
 fieldtype(A)    ::=  IDENTIFIER(B).
 {
   IdentifierFieldType* p = new IdentifierFieldType();
-  p->identifier = *B;
+  p->m_identifier = *B;
   A = p;
   delete B;
 }
@@ -382,27 +382,27 @@ fieldtype(A)    ::=  definitiontype(B) .
 definitiontype(A)  ::=  basetype(B) .
 {
   BasenameDefinitiontype* p = new BasenameDefinitiontype();
-  p->basetype = *B;
+  p->m_baseType = *B;
   A = p;
   delete B;
 }
 definitiontype(A)  ::=  containertype(B) .
 {
   ContainerTypeDefinitionType* p = new ContainerTypeDefinitionType();
-  p->containertype = B;
+  p->m_containerType = B;
   A = p;
 }
 
 %type basetype {QString*}
 %destructor basetype {delete $$;}
-basetype(A)        ::=  BOOL. {A = new QString("bool");}
-basetype(A)        ::=  BYTE. {A = new QString("byte");}
-basetype(A)        ::=  I16. {A = new QString("i16");}
-basetype(A)        ::=  I32. {A = new QString("i32");}
-basetype(A)        ::=  I64. {A = new QString("i64");}
-basetype(A)        ::=  DOUBLE. {A = new QString("double");}
-basetype(A)        ::=  STRING. {A = new QString("string");}
-basetype(A)        ::=  BINARY. {A = new QString("binary");}
+basetype(A)        ::=  BOOL. {A = new QString(QStringLiteral("bool"));}
+basetype(A)        ::=  BYTE. {A = new QString(QStringLiteral("byte"));}
+basetype(A)        ::=  I16. {A = new QString(QStringLiteral("i16"));}
+basetype(A)        ::=  I32. {A = new QString(QStringLiteral("i32"));}
+basetype(A)        ::=  I64. {A = new QString(QStringLiteral("i64"));}
+basetype(A)        ::=  DOUBLE. {A = new QString(QStringLiteral("double"));}
+basetype(A)        ::=  STRING. {A = new QString(QStringLiteral("string"));}
+basetype(A)        ::=  BINARY. {A = new QString(QStringLiteral("binary"));}
 
 %type containertype {ContainerType*}
 //%destructor containertype {delete $$;}
@@ -424,8 +424,8 @@ containertype(A)   ::=  listtype(B).
 maptype(A)         ::=  MAP LT fieldtype(B) LISTSEP fieldtype(C) GT.
 {
   A = new MapType();
-  A->keyType = B->type();
-  A->valueType = C->type();
+  A->m_keyType = B->type();
+  A->m_valueType = C->type();
   delete B;
   delete C;
 }
@@ -435,7 +435,7 @@ maptype(A)         ::=  MAP LT fieldtype(B) LISTSEP fieldtype(C) GT.
 settype(A)         ::=  SET LT fieldtype(B) GT.
 {
   A = new SetType();
-  A->valueType = B->type();
+  A->m_valueType = B->type();
   delete B;
 }
 
@@ -444,7 +444,7 @@ settype(A)         ::=  SET LT fieldtype(B) GT.
 listtype(A)         ::=  LIST LT fieldtype(B) GT.
 {
   A = new ListType();
-  A->valueType = B->type();
+  A->m_valueType = B->type();
   delete B;
 }
 
@@ -453,42 +453,42 @@ listtype(A)         ::=  LIST LT fieldtype(B) GT.
 constvalue(A)    ::=  INTEGER_VALUE(B) .
 {
   Parser::IntegerValue* p = new Parser::IntegerValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  DOUBLE_VALUE(B) .
 {
   Parser::DoubleValue* p = new Parser::DoubleValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  STRING_VALUE(B) .
 {
   Parser::StringValue* p = new Parser::StringValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  IDENTIFIER(B) .
 {
   Parser::IdentifierValue* p = new Parser::IdentifierValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  constlist(B) .
 {
   Parser::ListValue* p = new Parser::ListValue;
-  p->values = *B;
+  p->m_values = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  constmap(B) .
 {
   Parser::MapValue* p = new Parser::MapValue;
-  p->values = *B;
+  p->m_values = *B;
   A = p;
   delete B;
 }

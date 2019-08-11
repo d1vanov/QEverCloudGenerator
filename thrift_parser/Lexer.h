@@ -49,21 +49,21 @@ public:
 
     struct TerminalSymbol
     {
-        TerminalSymbolType type;
-        QString data;
-        QString file;
-        int line;
+        TerminalSymbolType m_type;
+        QString m_data;
+        QString m_fileName;
+        int m_lineNum;
 
-        TerminalSymbol(TerminalSymbolType type, QString data, QString file,
-                       int line) :
-            type(type),
-            data(data),
-            file(file),
-            line(line)
+        TerminalSymbol(const TerminalSymbolType type, const QString & data,
+                       const QString & fileName, const int lineNum) :
+            m_type(type),
+            m_data(data),
+            m_fileName(fileName),
+            m_lineNum(lineNum)
         {}
     };
 
-
+public:
     explicit Lexer(QObject * parent = nullptr);
 
     const QList<TerminalSymbol> & terminals()
@@ -74,7 +74,6 @@ public:
     void feedFile(QString fileName);
 
 private:
-
     void lex(QString fileName, const QString & text);
 
     struct LexContext

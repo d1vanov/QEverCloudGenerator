@@ -70,12 +70,12 @@ public:
     QSharedPointer<Parser::Type> type() override
     {
         QSharedPointer<Parser::IdentifierType> p(new Parser::IdentifierType);
-        p->identifier = identifier;
+        p->m_identifier = m_identifier;
         return p;
     }
 
 public:
-    QString identifier;
+    QString m_identifier;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -93,12 +93,12 @@ public:
     QSharedPointer<Parser::Type> type() override
     {
         QSharedPointer<Parser::BaseType> p(new Parser::BaseType);
-        p->basetype = basetype;
+        p->m_baseType = m_baseType;
         return p;
     }
 
 public:
-    QString basetype;
+    QString m_baseType;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -115,25 +115,25 @@ class ContainerTypeDefinitionType: public DefinitionType
 {
 public:
     ContainerTypeDefinitionType() :
-        containertype(nullptr)
+        m_containerType(nullptr)
     {}
 
     ~ContainerTypeDefinitionType() override
     {
-        delete containertype;
+        delete m_containerType;
     }
 
     QSharedPointer<Parser::Type> type() override
     {
-        if (containertype) {
-            return containertype->type();
+        if (m_containerType) {
+            return m_containerType->type();
         }
 
         throw std::runtime_error("containertype == nullptr");
     }
 
 public:
-    ContainerType* containertype;
+    ContainerType* m_containerType;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -146,14 +146,14 @@ public:
     QSharedPointer<Parser::Type> type() override
     {
         QSharedPointer<Parser::MapType> p(new Parser::MapType);
-        p->keyType = keyType;
-        p->valueType = valueType;
+        p->m_keyType = m_keyType;
+        p->m_valueType = m_valueType;
         return p;
     }
 
 public:
-    QSharedPointer<Parser::Type> keyType;
-    QSharedPointer<Parser::Type> valueType;
+    QSharedPointer<Parser::Type> m_keyType;
+    QSharedPointer<Parser::Type> m_valueType;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -166,12 +166,12 @@ public:
     QSharedPointer<Parser::Type> type() override
     {
         QSharedPointer<Parser::ListType> p(new Parser::ListType);
-        p->valueType = valueType;
+        p->m_valueType = m_valueType;
         return p;
     }
 
 public:
-    QSharedPointer<Parser::Type> valueType;
+    QSharedPointer<Parser::Type> m_valueType;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -184,12 +184,12 @@ public:
     QSharedPointer<Parser::Type> type() override
     {
         QSharedPointer<Parser::SetType> p(new Parser::SetType);
-        p->valueType = valueType;
+        p->m_valueType = m_valueType;
         return p;
     }
 
 public:
-    QSharedPointer<Parser::Type> valueType;
+    QSharedPointer<Parser::Type> m_valueType;
 };
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_PARSER_HELPER_H

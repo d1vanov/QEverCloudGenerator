@@ -41,33 +41,17 @@ class Parser : public QObject
 {
     Q_OBJECT
 public:
-    explicit Parser(QObject * parent = nullptr);
-
-    virtual ~Parser();
-
-    void feed(const Lexer::TerminalSymbolType type, const QString & value);
-
-    void setFile(QString file)
-    {
-        m_fileName = file;
-        if (!m_fileNames.contains(file)) {
-            m_fileNames << file;
-        }
-    }
-
-    void complete();
-
     struct Namespace
     {
-        QString file;
-        QString scope;
-        QString name;
+        QString m_fileName;
+        QString m_scope;
+        QString m_name;
     };
 
     struct Include
     {
-        QString file;
-        QString name;
+        QString m_fileName;
+        QString m_name;
     };
 
     class Type
@@ -85,45 +69,50 @@ public:
     class BaseType: public Type
     {
     public:
-        QString basetype;
+        QString m_baseType;
+
         ~BaseType() override {}
     };
 
     class IdentifierType: public Type
     {
     public:
-        QString identifier;
+        QString m_identifier;
+
         ~IdentifierType() override {}
     };
 
     class MapType: public Type
     {
     public:
-        QSharedPointer<Type> keyType;
-        QSharedPointer<Type> valueType;
+        QSharedPointer<Type> m_keyType;
+        QSharedPointer<Type> m_valueType;
+
         ~MapType() override {}
     };
 
     class SetType: public Type
     {
     public:
-        QSharedPointer<Type> valueType;
+        QSharedPointer<Type> m_valueType;
+
         ~SetType() override {}
     };
 
     class ListType: public Type
     {
     public:
-        QSharedPointer<Type> valueType;
+        QSharedPointer<Type> m_valueType;
+
         ~ListType() override {}
     };
 
     struct TypeDefinition
     {
-        QString file;
-        QString name;
-        QString docComment;
-        QSharedPointer<Type> type;
+        QString m_fileName;
+        QString m_name;
+        QString m_docComment;
+        QSharedPointer<Type> m_type;
     };
 
     class ConstValue
@@ -135,7 +124,7 @@ public:
     class LiteralValue: public ConstValue
     {
     public:
-        QString value;
+        QString m_value;
     };
 
     class IntegerValue: public LiteralValue
@@ -165,85 +154,161 @@ public:
     class ListValue: public ConstValue
     {
     public:
-        QList<QSharedPointer<ConstValue>> values;
+        QList<QSharedPointer<ConstValue>> m_values;
+
         ~ListValue() override {}
     };
 
     class MapValue: public ConstValue
     {
     public:
-        QList<QPair<QSharedPointer<ConstValue>,QSharedPointer<ConstValue>>> values;
+        using ValuesList =
+            QList<QPair<QSharedPointer<ConstValue>,QSharedPointer<ConstValue>>>;
+
+        ValuesList m_values;
+
         ~MapValue() override {}
     };
 
     struct Field
     {
-        int id;
-        enum class RequiredFlag {Default, Optional, Required} required;
-        QSharedPointer<Type> type;
-        QString name;
-        QSharedPointer<ConstValue> initializer;
+        enum class RequiredFlag {
+            Default,
+            Optional,
+            Required
+        };
+
+        int m_id;
+        RequiredFlag m_required;
+
+        QSharedPointer<Type> m_type;
+        QString m_name;
+        QSharedPointer<ConstValue> m_initializer;
     };
 
     struct Structure
     {
-        QString file;
-        QString name;
-        QString docComment;
-        QList<Field> fields;
-        QMap<QString, QString> fieldComments;
-        void parseStuctComment(QString rawComment);
+        QString m_fileName;
+        QString m_name;
+        QString m_docComment;
+        QList<Field> m_fields;
+        QMap<QString, QString> m_fieldComments;
+
+        void parseStructComment(QString rawComment);
     };
 
     struct Enumeration
     {
-        QString file;
-        QString name;
-        QString docComment;
-        QList<QPair<QString, QString>> values;
+        QString m_fileName;
+        QString m_name;
+        QString m_docComment;
+        QList<QPair<QString, QString>> m_values;
     };
 
     struct Function
     {
-        bool isOneway;
-        QSharedPointer<Type> type;
-        QString name;
-        QList<Field> params;
-        QList<Field> throws;
-        QString docComment;
+        bool m_isOneway;
+        QSharedPointer<Type> m_type;
+        QString m_name;
+        QList<Field> m_params;
+        QList<Field> m_throws;
+        QString m_docComment;
     };
 
     struct Service
     {
-        QString file;
-        QString name;
-        QString extends;
-        QString docComment;
-        QList<Function> functions;
+        QString m_fileName;
+        QString m_name;
+        QString m_extends;
+        QString m_docComment;
+        QList<Function> m_functions;
     };
 
     struct Constant
     {
-        QString file;
-        QSharedPointer<Type> type;
-        QString name;
-        QSharedPointer<ConstValue> value;
-        QString docComment;
+        QString m_fileName;
+        QSharedPointer<Type> m_type;
+        QString m_name;
+        QSharedPointer<ConstValue> m_value;
+        QString m_docComment;
     };
 
-    QStringList files() {return m_fileNames;}
-    QList<Namespace> namespaces() {return m_namespaces;}
-    QList<Include> includes() {return m_includes;}
-    QList<TypeDefinition> typedefs() {return m_typedefs;}
-    QList<Structure> structures() {return m_structures;}
-    QList<Enumeration> enumerations() {return m_enumerations;}
-    QList<Structure> exceptions() {return m_exceptions;}
-    QList<Service> services() {return m_services;}
-    QList<Constant> constants() {return m_constants;}
-    QList<Structure> unions() {return m_unions;}
+public:
+    explicit Parser(QObject * parent = nullptr);
 
-    bool isError() {return m_isError;}
-    QString errorMessage() {return m_errorMessage;}
+    virtual ~Parser();
+
+    void feed(const Lexer::TerminalSymbolType type, const QString & value);
+
+    void setFileName(const QString & fileName)
+    {
+        m_fileName = fileName;
+        if (!m_fileNames.contains(fileName)) {
+            m_fileNames << fileName;
+        }
+    }
+
+    void complete();
+
+    const QStringList & files() const
+    {
+        return m_fileNames;
+    }
+
+    const QList<Namespace> & namespaces() const
+    {
+        return m_namespaces;
+    }
+
+    const QList<Include> & includes() const
+    {
+        return m_includes;
+    }
+
+    const QList<TypeDefinition> & typedefs() const
+    {
+        return m_typedefs;
+    }
+
+    const QList<Structure> & structures() const
+    {
+        return m_structures;
+    }
+
+    const QList<Enumeration> & enumerations() const
+    {
+        return m_enumerations;
+    }
+
+    const QList<Structure> & exceptions() const
+    {
+        return m_exceptions;
+    }
+
+    const QList<Service> & services() const
+    {
+        return m_services;
+    }
+
+    const QList<Constant> & constants() const
+    {
+        return m_constants;
+    }
+
+    const QList<Structure> & unions() const
+    {
+        return m_unions;
+    }
+
+    bool isError() const
+    {
+        return m_isError;
+    }
+
+    const QString & errorMessage() const
+    {
+        return m_errorMessage;
+    }
 
     void setErrorFlag(QString errorMessage)
     {

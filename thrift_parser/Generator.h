@@ -31,7 +31,7 @@
 class Generator
 {
 public:
-    void generateSources(Parser * parser, QString outPath);
+    void generateSources(Parser * parser, const QString & outPath);
 
 private:
     QString generatedHeaderOutputPath(const QString & outPath);
@@ -44,33 +44,35 @@ private:
     // Methods for writing header and source files
 
     void writeHeaderHeader(
-        QTextStream & out, QString fileName,
-        QStringList additionalPreIncludes = QStringList(),
-        QStringList additionalPostIncludes = QStringList());
+        QTextStream & out, const QString & fileName,
+        const QStringList & additionalPreIncludes = QStringList(),
+        const QStringList & additionalPostIncludes = QStringList());
 
     void writeHeaderBody(
-        QTextStream& out, QString headerFileName,
-        QStringList moreIncludes = QStringList());
+        QTextStream & out, const QString & headerFileName,
+        const QStringList & additionalIncludes = QStringList());
 
     void writeHeaderFooter(
-        QTextStream & out, QString fileName,
-        QStringList extraContent = QStringList());
+        QTextStream & out, const QString & fileName,
+        const QStringList & extraContent = QStringList());
 
     void writeBodyFooter(QTextStream & out);
 
     void writeThriftReadField(
-        QTextStream & out, const Parser::Field & field, QString identPrefix,
-        QString fieldParent);
+        QTextStream & out, const Parser::Field & field,
+        const QString & identPrefix,
+        const QString & fieldParent);
 
     void writeThriftWriteFields(
         QTextStream & out, const QList<Parser::Field> & fields,
-        QString identPrefix, QString fieldPrefix);
+        const QString & identPrefix, const QString & fieldPrefix);
 
     // Methods for taking a string representation of things
 
     QString valueToStr(
         QSharedPointer<Parser::ConstValue> value,
-        QSharedPointer<Parser::Type> type, QString identifier);
+        QSharedPointer<Parser::Type> type,
+        const QString & identifier);
 
     QString fieldToStr(const Parser::Field & field);
 
@@ -85,23 +87,23 @@ private:
     };
 
     QString typeToStr(
-        QSharedPointer<Parser::Type> type, QString identifier,
-        MethodType methodType = MethodType::TypeName);
+        QSharedPointer<Parser::Type> type, const QString & identifier,
+        const MethodType methodType = MethodType::TypeName);
 
     // Other auxiliary methods
 
     QString getIdentifier(const QSharedPointer<Parser::Type> & type);
 
-    QString clearInclude(QString s);
-    QString clearTypedef(QString s);
+    QString clearInclude(const QString & s) const;
+    QString clearTypedef(const QString & s) const;
 
 private:
-    QStringList includeList_;
-    QMap<QString, QString> typedefMap_;
-    QStringList baseTypes_;
-    QSet<QString> allstructs_;
-    QSet<QString> allexceptions_;
-    QSet<QString> allenums_;
+    QStringList m_includeList;
+    QMap<QString, QString> m_typedefMap;
+    QStringList m_baseTypes;
+    QSet<QString> m_allStructs;
+    QSet<QString> m_allExceptions;
+    QSet<QString> m_allEnums;
 };
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_GENERATOR_H

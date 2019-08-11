@@ -24,21 +24,24 @@
  */
 
 #include "Generator.h"
+#include "Helpers.h"
 
 #include <QDir>
 #include <QFile>
 #include <QMap>
 #include <QString>
 
-static const char * disclaimer = "/**\n"
-                                 " * Original work: Copyright (c) 2014 Sergey Skoblikov\n"
-                                 " * Modified work: Copyright (c) 2015-2016 Dmitry Ivanov\n"
-                                 " *\n"
-                                 " * This file is a part of QEverCloud project and is distributed under the terms of MIT license:\n"
-                                 " * https://opensource.org/licenses/MIT\n"
-                                 " *\n"
-                                 " * This file was generated from Evernote Thrift API\n"
-                                 " */\n";
+static const char * disclaimer =
+    "/**\n"
+    " * Original work: Copyright (c) 2014 Sergey Skoblikov\n"
+    " * Modified work: Copyright (c) 2015-2019 Dmitry Ivanov\n"
+    " *\n"
+    " * This file is a part of QEverCloud project and is distributed under\n"
+    " * the terms of MIT license:\n"
+    " * https://opensource.org/licenses/MIT\n"
+    " *\n"
+    " * This file was generated from Evernote Thrift API\n"
+    " */\n";
 
 QString Generator::generatedHeaderOutputPath(const QString & outPath)
 {
@@ -49,7 +52,9 @@ QString Generator::generatedHeaderOutputPath(const QString & outPath)
     {
         bool res = headerOutDir.mkpath(headerOutDir.absolutePath());
         if (Q_UNLIKELY(!res)) {
-            throw std::runtime_error(QString("Can't create output directory for header files: %1").arg(headerOutDir.absolutePath()).toStdString());
+            throw std::runtime_error(
+                QString("Can't create output directory for header files: %1")
+                .arg(headerOutDir.absolutePath()).toStdString());
         }
     }
 
@@ -65,18 +70,18 @@ QString Generator::generatedSourceOutputPath(const QString & outPath)
     {
         bool res = sourceOutDir.mkpath(sourceOutDir.absolutePath());
         if (Q_UNLIKELY(!res)) {
-            throw std::runtime_error(QString("Can't create output directory for source files: %1").arg(sourceOutDir.absolutePath()).toStdString());
+            throw std::runtime_error(
+                QString("Can't create output directory for source files: %1")
+                .arg(sourceOutDir.absolutePath()).toStdString());
         }
     }
 
     return sourceOutPath;
 }
 
-QString Generator::clearInclude(QString s)
+QString Generator::clearInclude(const QString & s) const
 {
-    for(auto it = includeList_.constBegin(), end = includeList_.constEnd(); it != end; ++it)
-    {
-        const QString & inc = *it;
+    for(const auto & inc: qAsConst(m_includeList)) {
         if (s.startsWith(inc)) {
             return s.mid(inc.length());
         }
@@ -85,29 +90,33 @@ QString Generator::clearInclude(QString s)
     return s;
 }
 
-QString Generator::clearTypedef(QString s)
+QString Generator::clearTypedef(const QString & s) const
 {
-    if (typedefMap_.contains(s)) {
-        return typedefMap_.value(s);
+    if (m_typedefMap.contains(s)) {
+        return m_typedefMap.value(s);
     }
 
     return s;
 }
 
-void Generator::writeHeaderHeader(QTextStream & out, QString fileName,
-                                  QStringList additionalPreIncludes,
-                                  QStringList additionalPostIncludes)
+void Generator::writeHeaderHeader(
+    QTextStream & out, const QString & fileName,
+    const QStringList & additionalPreIncludes,
+    const QStringList & additionalPostIncludes)
 {
     out << disclaimer << endl;
     out << endl;
-    QString guard = QString("QEVERCLOUD_GENERATED_%1_H").arg(fileName.split('.')[0].toUpper());
+
+    QString guard =
+        QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H")
+        .arg(fileName.split('.')[0].toUpper());
     out << "#ifndef " << guard << endl;
     out << "#define " << guard << endl;
     out << endl;
 
-    if (fileName != "EDAMErrorCode.h")
+    if (fileName != QStringLiteral("EDAMErrorCode.h"))
     {
-        if (fileName != "types_impl.h") {
+        if (fileName != QStringLiteral("types_impl.h")) {
             out << "#include \"../Optional.h\"" << endl;
             out << "#include \"../export.h\"" << endl;
         }
@@ -115,10 +124,9 @@ void Generator::writeHeaderHeader(QTextStream & out, QString fileName,
             out << "#include <Optional.h>" << endl;
         }
 
-        for(auto it = additionalPreIncludes.constBegin(), end = additionalPreIncludes.constEnd(); it != end; ++it)
+        for(const auto & include: qAsConst(additionalPreIncludes))
         {
-            const QString & include = *it;
-            if(include.startsWith('<')) {
+            if (include.startsWith(QChar::fromLatin1('<'))) {
                 out << "#include " << include << endl;
             }
             else {
@@ -126,17 +134,16 @@ void Generator::writeHeaderHeader(QTextStream & out, QString fileName,
             }
         }
 
-        QStringList includes;
-        includes << "QMap" << "QList" << "QSet" << "QString" << "QStringList"
-                 << "QByteArray" << "QDateTime" << "QMetaType";
-        for(auto it = includes.constBegin(), end = includes.constEnd(); it != end; ++it) {
-            out << "#include <" << *it << ">" << endl;
+        auto includes = QStringList()
+            << "QMap" << "QList" << "QSet" << "QString" << "QStringList"
+            << "QByteArray" << "QDateTime" << "QMetaType";
+        for(const auto & include: qAsConst(includes)) {
+            out << "#include <" << include << ">" << endl;
         }
 
-        for(auto it = additionalPostIncludes.constBegin(), end = additionalPostIncludes.constEnd(); it != end; ++it)
+        for(const auto & include: qAsConst(additionalPostIncludes))
         {
-            const QString & include = *it;
-            if(include.startsWith('<')) {
+            if (include.startsWith(QChar::fromLatin1('<'))) {
                 out << "#include " << include << endl;
             }
             else {
@@ -157,34 +164,18 @@ void Generator::writeHeaderHeader(QTextStream & out, QString fileName,
     out << endl;
 }
 
-void Generator::writeHeaderFooter(QTextStream & out, QString fileName, QStringList extraContent)
-{
-    out << "} // namespace qevercloud" << endl;
-
-    for(auto it = extraContent.constBegin(), end = extraContent.constEnd(); it != end; ++it)
-    {
-        const QString & extraContentLine = *it;
-        if (!extraContentLine.isEmpty()) {
-            out << extraContentLine << endl;
-        }
-    }
-
-    QString guard = QString("QEVERCLOUD_GENERATED_%1_H").arg(fileName.split('.')[0].toUpper());
-    out << endl;
-    out << "#endif // " << guard << endl;
-}
-
-void Generator::writeHeaderBody(QTextStream& out, QString headerFileName, QStringList moreIncludes)
+void Generator::writeHeaderBody(
+    QTextStream & out, const QString & headerFileName,
+    const QStringList & additionalIncludes)
 {
     out << disclaimer << endl;
     out << endl;
     out << "#include <generated/" << headerFileName << ">" << endl;
     out << "#include \"../impl.h\"" << endl;
 
-    for(auto it = moreIncludes.constBegin(), end = moreIncludes.constEnd(); it != end; ++it)
+    for(const auto & include: additionalIncludes)
     {
-        const QString & include = *it;
-        if(include.startsWith('<')) {
+        if (include.startsWith(QChar::fromLatin1('<'))) {
             out << "#include " << include << endl;
         }
         else {
@@ -197,264 +188,299 @@ void Generator::writeHeaderBody(QTextStream& out, QString headerFileName, QStrin
     out << endl;
 }
 
+void Generator::writeHeaderFooter(
+    QTextStream & out, const QString & fileName,
+    const QStringList & extraContent)
+{
+    out << "} // namespace qevercloud" << endl;
+
+    for(const auto & line: extraContent)
+    {
+        if (!line.isEmpty()) {
+            out << line << endl;
+        }
+    }
+
+    QString guard = QString("QEVERCLOUD_GENERATED_%1_H").arg(fileName.split('.')[0].toUpper());
+    out << endl;
+    out << "#endif // " << guard << endl;
+}
+
 void Generator::writeBodyFooter(QTextStream & out)
 {
     out << endl;
     out << "} // namespace qevercloud" << endl;
 }
 
-QString Generator::typeToStr(QSharedPointer<Parser::Type> type, QString identifier, MethodType methodType)
+QString Generator::typeToStr(
+    QSharedPointer<Parser::Type> type, const QString & identifier,
+    const MethodType methodType)
 {
-    QSharedPointer<Parser::BaseType>        basetype        = type.dynamicCast<Parser::BaseType>();
-    QSharedPointer<Parser::VoidType>        voidtype        = type.dynamicCast<Parser::VoidType>();
-    QSharedPointer<Parser::IdentifierType>  identifiertype  = type.dynamicCast<Parser::IdentifierType>();
-    QSharedPointer<Parser::MapType>         maptype         = type.dynamicCast<Parser::MapType>();
-    QSharedPointer<Parser::SetType>         settype         = type.dynamicCast<Parser::SetType>();
-    QSharedPointer<Parser::ListType>        listtype        = type.dynamicCast<Parser::ListType>();
+    QSharedPointer<Parser::BaseType> baseType =
+        type.dynamicCast<Parser::BaseType>();
+
+    QSharedPointer<Parser::VoidType> voidType =
+        type.dynamicCast<Parser::VoidType>();
+
+    QSharedPointer<Parser::IdentifierType> identifierType =
+        type.dynamicCast<Parser::IdentifierType>();
+
+    QSharedPointer<Parser::MapType> mapType =
+        type.dynamicCast<Parser::MapType>();
+
+    QSharedPointer<Parser::SetType> setType =
+        type.dynamicCast<Parser::SetType>();
+
+    QSharedPointer<Parser::ListType> listType =
+        type.dynamicCast<Parser::ListType>();
+
     QString result;
 
-    QString justTypeName;
+    QString typeName;
     if (methodType == MethodType::FuncParamType) {
-        justTypeName = typeToStr(type, identifier, MethodType::TypeName);
+        typeName = typeToStr(type, identifier, MethodType::TypeName);
     }
 
-    if (!basetype.isNull())
+    if (!baseType.isNull())
     {
-        if (basetype->basetype == "bool")
+        if (baseType->m_baseType == QStringLiteral("bool"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "bool";
+                result = QStringLiteral("bool");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeBool(";
+                result = QStringLiteral("w.writeBool(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readBool(";
+                result = QStringLiteral("r.readBool(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_BOOL";
+                result = QStringLiteral("ThriftFieldType::T_BOOL");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
-            default: result = "";
+            default: result = QLatin1Literal("");
             }
         }
-        else if (basetype->basetype == "string")
+        else if (baseType->m_baseType == QStringLiteral("string"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "QString";
+                result = QStringLiteral("QString");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeString(";
+                result = QStringLiteral("w.writeString(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readString(";
+                result = QStringLiteral("r.readString(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_STRING";
+                result = QStringLiteral("ThriftFieldType::T_STRING");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
             default:
-                result = "";
+                result = QLatin1Literal("");
             }
         }
-        else if (basetype->basetype == "double")
+        else if (baseType->m_baseType == QStringLiteral("double"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "double";
+                result = QStringLiteral("double");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeDouble(";
+                result = QStringLiteral("w.writeDouble(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readDouble(";
+                result = QStringLiteral("r.readDouble(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_DOUBLE";
+                result = QStringLiteral("ThriftFieldType::T_DOUBLE");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
             default:
-                result = "";
+                result = QLatin1Literal("");
             }
         }
-        else if (basetype->basetype == "binary")
+        else if (baseType->m_baseType == QStringLiteral("binary"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "QByteArray";
+                result = QStringLiteral("QByteArray");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeBinary(";
+                result = QStringLiteral("w.writeBinary(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readBinary(";
+                result = QStringLiteral("r.readBinary(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_STRING";
+                result = QStringLiteral("ThriftFieldType::T_STRING");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
             default:
-                result = "";
+                result = QLatin1Literal("");
             }
         }
-        else if (basetype->basetype == "byte")
+        else if (baseType->m_baseType == QStringLiteral("byte"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "quint8";
+                result = QStringLiteral("quint8");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeByte(";
+                result = QStringLiteral("w.writeByte(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readByte(";
+                result = QStringLiteral("r.readByte(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_BYTE";
+                result = QStringLiteral("ThriftFieldType::T_BYTE");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
             default:
-                result = "";
+                result = QLatin1Literal("");
             }
         }
-        else if (basetype->basetype == "i16")
+        else if (baseType->m_baseType == QStringLiteral("i16"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "qint16";
+                result = QStringLiteral("qint16");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeI16(";
+                result = QStringLiteral("w.writeI16(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readI16(";
+                result = QStringLiteral("r.readI16(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_I16";
+                result = QStringLiteral("ThriftFieldType::T_I16");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
             default:
-                result = "";
+                result = QLatin1Literal("");
             }
         }
-        else if (basetype->basetype == "i32")
+        else if (baseType->m_baseType == QStringLiteral("i32"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "qint32";
+                result = QStringLiteral("qint32");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeI32(";
+                result = QStringLiteral("w.writeI32(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readI32(";
+                result = QStringLiteral("r.readI32(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_I32";
+                result = QStringLiteral("ThriftFieldType::T_I32");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
             default:
-                result = "";
+                result = QLatin1Literal("");
             }
         }
-        else if (basetype->basetype == "i64")
+        else if (baseType->m_baseType == QStringLiteral("i64"))
         {
             switch(methodType)
             {
             case MethodType::TypeName:
             case MethodType::ReadTypeName:
-                result = "qint64";
+                result = QStringLiteral("qint64");
                 break;
             case MethodType::WriteMethod:
-                result = "w.writeI64(";
+                result = QStringLiteral("w.writeI64(");
                 break;
             case MethodType::ReadMethod:
-                result = "r.readI64(";
+                result = QStringLiteral("r.readI64(");
                 break;
             case MethodType::ThriftFieldType:
-                result = "ThriftFieldType::T_I64";
+                result = QStringLiteral("ThriftFieldType::T_I64");
                 break;
             case MethodType::FuncParamType:
-                result = justTypeName;
+                result = typeName;
                 break;
             default:
-                result = "";
+                result = QLatin1Literal("");
             }
         }
     }
-    else if (voidtype)
+    else if (voidType)
     {
         switch(methodType)
         {
         case MethodType::TypeName:
         case MethodType::ReadTypeName:
-            result = "void";
+            result = QStringLiteral("void");
             break;
-        default: result = "";
+        default: result = QLatin1Literal("");
         }
     }
-    else if (identifiertype)
+    else if (identifierType)
     {
-        QString nameOfType = clearInclude(identifiertype->identifier);
+        QString nameOfType = clearInclude(identifierType->m_identifier);
         if (methodType == MethodType::FuncParamType)
         {
-            if (allenums_.contains(nameOfType))
+            if (m_allEnums.contains(nameOfType))
             {
-                result = justTypeName;
+                result = typeName;
             }
             else
             {
                 QString nameOfType2 = clearTypedef(nameOfType);
                 if (nameOfType2 != nameOfType) {
-                    result = justTypeName;
+                    result = typeName;
                 }
                 else {
-                    result = "const " + justTypeName + "&";
+                    QTextStream strm(&result);
+                    strm << "const " << typeName << "&";
                 }
             }
         }
         else if (methodType == MethodType::TypeName)
         {
             result = nameOfType;
-            if (allenums_.contains(result)) {
-                result = result + "::type";
+            if (m_allEnums.contains(result)) {
+                result = result + QStringLiteral("::type");
             }
         }
         else if(methodType == MethodType::ReadTypeName)
         {
-            result = nameOfType == "Timestamp" ? "qint64" : nameOfType;
-            if (allenums_.contains(result)) {
-                result = result + "::type";
+            result = (nameOfType == QStringLiteral("Timestamp")
+                      ? QStringLiteral("qint64")
+                      : nameOfType);
+            if (m_allEnums.contains(result)) {
+                result = result + QStringLiteral("::type");
             }
         }
         else
@@ -462,45 +488,56 @@ QString Generator::typeToStr(QSharedPointer<Parser::Type> type, QString identifi
             QString nameOfType2 = clearTypedef(nameOfType);
             if (nameOfType2 != nameOfType)
             {
-                if (!baseTypes_.contains(nameOfType2)) {
-                    throw std::runtime_error("typedefs are supported for base types only");
+                if (!m_baseTypes.contains(nameOfType2)) {
+                    throw std::runtime_error(
+                        "typedefs are supported for base types only");
                 }
 
                 QSharedPointer<Parser::BaseType> type2(new Parser::BaseType);
-                type2->basetype = nameOfType2;
+                type2->m_baseType = nameOfType2;
                 result = typeToStr(type2, identifier, methodType);
             }
             else
             {
-                if (allstructs_.contains(nameOfType) || allexceptions_.contains(nameOfType))
+                if (m_allStructs.contains(nameOfType) ||
+                    m_allExceptions.contains(nameOfType))
                 {
                     switch(methodType)
                     {
                     case MethodType::WriteMethod:
-                        result = "write" + nameOfType + "(w, ";
+                        {
+                            QTextStream strm(&result);
+                            strm << "write" << nameOfType << "(w, ";
+                        }
                         break;
                     case MethodType::ReadMethod:
-                        result = "read" + nameOfType + "(r, ";
+                        {
+                            QTextStream strm(&result);
+                            strm << "read" << nameOfType << "(r, ";
+                        }
                         break;
                     case MethodType::ThriftFieldType:
-                        result = "ThriftFieldType::T_STRUCT";
+                        result = QStringLiteral("ThriftFieldType::T_STRUCT");
                         break;
                     default:
-                        result = "";
+                        result = QLatin1Literal("");
                     }
                 }
-                else if (allenums_.contains(nameOfType))
+                else if (m_allEnums.contains(nameOfType))
                 {
                     switch(methodType)
                     {
                     case MethodType::WriteMethod:
-                        result = "w.writeI32(static_cast<qint32>(";
+                        result = QStringLiteral("w.writeI32(static_cast<qint32>(");
                         break;
                     case MethodType::ReadMethod:
-                        result = "readEnum" + nameOfType + "(r, ";
+                        {
+                            QTextStream strm(&result);
+                            strm << "readEnum" << nameOfType << "(r, ";
+                        }
                         break;
                     case MethodType::ThriftFieldType:
-                        result = "ThriftFieldType::T_I32";
+                        result = QStringLiteral("ThriftFieldType::T_I32");
                         break;
                     default:
                         result = "";
@@ -509,55 +546,64 @@ QString Generator::typeToStr(QSharedPointer<Parser::Type> type, QString identifi
             }
         }
     }
-    else if (maptype)
+    else if (mapType)
     {
         switch(methodType)
         {
         case MethodType::TypeName:
         case MethodType::ReadTypeName:
-            result = "QMap< " + typeToStr(maptype->keyType, identifier) + ", " + typeToStr(maptype->valueType, identifier) + " >";
+            {
+                QTextStream strm(&result);
+                strm << "QMap< " << typeToStr(mapType->m_keyType, identifier)
+                    << ", " << typeToStr(mapType->m_valueType, identifier)
+                    << " >";
+            }
             break;
         case MethodType::WriteMethod:
-            result = "w.writeMapBegin(";
+            result = QStringLiteral("w.writeMapBegin(");
             break;
         case MethodType::ReadMethod:
-            result = "r.readMapBegin(";
+            result = QStringLiteral("r.readMapBegin(");
             break;
         case MethodType::ThriftFieldType:
-            result = "ThriftFieldType::T_MAP";
+            result = QStringLiteral("ThriftFieldType::T_MAP");
             break;
         case MethodType::FuncParamType:
-            result = justTypeName;
+            result = typeName;
             break;
         default:
-            result = "";
+            result = QLatin1Literal("");
         }
     }
-    else if (settype)
+    else if (setType)
     {
         switch(methodType)
         {
         case MethodType::TypeName:
         case MethodType::ReadTypeName:
-            result = "QSet< " + typeToStr(settype->valueType, identifier) + " >";
+            {
+                QTextStream strm(&result);
+                strm << "QSet< " << typeToStr(setType->m_valueType, identifier)
+                    << " >";
+            }
             break;
         case MethodType::WriteMethod:
-            result = "w.writeSetBegin(";
+            result = QStringLiteral("w.writeSetBegin(");
             break;
         case MethodType::ReadMethod:
-            result = "r.readSetBegin(";
+            result = QStringLiteral("r.readSetBegin(");
             break;
         case MethodType::ThriftFieldType:
-            result = "ThriftFieldType::T_SET";
+            result = QStringLiteral("ThriftFieldType::T_SET");
             break;
         case MethodType::FuncParamType:
-            result = justTypeName;
+            result = typeName;
             break;
         default:
-            result = "";
+            result = QLatin1Literal("");
         }
     }
-    else if (listtype)
+    else if (listType)
     {
         switch(methodType)
         {
@@ -565,85 +611,111 @@ QString Generator::typeToStr(QSharedPointer<Parser::Type> type, QString identifi
         case MethodType::ReadTypeName:
             {
                 // list<string> => QStringList
-                QString valueType = typeToStr(listtype->valueType, identifier);
-                if (valueType == "QString") {
-                    result = "QStringList";
+                QString valueType = typeToStr(listType->m_valueType, identifier);
+                if (valueType == QStringLiteral("QString")) {
+                    result = QStringLiteral("QStringList");
                 }
                 else {
-                    result = "QList< " + valueType + " >";
+                    QTextStream strm(&result);
+                    strm << "QList< " << valueType << " >";
                 }
 
                 break;
             }
         case MethodType::WriteMethod:
-            result = "w.writeListBegin(";
+            result = QStringLiteral("w.writeListBegin(");
             break;
         case MethodType::ReadMethod:
-            result = "r.readListBegin(";
+            result = QStringLiteral("r.readListBegin(");
             break;
         case MethodType::ThriftFieldType:
-            result = "ThriftFieldType::T_LIST";
+            result = QStringLiteral("ThriftFieldType::T_LIST");
             break;
         case MethodType::FuncParamType:
-            result = justTypeName;
+            result = typeName;
             break;
         default:
-            result = "";
+            result = QLatin1Literal("");
         }
     }
 
     if (result.isEmpty() &&
-        (methodType == MethodType::TypeName || methodType == MethodType::ReadTypeName ||
+        (methodType == MethodType::TypeName ||
+         methodType == MethodType::ReadTypeName ||
          methodType == MethodType::FuncParamType))
     {
-        throw std::runtime_error(QString("Error! unrecognized type (%1)").arg(identifier).toStdString());
+        throw std::runtime_error(
+            QString::fromUtf8("Error! unrecognized type (%1)")
+            .arg(identifier).toStdString());
     }
 
     return result;
 }
 
-QString Generator::valueToStr(QSharedPointer<Parser::ConstValue> value, QSharedPointer<Parser::Type> type, QString identifier)
+QString Generator::valueToStr(
+    QSharedPointer<Parser::ConstValue> value,
+    QSharedPointer<Parser::Type> type, const QString & identifier)
 {
     if (value.isNull()) {
         return QString();
     }
 
-    QSharedPointer<Parser::MapType> maptype = type.dynamicCast<Parser::MapType>();
-    QSharedPointer<Parser::SetType> settype = type.dynamicCast<Parser::SetType>();
-    QSharedPointer<Parser::ListType> listtype = type.dynamicCast<Parser::ListType>();
+    QSharedPointer<Parser::MapType> mapType =
+        type.dynamicCast<Parser::MapType>();
 
-    QSharedPointer<Parser::StringValue> stringvalue = value.dynamicCast<Parser::StringValue>();
-    QSharedPointer<Parser::LiteralValue> literalvalue = value.dynamicCast<Parser::LiteralValue>();
-    QSharedPointer<Parser::ListValue> listvalue = value.dynamicCast<Parser::ListValue>();
-    QSharedPointer<Parser::MapValue> mapvalue = value.dynamicCast<Parser::MapValue>();
+    QSharedPointer<Parser::SetType> setType =
+        type.dynamicCast<Parser::SetType>();
+
+    QSharedPointer<Parser::ListType> listType =
+        type.dynamicCast<Parser::ListType>();
+
+    QSharedPointer<Parser::StringValue> stringValue =
+        value.dynamicCast<Parser::StringValue>();
+
+    QSharedPointer<Parser::LiteralValue> literalValue =
+        value.dynamicCast<Parser::LiteralValue>();
+
+    QSharedPointer<Parser::ListValue> listValue =
+        value.dynamicCast<Parser::ListValue>();
+
+    QSharedPointer<Parser::MapValue> mapValue =
+        value.dynamicCast<Parser::MapValue>();
 
     QString result;
-    if (stringvalue)
+    if (stringValue)
     {
-        result = QStringLiteral("QStringLiteral(") + stringvalue->value + QStringLiteral(")");
+        QTextStream strm(&result);
+        strm << "QStringLiteral(" << stringValue->m_value << ")";
     }
-    else if (literalvalue)
+    else if (literalValue)
     {
-        result = literalvalue->value;
+        result = literalValue->m_value;
     }
-    else if (listvalue)
+    else if (listValue)
     {
-        if (!settype && !listtype) {
-            throw std::runtime_error(QString::fromUtf8("List initializer for a unsupported type for (%1)").arg(identifier).toStdString());
+        if (!setType && !listType) {
+            throw std::runtime_error(QString::fromUtf8(
+                "List initializer for a unsupported type for (%1)")
+                .arg(identifier).toStdString());
         }
 
         result = typeToStr(type, identifier) + QStringLiteral("()");
-        for(auto it = listvalue->values.constBegin(), end = listvalue->values.constEnd(); it != end; ++it) {
-            const QSharedPointer<Parser::ConstValue> & v = *it;
-            result += " << " + valueToStr(v, QSharedPointer<Parser::Type>(nullptr), identifier);
+        for(const auto & v: qAsConst(listValue->m_values)) {
+            QTextStream strm(&result, QIODevice::Append);
+            strm << " << " << valueToStr(
+                v, QSharedPointer<Parser::Type>(nullptr), identifier);
         }
     }
-    else if (mapvalue) {
-        throw std::runtime_error(QString::fromUtf8("map constants are not implemented (%1)").arg(identifier).toStdString());
+    else if (mapValue) {
+        throw std::runtime_error(
+            QString::fromUtf8("map constants are not implemented (%1)")
+            .arg(identifier).toStdString());
     }
 
     if (result.isEmpty()) {
-        throw std::runtime_error(QString::fromUtf8("Error! unrecognized constant value (%1)").arg(identifier).toStdString());
+        throw std::runtime_error(
+            QString::fromUtf8("Error! unrecognized constant value (%1)")
+            .arg(identifier).toStdString());
     }
 
     return result;
@@ -653,9 +725,12 @@ void Generator::generateConstants(Parser * parser, const QString & outPath)
 {
     const QString headerOutPath = generatedHeaderOutputPath(outPath);
     const QString headerFileName = QStringLiteral("constants.h");
+
     QFile headerFile(QDir(headerOutPath).absoluteFilePath(headerFileName));
-    if (!headerFile.open(QIODevice::WriteOnly|QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8("Can't open the generated header file for writing: %1").arg(headerFile.fileName()).toStdString());
+    if (!headerFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open the generated header file for writing: %1")
+            .arg(headerFile.fileName()).toStdString());
     }
 
     // Generate header:
@@ -665,29 +740,28 @@ void Generator::generateConstants(Parser * parser, const QString & outPath)
 
     writeHeaderHeader(hout, headerFileName);
 
-    QString file;
-    QList<Parser::Constant> constants = parser->constants();
-    for(auto it = constants.constBegin(), end = constants.constEnd(); it != end; ++it)
+    QString fileName;
+    const auto & constants = parser->constants();
+    for(const auto & c: constants)
     {
-        const Parser::Constant & c = *it;
-
-        if (file != c.file)
+        if (fileName != c.m_fileName)
         {
-            bool first = file.isEmpty();
+            bool first = fileName.isEmpty();
             if (!first) {
                 hout << endl;
             }
 
-            file = c.file;
-            hout << "// " << c.file << endl;
+            fileName = c.m_fileName;
+            hout << "// " << c.m_fileName << endl;
         }
 
-        if (!c.docComment.isEmpty()) {
-            hout << c.docComment << endl;
+        if (!c.m_docComment.isEmpty()) {
+            hout << c.m_docComment << endl;
         }
 
-        hout << "QEVERCLOUD_EXPORT extern const " << typeToStr(c.type, c.name)
-             << " " << c.name << ";" << endl << endl;
+        hout << "QEVERCLOUD_EXPORT extern const "
+            << typeToStr(c.m_type, c.m_name)
+            << " " << c.m_name << ";" << endl << endl;
     }
 
     writeHeaderFooter(hout, headerFileName);
@@ -696,34 +770,38 @@ void Generator::generateConstants(Parser * parser, const QString & outPath)
 
     const QString sourceOutPath = generatedSourceOutputPath(outPath);
     const QString bodyFileName = "constants.cpp";
+
     QFile bodyFile(QDir(sourceOutPath).absoluteFilePath(bodyFileName));
     if (!bodyFile.open(QIODevice::WriteOnly|QIODevice::Text)) {
-        throw std::runtime_error(QString("Can't open the generated source file for writing: %1").arg(bodyFile.fileName()).toStdString());
+        throw std::runtime_error(QString(
+            "Can't open the generated source file for writing: %1")
+            .arg(bodyFile.fileName()).toStdString());
     }
 
     QTextStream bout(&bodyFile);
     bout.setCodec("UTF-8");
 
     QStringList additionalPreIncludes;
-    additionalPreIncludes << QStringLiteral("<qt4helpers.h>");
+    additionalPreIncludes << QStringLiteral("<Helpers.h>");
     writeHeaderBody(bout, headerFileName, additionalPreIncludes);
 
-    file = "";
-    for(auto it = constants.constBegin(), end = constants.constEnd(); it != end; ++it)
+    fileName = QLatin1Literal("");
+    for(const auto & c: constants)
     {
-        const Parser::Constant & c = *it;
-
-        if (file != c.file) {
-            file = c.file;
-            bout << endl << "// " << c.file << endl << endl;
+        if (fileName != c.m_fileName) {
+            fileName = c.m_fileName;
+            bout << endl << "// " << c.m_fileName << endl << endl;
         }
 
-        if (c.value.isNull()) {
-            throw std::runtime_error(QString("Constant without a value: %1").arg(c.name).toStdString());
+        if (c.m_value.isNull()) {
+            throw std::runtime_error(
+                QString("Constant without a value: %1")
+                .arg(c.m_name).toStdString());
         }
 
-        bout << "const " << typeToStr(c.type, c.name) << " "
-             << c.name << " = " << valueToStr(c.value, c.type, c.name) << ";" << endl;
+        bout << "const " << typeToStr(c.m_type, c.m_name) << " "
+             << c.m_name << " = " << valueToStr(c.m_value, c.m_type, c.m_name)
+             << ";" << endl;
     }
 
     writeBodyFooter(bout);
@@ -731,14 +809,14 @@ void Generator::generateConstants(Parser * parser, const QString & outPath)
 
 QString Generator::fieldToStr(const Parser::Field & field)
 {
-   QString s = typeToStr(field.type, field.name);
-   if (field.required == Parser::Field::RequiredFlag::Optional) {
+   QString s = typeToStr(field.m_type, field.m_name);
+   if (field.m_required == Parser::Field::RequiredFlag::Optional) {
        s = "Optional< " + s + " >";
    }
 
-   s += " " + field.name;
-   if (field.initializer) {
-       s += " = " + valueToStr(field.initializer, field.type, field.name);
+   s += " " + field.m_name;
+   if (field.m_initializer) {
+       s += " = " + valueToStr(field.m_initializer, field.m_type, field.m_name);
    }
 
    return s;
@@ -748,93 +826,150 @@ QString Generator::getIdentifier(const QSharedPointer<Parser::Type> & type)
 {
     auto it = type.dynamicCast<Parser::IdentifierType>();
     return (it
-            ? clearInclude(it->identifier)
+            ? clearInclude(it->m_identifier)
             : QString());
 }
 
-void Generator::writeThriftWriteFields(QTextStream & out, const QList<Parser::Field> & fields, QString identPrefix, QString fieldPrefix)
+void Generator::writeThriftWriteFields(
+    QTextStream & out, const QList<Parser::Field> & fields,
+    const QString & identPrefix, const QString & fieldPrefix)
 {
-    for(auto it = fields.constBegin(), end = fields.constEnd(); it != end; ++it)
+    for(const auto & field: fields)
     {
-        const Parser::Field & field = *it;
+        QString ident = QLatin1Literal("");
 
-        QString ident = QStringLiteral("");
-
-        bool isOptional = (field.required == Parser::Field::RequiredFlag::Optional);
+        bool isOptional =
+            (field.m_required == Parser::Field::RequiredFlag::Optional);
         if (isOptional) {
             ident = QStringLiteral("    ");
-            out << QStringLiteral("    if(") << fieldPrefix + field.name << QStringLiteral(".isSet()) {") << endl;
+            out << QStringLiteral("    if (") << fieldPrefix
+                << field.m_name << QStringLiteral(".isSet()) {") << endl;
         }
 
-        out << ident << QStringLiteral("    w.writeFieldBegin(QStringLiteral(\"")
-            << field.name << QStringLiteral("\"), ")
-            << typeToStr(field.type, identPrefix + QStringLiteral(". ") + field.name, MethodType::ThriftFieldType)
-            << QStringLiteral(", ") << field.id << QStringLiteral(");") << endl;
+        out << ident
+            << QStringLiteral("    w.writeFieldBegin(QStringLiteral(\"")
+            << field.m_name << QStringLiteral("\"), ")
+            << typeToStr(
+                field.m_type, identPrefix + QStringLiteral(". ") + field.m_name,
+                MethodType::ThriftFieldType)
+            << QStringLiteral(", ") << field.m_id << QStringLiteral(");")
+            << endl;
 
-        QString fieldMoniker = fieldPrefix + field.name + (isOptional ? QStringLiteral(".ref()") : QStringLiteral(""));
-        QString writeMethod = typeToStr(field.type, identPrefix + QStringLiteral(",") + field.name, MethodType::WriteMethod);
+        QString fieldMoniker;
+        {
+            QTextStream strm(&fieldMoniker);
+            strm << fieldPrefix << field.m_name
+                << (isOptional ? QStringLiteral(".ref()") : QLatin1Literal(""));
+        }
+
+        QString writeMethod = typeToStr(
+            field.m_type, identPrefix + QStringLiteral(",") + field.m_name,
+            MethodType::WriteMethod);
 
         if (writeMethod.contains(QStringLiteral("writeListBegin")))
         {
-            QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::ListType>()->valueType;
+            QSharedPointer<Parser::Type> valueType =
+                field.m_type.dynamicCast<Parser::ListType>()->m_valueType;
 
             out << ident << QStringLiteral("    w.writeListBegin(")
-                << typeToStr(valueType, identPrefix + QStringLiteral(",") + field.name, MethodType::ThriftFieldType)
-                << QStringLiteral(", ") << fieldMoniker << QStringLiteral(".length());") << endl;
+                << typeToStr(
+                    valueType, identPrefix + QStringLiteral(",") + field.m_name,
+                    MethodType::ThriftFieldType)
+                << QStringLiteral(", ") << fieldMoniker
+                << QStringLiteral(".length());") << endl;
 
-            out << ident << QStringLiteral("    for(") << typeToStr(field.type, QString(), MethodType::TypeName)
-                << QStringLiteral("::const_iterator it = ") << fieldMoniker << QStringLiteral(".constBegin(), end = ")
-                << fieldMoniker << QStringLiteral(".constEnd(); it != end; ++it) {") << endl;
+            out << ident
+                << QStringLiteral("    for(const auto & value: qAsConst(")
+                << fieldMoniker << QStringLiteral(")) {") << endl;
 
-            QString writeMethod = typeToStr(valueType, identPrefix + "," + field.name, MethodType::WriteMethod);
-            out << ident << QStringLiteral("        ") << writeMethod << QStringLiteral("*it")
-                << (writeMethod.contains(QStringLiteral("static_cast<")) ? QStringLiteral(")") : QStringLiteral(""))
+            QString writeMethod = typeToStr(
+                valueType, identPrefix + QStringLiteral(",") + field.m_name,
+                MethodType::WriteMethod);
+
+            out << ident << QStringLiteral("        ") << writeMethod
+                << QStringLiteral("value")
+                << (writeMethod.contains(QStringLiteral("static_cast<"))
+                    ? QStringLiteral(")")
+                    : QLatin1Literal(""))
                 << QStringLiteral(");") << endl;
 
             out << ident << QStringLiteral("    }") << endl;
             out << ident << QStringLiteral("    w.writeListEnd();") << endl;
         }
-        else if(writeMethod.contains(QStringLiteral("writeSetBegin")))
+        else if (writeMethod.contains(QStringLiteral("writeSetBegin")))
         {
-            QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::SetType>()->valueType;
+            QSharedPointer<Parser::Type> valueType =
+                field.m_type.dynamicCast<Parser::SetType>()->m_valueType;
 
             out << ident << QStringLiteral("    w.writeSetBegin(")
-                << typeToStr(valueType, identPrefix + QStringLiteral(",") + field.name, MethodType::ThriftFieldType)
-                << QStringLiteral(", ") << fieldMoniker << QStringLiteral(".count());") << endl;
+                << typeToStr(
+                    valueType, identPrefix + QStringLiteral(",") + field.m_name,
+                    MethodType::ThriftFieldType)
+                << QStringLiteral(", ") << fieldMoniker
+                << QStringLiteral(".count());") << endl;
 
-            out << ident << QStringLiteral("    for(") << typeToStr(field.type, QString(), MethodType::TypeName)
-                << QStringLiteral("::const_iterator it = ") << fieldMoniker << QStringLiteral(".constBegin(), end = ")
-                << fieldMoniker << QStringLiteral(".constEnd(); it != end; ++it) {") << endl;
+            out << ident
+                << QStringLiteral("    for(const auto & value: qAsConst(")
+                << fieldMoniker << ")) {" << endl;
 
-            QString writeMethod = typeToStr(valueType, identPrefix + QStringLiteral(",") + field.name, MethodType::WriteMethod);
-            out << ident << QStringLiteral("        ") << writeMethod << QStringLiteral("*it")
-                << (writeMethod.contains(QStringLiteral("static_cast<")) ? QStringLiteral(")") : QStringLiteral(""))
+            QString writeMethod = typeToStr(
+                valueType, identPrefix + QStringLiteral(",") + field.m_name,
+                MethodType::WriteMethod);
+
+            out << ident << QStringLiteral("        ") << writeMethod
+                << QStringLiteral("value")
+                << (writeMethod.contains(QStringLiteral("static_cast<"))
+                    ? QStringLiteral(")")
+                    : QLatin1Literal(""))
                 << QStringLiteral(");") << endl;
 
             out << ident << QStringLiteral("    }") << endl;
             out << ident << QStringLiteral("    w.writeSetEnd();") << endl;
         }
-        else if(writeMethod.contains(QStringLiteral("writeMapBegin")))
+        else if (writeMethod.contains(QStringLiteral("writeMapBegin")))
         {
-            QSharedPointer<Parser::Type> keyType = field.type.dynamicCast<Parser::MapType>()->keyType;
-            QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::MapType>()->valueType;
+            QSharedPointer<Parser::Type> keyType =
+                field.m_type.dynamicCast<Parser::MapType>()->m_keyType;
+
+            QSharedPointer<Parser::Type> valueType =
+                field.m_type.dynamicCast<Parser::MapType>()->m_valueType;
 
             out << ident << QStringLiteral("    w.writeMapBegin(")
-                << typeToStr(keyType, identPrefix + QStringLiteral(",") + field.name, MethodType::ThriftFieldType)
-                << QStringLiteral(", ") << typeToStr(valueType, identPrefix + QStringLiteral(",") + field.name, MethodType::ThriftFieldType)
-                << QStringLiteral(", ") << fieldMoniker << QStringLiteral(".size());") << endl;
+                << typeToStr(
+                    keyType, identPrefix + QStringLiteral(",") + field.m_name,
+                    MethodType::ThriftFieldType)
+                << QStringLiteral(", ")
+                << typeToStr(
+                    valueType, identPrefix + QStringLiteral(",") + field.m_name,
+                    MethodType::ThriftFieldType)
+                << QStringLiteral(", ") << fieldMoniker
+                << QStringLiteral(".size());") << endl;
 
-            out << ident << QStringLiteral("    for(") << typeToStr(field.type, QString(), MethodType::TypeName)
-                << QStringLiteral("::const_iterator it = ") << fieldMoniker << QStringLiteral(".constBegin(), end = ")
-                << fieldMoniker << QStringLiteral(".constEnd(); it != end; ++it) {") << endl;
+            out << ident
+                << QStringLiteral("    for(auto it = ")
+                << fieldMoniker << QStringLiteral(".constBegin(), end = ")
+                << fieldMoniker
+                << QStringLiteral(".constEnd(); it != end; ++it) {") << endl;
 
-            QString keyWriteMethod = typeToStr(keyType, identPrefix + QStringLiteral(",") + field.name, MethodType::WriteMethod);
-            QString valueWriteMethod = typeToStr(valueType, identPrefix + QStringLiteral(",") + field.name, MethodType::WriteMethod);
-            out << ident << QStringLiteral("        ") << keyWriteMethod << QStringLiteral("it.key()")
-                << (keyWriteMethod.contains(QStringLiteral("static_cast<")) ? QStringLiteral(")") : QStringLiteral(""))
+            QString keyWriteMethod = typeToStr(
+                keyType, identPrefix + QStringLiteral(",") + field.m_name,
+                MethodType::WriteMethod);
+
+            QString valueWriteMethod = typeToStr(
+                valueType, identPrefix + QStringLiteral(",") + field.m_name,
+                MethodType::WriteMethod);
+
+            out << ident << QStringLiteral("        ") << keyWriteMethod
+                << QStringLiteral("it.key()")
+                << (keyWriteMethod.contains(QStringLiteral("static_cast<"))
+                    ? QStringLiteral(")")
+                    : QLatin1Literal(""))
                 << QStringLiteral(");") << endl;
-            out << ident << QStringLiteral("        ") << valueWriteMethod << QStringLiteral("it.value()")
-                << (valueWriteMethod.contains(QStringLiteral("static_cast<")) ? QStringLiteral(")") : QStringLiteral(""))
+            out << ident << QStringLiteral("        ") << valueWriteMethod
+                << QStringLiteral("it.value()")
+                << (valueWriteMethod.contains(QStringLiteral("static_cast<"))
+                    ? QStringLiteral(")")
+                    : QLatin1Literal(""))
                 << QStringLiteral(");") << endl;
 
             out << ident << QStringLiteral("    }") << endl;
@@ -842,8 +977,11 @@ void Generator::writeThriftWriteFields(QTextStream & out, const QList<Parser::Fi
         }
         else
         {
-            out << ident << QStringLiteral("    ") << writeMethod << fieldMoniker
-                << (writeMethod.contains(QStringLiteral("static_cast<")) ? QStringLiteral(")") : QStringLiteral(""))
+            out << ident << QStringLiteral("    ") << writeMethod
+                << fieldMoniker
+                << (writeMethod.contains(QStringLiteral("static_cast<"))
+                    ? QStringLiteral(")")
+                    : QLatin1Literal(""))
                 << QStringLiteral(");") << endl;
         }
 
@@ -854,80 +992,138 @@ void Generator::writeThriftWriteFields(QTextStream & out, const QList<Parser::Fi
     }
 }
 
-void Generator::writeThriftReadField(QTextStream & out, const Parser::Field & field, QString identPrefix, QString fieldParent)
+void Generator::writeThriftReadField(
+    QTextStream & out, const Parser::Field & field, const QString & identPrefix,
+    const QString & fieldParent)
 {
     const char * indent = "                ";
 
-    out << indent << typeToStr(field.type, identPrefix + field.name, MethodType::ReadTypeName)
+    out << indent
+        << typeToStr(
+            field.m_type, identPrefix + field.m_name, MethodType::ReadTypeName)
         << QStringLiteral(" v;") << endl;
 
-    QString readMethod = typeToStr(field.type, identPrefix + field.name, MethodType::ReadMethod);
+    QString readMethod = typeToStr(
+        field.m_type, identPrefix + field.m_name, MethodType::ReadMethod);
     if (readMethod.contains(QStringLiteral("readListBegin")))
     {
-        QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::ListType>()->valueType;
-        QString valueReadMethod = typeToStr(valueType,  identPrefix + field.name, MethodType::ReadMethod);
-        QString valueThriftType = typeToStr(valueType,  identPrefix + field.name, MethodType::ThriftFieldType);
+        QSharedPointer<Parser::Type> valueType =
+            field.m_type.dynamicCast<Parser::ListType>()->m_valueType;
+
+        QString valueReadMethod = typeToStr(
+            valueType, identPrefix + field.m_name, MethodType::ReadMethod);
+
+        QString valueThriftType = typeToStr(
+            valueType,  identPrefix + field.m_name,
+            MethodType::ThriftFieldType);
+
         out << indent << QStringLiteral("qint32 size;") << endl;
-        out << indent << QStringLiteral("ThriftFieldType::type elemType;") << endl;
-        out << indent << QStringLiteral("r.readListBegin(elemType, size);") << endl;
+        out << indent << QStringLiteral("ThriftFieldType::type elemType;")
+            << endl;
+        out << indent << QStringLiteral("r.readListBegin(elemType, size);")
+            << endl;
         out << indent << QStringLiteral("v.reserve(size);") << endl;
         out << indent << QStringLiteral("if(elemType != ") << valueThriftType
-            << QStringLiteral(") throw ThriftException(ThriftException::Type::INVALID_DATA, QStringLiteral(\"Incorrect list type (")
-            << identPrefix + field.name << QStringLiteral(")\"));") << endl;
-        out << indent << QStringLiteral("for(qint32 i = 0; i < size; i++) {") << endl;
-        out << indent << QStringLiteral("    ") << typeToStr(valueType, identPrefix + field.name, MethodType::ReadTypeName)
+            << QStringLiteral(") throw ThriftException(ThriftException::Type::")
+            << QStringLiteral("INVALID_DATA, QStringLiteral(\"Incorrect list ")
+            << QStringLiteral("type (")
+            << identPrefix + field.m_name << QStringLiteral(")\"));") << endl;
+        out << indent << QStringLiteral("for(qint32 i = 0; i < size; i++) {")
+            << endl;
+        out << indent << QStringLiteral("    ")
+            << typeToStr(
+                valueType, identPrefix + field.m_name, MethodType::ReadTypeName)
             << QStringLiteral(" elem;") << endl;
-        out << indent << QStringLiteral("    ") << valueReadMethod << QStringLiteral("elem);") << endl;
+        out << indent << QStringLiteral("    ") << valueReadMethod
+            << QStringLiteral("elem);") << endl;
         out << indent << QStringLiteral("    v.append(elem);") << endl;
         out << indent << QStringLiteral("}") << endl;
         out << indent << QStringLiteral("r.readListEnd();") << endl;
     }
     else if (readMethod.contains("readSetBegin"))
     {
-        QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::SetType>()->valueType;
-        QString valueReadMethod = typeToStr(valueType,  identPrefix + field.name, MethodType::ReadMethod);
-        QString valueThriftType = typeToStr(valueType,  identPrefix + field.name, MethodType::ThriftFieldType);
+        QSharedPointer<Parser::Type> valueType =
+            field.m_type.dynamicCast<Parser::SetType>()->m_valueType;
+
+        QString valueReadMethod = typeToStr(
+            valueType, identPrefix + field.m_name, MethodType::ReadMethod);
+
+        QString valueThriftType = typeToStr(
+            valueType, identPrefix + field.m_name, MethodType::ThriftFieldType);
+
         out << indent << QStringLiteral("qint32 size;") << endl;
         out << indent << QStringLiteral("ThriftFieldType::type elemType;") << endl;
         out << indent << QStringLiteral("r.readSetBegin(elemType, size);") << endl;
         out << indent << QStringLiteral("v.reserve(size);") << endl;
         out << indent << QStringLiteral("if (elemType != ") << valueThriftType
-            << QStringLiteral(") throw ThriftException(ThriftException::Type::INVALID_DATA, QStringLiteral(\"Incorrect set type (")
-            << identPrefix + field.name << QStringLiteral(")\"));") << endl;
-        out << indent << QStringLiteral("for(qint32 i = 0; i < size; i++) {") << endl;
-        out << indent << QStringLiteral("    ") << typeToStr(valueType, identPrefix + field.name, MethodType::ReadTypeName)
+            << QStringLiteral(") throw ThriftException(ThriftException::Type::")
+            << QStringLiteral("INVALID_DATA, QStringLiteral(\"Incorrect set ")
+            << QStringLiteral("type (")
+            << identPrefix + field.m_name << QStringLiteral(")\"));") << endl;
+        out << indent << QStringLiteral("for(qint32 i = 0; i < size; i++) {")
+            << endl;
+        out << indent << QStringLiteral("    ")
+            << typeToStr(
+                valueType, identPrefix + field.m_name, MethodType::ReadTypeName)
             << QStringLiteral(" elem;") << endl;
-        out << indent << QStringLiteral("    ") << valueReadMethod << QStringLiteral("elem);") << endl;
+        out << indent << QStringLiteral("    ") << valueReadMethod
+            << QStringLiteral("elem);") << endl;
         out << indent << QStringLiteral("    v.insert(elem);") << endl;
         out << indent << QStringLiteral("}") << endl;
         out << indent << QStringLiteral("r.readSetEnd();") << endl;
     }
     else if (readMethod.contains(QStringLiteral("readMapBegin")))
     {
-        QSharedPointer<Parser::Type> keyType = field.type.dynamicCast<Parser::MapType>()->keyType;
-        QString keyReadMethod = typeToStr(keyType, identPrefix + field.name, MethodType::ReadMethod);
-        QString keyThriftType = typeToStr(keyType, identPrefix + field.name, MethodType::ThriftFieldType);
-        QSharedPointer<Parser::Type> valueType = field.type.dynamicCast<Parser::MapType>()->valueType;
-        QString valueReadMethod = typeToStr(valueType, identPrefix + field.name, MethodType::ReadMethod);
-        QString valueThriftType = typeToStr(valueType, identPrefix + field.name, MethodType::ThriftFieldType);
+        QSharedPointer<Parser::Type> keyType =
+            field.m_type.dynamicCast<Parser::MapType>()->m_keyType;
+
+        QString keyReadMethod = typeToStr(
+            keyType, identPrefix + field.m_name, MethodType::ReadMethod);
+
+        QString keyThriftType = typeToStr(
+            keyType, identPrefix + field.m_name, MethodType::ThriftFieldType);
+
+        QSharedPointer<Parser::Type> valueType =
+            field.m_type.dynamicCast<Parser::MapType>()->m_valueType;
+
+        QString valueReadMethod = typeToStr(
+            valueType, identPrefix + field.m_name, MethodType::ReadMethod);
+
+        QString valueThriftType = typeToStr(
+            valueType, identPrefix + field.m_name, MethodType::ThriftFieldType);
+
         out << indent << QStringLiteral("qint32 size;") << endl;
-        out << indent << QStringLiteral("ThriftFieldType::type keyType;") << endl;
-        out << indent << QStringLiteral("ThriftFieldType::type elemType;") << endl;
-        out << indent << QStringLiteral("r.readMapBegin(keyType, elemType, size);") << endl;
+        out << indent << QStringLiteral("ThriftFieldType::type keyType;")
+            << endl;
+        out << indent << QStringLiteral("ThriftFieldType::type elemType;")
+            << endl;
+        out << indent
+            << QStringLiteral("r.readMapBegin(keyType, elemType, size);")
+            << endl;
         out << indent << QStringLiteral("if (keyType != ") << keyThriftType
-            << QStringLiteral(") throw ThriftException(ThriftException::Type::INVALID_DATA, QStringLiteral(\"Incorrect map key type (")
-            << identPrefix + field.name << QStringLiteral(")\"));") << endl;
+            << QStringLiteral(") throw ThriftException(ThriftException::Type::")
+            << QStringLiteral("INVALID_DATA, QStringLiteral(\"Incorrect map ")
+            << QStringLiteral("key type (")
+            << identPrefix << field.m_name << QStringLiteral(")\"));") << endl;
         out << indent << QStringLiteral("if (elemType != ") << valueThriftType
-            << QStringLiteral(") throw ThriftException(ThriftException::Type::INVALID_DATA, QStringLiteral(\"Incorrect map value type (")
-            << identPrefix + field.name << QStringLiteral(")\"));") << endl;
-        out << indent << QStringLiteral("for(qint32 i = 0; i < size; i++) {") << endl;
+            << QStringLiteral(") throw ThriftException(ThriftException::Type::")
+            << QStringLiteral("INVALID_DATA, QStringLiteral(\"Incorrect map ")
+            << QStringLiteral("value type (")
+            << identPrefix + field.m_name << QStringLiteral(")\"));") << endl;
+        out << indent << QStringLiteral("for(qint32 i = 0; i < size; i++) {")
+            << endl;
         out << indent << QStringLiteral("    ")
-            << typeToStr(keyType, identPrefix + field.name, MethodType::ReadTypeName)
+            << typeToStr(
+                keyType, identPrefix + field.m_name, MethodType::ReadTypeName)
             << QStringLiteral(" key;") << endl;
-        out << indent << QStringLiteral("    ") << keyReadMethod << QStringLiteral("key);") << endl;
-        out << indent << QStringLiteral("    ") << typeToStr(valueType, identPrefix + field.name, MethodType::ReadTypeName)
+        out << indent << QStringLiteral("    ") << keyReadMethod
+            << QStringLiteral("key);") << endl;
+        out << indent << QStringLiteral("    ")
+            << typeToStr(
+                valueType, identPrefix + field.m_name, MethodType::ReadTypeName)
             << QStringLiteral(" value;") << endl;
-        out << indent << QStringLiteral("    ") << valueReadMethod << QStringLiteral("value);") << endl;
+        out << indent << QStringLiteral("    ") << valueReadMethod
+            << QStringLiteral("value);") << endl;
         out << indent << QStringLiteral("    v[key] = value;") << endl;
         out << indent << QStringLiteral("}") << endl;
         out << indent << QStringLiteral("r.readMapEnd();") << endl;
@@ -937,7 +1133,8 @@ void Generator::writeThriftReadField(QTextStream & out, const Parser::Field & fi
         out << indent << readMethod << QStringLiteral("v);") << endl;
     }
 
-    out << indent << fieldParent << field.name << QStringLiteral(" = v;") << endl;
+    out << indent << fieldParent << field.m_name << QStringLiteral(" = v;")
+        << endl;
 }
 
 void Generator::generateTypes(Parser * parser, const QString & outPath)
@@ -946,22 +1143,32 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     const QString headerFileName = QStringLiteral("types.h");
     QFile headerFile(QDir(headerOutPath).absoluteFilePath(headerFileName));
     if (!headerFile.open(QIODevice::WriteOnly|QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8("Can't open the generated header file for writing: %1").arg(headerFile.fileName()).toStdString());
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open the generated header file for writing: %1")
+            .arg(headerFile.fileName()).toStdString());
     }
 
     QTextStream hout(&headerFile);
     hout.setCodec("UTF-8");
 
-    const QString EDAMErrorCodeHeaderFileName = QStringLiteral("EDAMErrorCode.h");
-    QStringList additionalPreIncludes = QStringList() << EDAMErrorCodeHeaderFileName;
-    QStringList additionalPostIncludes = QStringList() << QStringLiteral("<QSharedPointer>")
-                                                       << QStringLiteral("<QMetaType>");
+    const QString EDAMErrorCodeHeaderFileName =
+        QStringLiteral("EDAMErrorCode.h");
 
-    writeHeaderHeader(hout, headerFileName, additionalPreIncludes, additionalPostIncludes);
+    QStringList additionalPreIncludes =
+        QStringList() << EDAMErrorCodeHeaderFileName;
 
-    QFile EDAMErrorCodeHeaderFile(QDir(headerOutPath).absoluteFilePath(EDAMErrorCodeHeaderFileName));
+    QStringList additionalPostIncludes = QStringList()
+        << QStringLiteral("<QSharedPointer>") << QStringLiteral("<QMetaType>");
+
+    writeHeaderHeader(
+        hout, headerFileName, additionalPreIncludes, additionalPostIncludes);
+
+    QFile EDAMErrorCodeHeaderFile(
+        QDir(headerOutPath).absoluteFilePath(EDAMErrorCodeHeaderFileName));
     if (!EDAMErrorCodeHeaderFile.open(QIODevice::WriteOnly|QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8("Can't open the generated header file for writing: %1").arg(EDAMErrorCodeHeaderFile.fileName()).toStdString());
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open the generated header file for writing: %1")
+            .arg(EDAMErrorCodeHeaderFile.fileName()).toStdString());
     }
 
     QTextStream houtEDAMErrorCode(&EDAMErrorCodeHeaderFile);
@@ -969,30 +1176,31 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
 
     writeHeaderHeader(houtEDAMErrorCode, EDAMErrorCodeHeaderFileName);
 
-    QList<Parser::Enumeration> enumerations = parser->enumerations();
-    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it)
+    const auto & enumerations = parser->enumerations();
+    for(const auto & e: enumerations)
     {
-        const Parser::Enumeration & e = *it;
-
-        if (e.name == QStringLiteral("EDAMErrorCode"))
+        if (e.m_name == QStringLiteral("EDAMErrorCode"))
         {
-            if (!e.docComment.isEmpty()) {
-                houtEDAMErrorCode << e.docComment << endl;
+            if (!e.m_docComment.isEmpty()) {
+                houtEDAMErrorCode << e.m_docComment << endl;
             }
 
-            houtEDAMErrorCode << QStringLiteral("struct QEVERCLOUD_EXPORT ") << e.name << endl << QStringLiteral("{") << endl;
-            houtEDAMErrorCode << QStringLiteral("    enum type") << endl << QStringLiteral("    {") << endl;
+            houtEDAMErrorCode << QStringLiteral("struct QEVERCLOUD_EXPORT ")
+                << e.m_name << endl << QStringLiteral("{") << endl;
 
-            for(int i = 0; i< e.values.length(); i++)
+            houtEDAMErrorCode << QStringLiteral("    enum type") << endl
+                << QStringLiteral("    {") << endl;
+
+            for(int i = 0; i< e.m_values.length(); i++)
             {
-                const QPair<QString, QString>& v = e.values[i];
+                const QPair<QString, QString>& v = e.m_values[i];
                 houtEDAMErrorCode << QStringLiteral("        ") << v.first;
 
                 if (!v.second.isEmpty()) {
                     houtEDAMErrorCode << QStringLiteral(" = ") << v.second;
                 }
 
-                if (i < (e.values.length() - 1)) {
+                if (i < (e.m_values.length() - 1)) {
                     houtEDAMErrorCode << QStringLiteral(",");
                 }
 
@@ -1004,23 +1212,24 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
         }
         else
         {
-            if (!e.docComment.isEmpty()) {
-                hout << e.docComment << endl;
+            if (!e.m_docComment.isEmpty()) {
+                hout << e.m_docComment << endl;
             }
 
-            hout << QStringLiteral("struct QEVERCLOUD_EXPORT ") << e.name << QStringLiteral(" {") << endl;
+            hout << QStringLiteral("struct QEVERCLOUD_EXPORT ")
+                << e.m_name << QStringLiteral(" {") << endl;
             hout << QStringLiteral("    enum type {") << endl;
 
-            for(int i = 0; i< e.values.length(); i++)
+            for(int i = 0; i< e.m_values.length(); i++)
             {
-                const QPair<QString, QString> & v = e.values[i];
+                const QPair<QString, QString> & v = e.m_values[i];
                 hout << "        " << v.first;
 
                 if (!v.second.isEmpty()) {
                     hout << QStringLiteral(" = ") << v.second;
                 }
 
-                if (i < (e.values.length() - 1)) {
+                if (i < (e.m_values.length() - 1)) {
                     hout << QStringLiteral(",");
                 }
 
@@ -1035,17 +1244,16 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     hout << endl;
     houtEDAMErrorCode << endl;
 
-    QList<Parser::TypeDefinition> typedefs = parser->typedefs();
-    for(auto it = typedefs.constBegin(), end = typedefs.constEnd(); it != end; ++it)
+    const auto & typedefs = parser->typedefs();
+    for(const auto & t: typedefs)
     {
-        const Parser::TypeDefinition & t = *it;
-
-        if (!t.docComment.isEmpty()) {
-            hout << t.docComment << endl;
+        if (!t.m_docComment.isEmpty()) {
+            hout << t.m_docComment << endl;
         }
 
-        hout << QStringLiteral("typedef ") << typeToStr(t.type, t.name)
-             << QStringLiteral(" ") << t.name << QStringLiteral(";") << endl << endl;
+        hout << QStringLiteral("typedef ") << typeToStr(t.m_type, t.m_name)
+             << QStringLiteral(" ") << t.m_name << QStringLiteral(";")
+             << endl << endl;
     }
     hout << endl;
 
@@ -1053,12 +1261,12 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     QList<Parser::Structure> ordered;
 
     QSet<QString> exceptions;
-    QList<Parser::Structure> parserExceptions = parser->exceptions();
-    for(auto it = parserExceptions.constBegin(), end = parserExceptions.constEnd(); it != end; ++it) {
-        exceptions.insert(it->name);
+    const auto & parserExceptions = parser->exceptions();
+    for(const auto & e: parserExceptions) {
+        exceptions.insert(e.m_name);
     }
 
-    QList<Parser::Structure> heap = parser->structures();
+    auto heap = parser->structures();
     heap.append(parser->exceptions());
 
     int count = heap.count();
@@ -1069,37 +1277,48 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
         {
             const Parser::Structure s = heap[i];
             bool safeStruct = true;
-            for(const Parser::Field & f : s.fields)
+            for(const auto & f : s.m_fields)
             {
-                QString typeName = getIdentifier(f.type);
+                QString typeName = getIdentifier(f.m_type);
                 QString typeName2;
                 if (typeName.isEmpty())
                 {
-                    if (f.type.dynamicCast<Parser::SetType>()) {
-                        typeName = getIdentifier(f.type.dynamicCast<Parser::SetType>()->valueType);
+                    if (f.m_type.dynamicCast<Parser::SetType>()) {
+                        auto t = f.m_type.dynamicCast<Parser::SetType>();
+                        typeName = getIdentifier(t->m_valueType);
                     }
-                    else if (f.type.dynamicCast<Parser::ListType>()) {
-                        typeName = getIdentifier(f.type.dynamicCast<Parser::ListType>()->valueType);
+                    else if (f.m_type.dynamicCast<Parser::ListType>()) {
+                        auto t = f.m_type.dynamicCast<Parser::ListType>();
+                        typeName = getIdentifier(t->m_valueType);
                     }
-                    else if (f.type.dynamicCast<Parser::MapType>()) {
-                        typeName = getIdentifier(f.type.dynamicCast<Parser::MapType>()->valueType);
-                        typeName2 = getIdentifier(f.type.dynamicCast<Parser::MapType>()->keyType);
+                    else if (f.m_type.dynamicCast<Parser::MapType>()) {
+                        auto t = f.m_type.dynamicCast<Parser::MapType>();
+                        typeName = getIdentifier(t->m_valueType);
+                        typeName2 = getIdentifier(t->m_keyType);
                     }
                 }
 
-                if (!typeName.isEmpty() && (allstructs_.contains(typeName) || allexceptions_.contains(typeName)) && !safe.contains(typeName)) {
+                if (!typeName.isEmpty() &&
+                    (m_allStructs.contains(typeName) ||
+                     m_allExceptions.contains(typeName)) &&
+                    !safe.contains(typeName))
+                {
                     safeStruct = false;
                     break;
                 }
 
-                if (!typeName2.isEmpty() && (allstructs_.contains(typeName2) || allexceptions_.contains(typeName2)) && !safe.contains(typeName2)) {
+                if (!typeName2.isEmpty() &&
+                    (m_allStructs.contains(typeName2) ||
+                     m_allExceptions.contains(typeName2))
+                    && !safe.contains(typeName2))
+                {
                     safeStruct = false;
                     break;
                 }
             }
 
             if (safeStruct) {
-                safe << s.name;
+                safe << s.m_name;
                 ordered << s;
                 heap.removeAt(i);
             }
@@ -1113,49 +1332,58 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
         }
     }
 
-    for(auto it = ordered.constBegin(), end = ordered.constEnd(); it != end; ++it)
+    for(const auto & s: qAsConst(ordered))
     {
-        const Parser::Structure & s = *it;
-        if (!s.docComment.isEmpty()) {
-            hout << s.docComment << endl;
+        if (!s.m_docComment.isEmpty()) {
+            hout << s.m_docComment << endl;
         }
         else {
             hout << QStringLiteral("/** NO DOC COMMENT ID FOUND */") << endl;
         }
 
-        if (exceptions.contains(s.name))
+        if (exceptions.contains(s.m_name))
         {
-            hout << QStringLiteral("class QEVERCLOUD_EXPORT ") << s.name << QStringLiteral(": public EvernoteException")
-                 << endl << QStringLiteral("{") << endl << QStringLiteral("public:") << endl;
+            hout << QStringLiteral("class QEVERCLOUD_EXPORT ") << s.m_name
+                << QStringLiteral(": public EvernoteException")
+                << endl << QStringLiteral("{") << endl
+                << QStringLiteral("public:") << endl;
 
-            for(const Parser::Field & f : s.fields) {
-                hout << QStringLiteral("    ") << fieldToStr(f) << QStringLiteral(";") << endl;
+            for(const auto & f : s.m_fields) {
+                hout << QStringLiteral("    ") << fieldToStr(f)
+                    << QStringLiteral(";") << endl;
             }
 
             hout << endl;
-            hout << QStringLiteral("    ") << s.name << QStringLiteral("();") << endl;
-            hout << QStringLiteral("    virtual ~") << s.name << QStringLiteral("() throw() Q_DECL_OVERRIDE;") << endl;
+            hout << QStringLiteral("    ") << s.m_name
+                << QStringLiteral("();") << endl;
+            hout << QStringLiteral("    virtual ~") << s.m_name
+                << QStringLiteral("() throw() Q_DECL_OVERRIDE;") << endl;
 
-            if (!s.fields.isEmpty()) {
+            if (!s.m_fields.isEmpty()) {
                 hout << endl;
-                hout << QStringLiteral("    ") << s.name << QStringLiteral("(const ") << s.name << QStringLiteral(" & other);") << endl;
+                hout << QStringLiteral("    ") << s.m_name
+                    << QStringLiteral("(const ") << s.m_name
+                    << QStringLiteral(" & other);") << endl;
             }
 
-            hout << QStringLiteral("    const char * what() const throw() Q_DECL_OVERRIDE;") << endl;
-            hout << QStringLiteral("    virtual QSharedPointer<EverCloudExceptionData> exceptionData() const Q_DECL_OVERRIDE;") << endl;
+            hout << QStringLiteral("    const char * what() const throw() ")
+                << QStringLiteral("Q_DECL_OVERRIDE;") << endl;
+            hout << QStringLiteral("    virtual QSharedPointer<")
+                << QStringLiteral("EverCloudExceptionData> exceptionData() ")
+                << QStringLiteral("const Q_DECL_OVERRIDE;") << endl;
         }
         else
         {
-            hout << QStringLiteral("struct QEVERCLOUD_EXPORT ") << s.name << QStringLiteral(" {") << endl;
-            for(auto fit = s.fields.begin(), fend = s.fields.end(); fit != fend; ++fit)
+            hout << QStringLiteral("struct QEVERCLOUD_EXPORT ")
+                << s.m_name << QStringLiteral(" {") << endl;
+            for(const auto & f: qAsConst(s.m_fields))
             {
-                const Parser::Field & f = *fit;
-
-                if (s.fieldComments.contains(f.name))
+                if (s.m_fieldComments.contains(f.m_name))
                 {
-                    QStringList lines = s.fieldComments[f.name].split(QStringLiteral("\n"));
-                    for(auto lit = lines.constBegin(), lend = lines.constEnd(); lit != lend; ++lit) {
-                        hout << QStringLiteral("    ") << *lit << endl;
+                    QStringList lines =
+                        s.m_fieldComments[f.m_name].split(QStringLiteral("\n"));
+                    for(const auto & line: lines) {
+                        hout << QStringLiteral("    ") << line << endl;
                     }
                 }
                 else
@@ -1163,16 +1391,18 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
                     hout << QStringLiteral("    /** NOT DOCUMENTED */") << endl;
                 }
 
-                hout << QStringLiteral("    ") << fieldToStr(f) << QStringLiteral(";") << endl;
+                hout << QStringLiteral("    ") << fieldToStr(f)
+                    << QStringLiteral(";") << endl;
             }
         }
 
         hout << endl;
-        hout << QString::fromUtf8("    bool operator==(const %1 & other) const").arg(s.name) << endl;
+        hout << QString::fromUtf8(
+            "    bool operator==(const %1 & other) const").arg(s.m_name) << endl;
         hout << QStringLiteral("    {") << endl;
 
         bool first = true;
-        for(const Parser::Field & f : s.fields)
+        for(const auto & f : s.m_fields)
         {
             if(first) {
                 first = false;
@@ -1182,16 +1412,21 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
                 hout << QStringLiteral("            && ");
             }
 
-            if (f.required == Parser::Field::RequiredFlag::Optional) {
-                hout << QStringLiteral("%1.isEqual(other.%1)").arg(f.name) << endl;
+            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                hout << QStringLiteral("%1.isEqual(other.%1)").arg(f.m_name)
+                    << endl;
             }
             else {
-                hout << QStringLiteral("(%1 == other.%1)").arg(f.name) << endl;
+                hout << QStringLiteral("(%1 == other.%1)").arg(f.m_name)
+                    << endl;
             }
         }
 
-        hout << QStringLiteral("        ;") << endl << QStringLiteral("    }") << endl << endl;
-        hout << QStringLiteral("    bool operator!=(const %1 & other) const").arg(s.name) << endl;
+        hout << QStringLiteral("        ;") << endl << QStringLiteral("    }")
+            << endl << endl;
+        hout << QString::fromUtf8(
+            "    bool operator!=(const %1 & other) const").arg(s.m_name)
+            << endl;
         hout << QStringLiteral("    {") << endl;
         hout << QStringLiteral("        return !(*this == other);") << endl;
         hout << QStringLiteral("    }") << endl << endl;
@@ -1205,19 +1440,24 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     hout << endl;
     hout << QStringLiteral("} // namespace qevercloud") << endl<< endl;
 
-    for(auto it = ordered.constBegin(), end = ordered.constEnd(); it != end; ++it) {
-        hout << QStringLiteral("Q_DECLARE_METATYPE(qevercloud::") << it->name << QStringLiteral(")") << endl;
+    for(const auto & s: qAsConst(ordered)) {
+        hout << QStringLiteral("Q_DECLARE_METATYPE(qevercloud::") << s.m_name
+            << QStringLiteral(")") << endl;
     }
     hout << endl;
 
-    QString guard = QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H").arg(headerFileName.split(QStringLiteral("."))[0].toUpper());
+    QString guard = QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H")
+        .arg(headerFileName.split(QStringLiteral("."))[0].toUpper());
     hout << QStringLiteral("#endif // ") << guard << endl;
 
     const QString sourceOutPath = generatedSourceOutputPath(outPath);
     const QString typesImplHeaderFileName = QStringLiteral("types_impl.h");
-    QFile typesImplHeaderFile(QDir(sourceOutPath).absoluteFilePath(typesImplHeaderFileName));
+    QFile typesImplHeaderFile(
+        QDir(sourceOutPath).absoluteFilePath(typesImplHeaderFileName));
     if (!typesImplHeaderFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8("Can't open the generated header file for writing: %1").arg(typesImplHeaderFile.fileName()).toStdString());
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open the generated header file for writing: %1")
+            .arg(typesImplHeaderFile.fileName()).toStdString());
     }
 
     QTextStream hout2(&typesImplHeaderFile);
@@ -1234,19 +1474,20 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     QList<Parser::Structure> structuresAndExceptions = parser->structures();
     structuresAndExceptions << parser->exceptions();
 
-    for(auto it = structuresAndExceptions.constBegin(), end = structuresAndExceptions.constEnd(); it != end; ++it) {
-        const Parser::Structure & s = *it;
-        hout2 << QStringLiteral("void write") << s.name << QStringLiteral("(ThriftBinaryBufferWriter & w, const ")
-              << s.name << QStringLiteral(" & s);") << endl;
-        hout2 << QStringLiteral("void read") << s.name << QStringLiteral("(ThriftBinaryBufferReader & r, ")
-              << s.name << QStringLiteral(" & s);") << endl;
+    for(const auto & s: qAsConst(structuresAndExceptions)) {
+        hout2 << QStringLiteral("void write") << s.m_name
+            << QStringLiteral("(ThriftBinaryBufferWriter & w, const ")
+            << s.m_name << QStringLiteral(" & s);") << endl;
+        hout2 << QStringLiteral("void read") << s.m_name
+            << QStringLiteral("(ThriftBinaryBufferReader & r, ")
+            << s.m_name << QStringLiteral(" & s);") << endl;
     }
     hout2 << endl;
 
-    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it) {
-        const Parser::Enumeration & e = *it;
-        hout2 << QStringLiteral("void readEnum") << e.name << QStringLiteral("(ThriftBinaryBufferReader & r, ")
-              << e.name << QStringLiteral("::type & e);") << endl;
+    for(const auto & e: enumerations) {
+        hout2 << QStringLiteral("void readEnum") << e.m_name
+            << QStringLiteral("(ThriftBinaryBufferReader & r, ")
+            << e.m_name << QStringLiteral("::type & e);") << endl;
     }
     hout2 << endl;
     hout2 << QStringLiteral("/** @endcond */") << endl;
@@ -1256,7 +1497,9 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     const QString bodyFileName = QStringLiteral("types.cpp");
     QFile bodyFile(QDir(sourceOutPath).absoluteFilePath(bodyFileName));
     if (!bodyFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8("Can't open the generated source file for writing: %1").arg(bodyFile.fileName()).toStdString());
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open the generated source file for writing: %1")
+            .arg(bodyFile.fileName()).toStdString());
     }
 
     QTextStream bout(&bodyFile);
@@ -1271,92 +1514,113 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
 
     bout << QStringLiteral("/** @cond HIDDEN_SYMBOLS  */") << endl << endl;
 
-    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it)
+    for(const auto & e: enumerations)
     {
-        const Parser::Enumeration & e = *it;
-
-        bout <<  QStringLiteral("void readEnum") << e.name << QStringLiteral("(ThriftBinaryBufferReader & r, ")
-             << e.name << QStringLiteral("::type & e) {") << endl;
+        bout <<  QStringLiteral("void readEnum") << e.m_name
+            << QStringLiteral("(ThriftBinaryBufferReader & r, ")
+            << e.m_name << QStringLiteral("::type & e) {") << endl;
 
         bout << QStringLiteral("    qint32 i;") << endl;
         bout << QStringLiteral("    r.readI32(i);") << endl;
         bout << QStringLiteral("    switch(i) {") << endl;
 
-        for(const QPair<QString, QString> & v : e.values) {
-            QString value = e.name + "::" + v.first;
-            bout << QStringLiteral("    case static_cast<int>(") << value << QStringLiteral("): e = ")
-                 << value << QStringLiteral("; break;") << endl;
+        for(const auto & v : e.m_values) {
+            QString value = e.m_name + QStringLiteral("::") + v.first;
+            bout << QStringLiteral("    case static_cast<int>(")
+                << value << QStringLiteral(": e = ") << value
+                << QStringLiteral("; break;") << endl;
         }
 
-        bout << QStringLiteral("    default: throw ThriftException(ThriftException::Type::INVALID_DATA, QStringLiteral(\"Incorrect value for enum ")
-             << e.name << QStringLiteral("\"));") << endl;
+        bout << QStringLiteral(
+            "    default: throw ThriftException(ThriftException::Type::"
+            "INVALID_DATA, QStringLiteral(\"Incorrect value for enum ")
+             << e.m_name << QStringLiteral("\"));") << endl;
         bout << QStringLiteral("    }") << endl;
         bout << QStringLiteral("}") << endl << endl;
     }
 
-    for(auto it = structuresAndExceptions.constBegin(), end = structuresAndExceptions.constEnd(); it != end; ++it)
+    for(const auto & s: qAsConst(structuresAndExceptions))
     {
-        const Parser::Structure & s = *it;
-
-        if (exceptions.contains(s.name))
+        if (exceptions.contains(s.m_name))
         {
-            bout << s.name << QStringLiteral("::") << s.name << QStringLiteral("() {}") << endl;
-            bout << s.name << QStringLiteral("::~") << s.name << QStringLiteral("() throw() {}") << endl;
+            bout << s.m_name << QStringLiteral("::") << s.m_name
+                << QStringLiteral("() {}") << endl;
+            bout << s.m_name << QStringLiteral("::~") << s.m_name
+                << QStringLiteral("() throw() {}") << endl;
 
-            if (!s.fields.isEmpty())
+            if (!s.m_fields.isEmpty())
             {
-                bout << s.name << QStringLiteral("::") << s.name << QStringLiteral("(const ") << s.name
+                bout << s.m_name << QStringLiteral("::") << s.m_name
+                    << QStringLiteral("(const ") << s.m_name
                     << QStringLiteral("& other) : EvernoteException(other)") << endl;
                 bout << QStringLiteral("{") << endl;
-                for(const Parser::Field & f : s.fields) {
-                    bout << QStringLiteral("   ") << f.name << QStringLiteral(" = other.") << f.name << QStringLiteral(";") << endl;
+                for(const auto & f : s.m_fields) {
+                    bout << QStringLiteral("   ") << f.m_name
+                        << QStringLiteral(" = other.") << f.m_name
+                        << QStringLiteral(";") << endl;
                 }
                 bout << QStringLiteral("}") << endl;
             }
         }
 
-        bout << QStringLiteral("void write") << s.name << QStringLiteral("(ThriftBinaryBufferWriter & w, const ")
-             << s.name << QStringLiteral(" & s) {") << endl;
+        bout << QStringLiteral("void write") << s.m_name
+            << QStringLiteral("(ThriftBinaryBufferWriter & w, const ")
+            << s.m_name << QStringLiteral(" & s) {") << endl;
 
-        bout << QStringLiteral("    w.writeStructBegin(QStringLiteral(\"") << s.name  << QStringLiteral("\"));") << endl;
-        writeThriftWriteFields(bout, s.fields, s.name, QStringLiteral("s."));
+        bout << QStringLiteral("    w.writeStructBegin(QStringLiteral(\"")
+            << s.m_name  << QStringLiteral("\"));") << endl;
+        writeThriftWriteFields(bout, s.m_fields, s.m_name, QStringLiteral("s."));
         bout << QStringLiteral("    w.writeFieldStop();") << endl;
         bout << QStringLiteral("    w.writeStructEnd();") << endl;
         bout << QStringLiteral("}") << endl << endl;
 
-        bout << QStringLiteral("void read") << s.name << QStringLiteral("(ThriftBinaryBufferReader & r, ")
-             << s.name << QStringLiteral(" & s) {") << endl;
+        bout << QStringLiteral("void read") << s.m_name
+            << QStringLiteral("(ThriftBinaryBufferReader & r, ")
+            << s.m_name << QStringLiteral(" & s) {") << endl;
         bout << QStringLiteral("    QString fname;") << endl;
         bout << QStringLiteral("    ThriftFieldType::type fieldType;") << endl;
         bout << QStringLiteral("    qint16 fieldId;") << endl;
 
-        for(const Parser::Field & field : s.fields)
+        for(const auto & field : s.m_fields)
         {
-            if (field.required != Parser::Field::RequiredFlag::Optional) {
-                bout << QStringLiteral("    bool ") << field.name << QStringLiteral("_isset = false;") << endl;
+            if (field.m_required != Parser::Field::RequiredFlag::Optional) {
+                bout << QStringLiteral("    bool ") << field.m_name
+                    << QStringLiteral("_isset = false;") << endl;
             }
         }
 
         bout << QStringLiteral("    r.readStructBegin(fname);") << endl;
-        bout << QStringLiteral("    while(true)") << endl << QStringLiteral("    {") << endl;
-        bout << QStringLiteral("        r.readFieldBegin(fname, fieldType, fieldId);") << endl;
-        bout << QStringLiteral("        if (fieldType == ThriftFieldType::T_STOP) break;") << endl;
+        bout << QStringLiteral("    while(true)") << endl
+            << QStringLiteral("    {") << endl;
+        bout << QStringLiteral("        r.readFieldBegin(fname, fieldType, ")
+            << QStringLiteral("fieldId);") << endl;
+        bout << QStringLiteral("        if (fieldType == ")
+            << QStringLiteral("ThriftFieldType::T_STOP) break;") << endl;
 
-        for(const Parser::Field & field : s.fields)
+        for(const auto & field : s.m_fields)
         {
-            bool isOptional = (field.required == Parser::Field::RequiredFlag::Optional);
-            bout << QStringLiteral("        if (fieldId == ") << field.id << QStringLiteral(") {") << endl;
+            bool isOptional =
+                (field.m_required == Parser::Field::RequiredFlag::Optional);
+            bout << QStringLiteral("        if (fieldId == ") << field.m_id
+                << QStringLiteral(") {") << endl;
             bout << QStringLiteral("            if (fieldType == ")
-                 << typeToStr(field.type, s.name + "." + field.name, MethodType::ThriftFieldType)
+                 << typeToStr(
+                     field.m_type, s.m_name + "." + field.m_name,
+                     MethodType::ThriftFieldType)
                  << QStringLiteral(") {") << endl;
 
             if (!isOptional) {
-                bout << QStringLiteral("                ") << field.name << QStringLiteral("_isset = true;") << endl;
+                bout << QStringLiteral("                ") << field.m_name
+                    << QStringLiteral("_isset = true;") << endl;
             }
 
-            writeThriftReadField(bout, field, s.name + QStringLiteral("."), QStringLiteral("s."));
+            writeThriftReadField(
+                bout, field, s.m_name + QStringLiteral("."),
+                QStringLiteral("s."));
+
             bout << QStringLiteral("            } else {") << endl;
-            bout << QStringLiteral("                r.skip(fieldType);") << endl;
+            bout << QStringLiteral("                r.skip(fieldType);")
+                << endl;
             bout << QStringLiteral("            }") << endl;
             bout << QStringLiteral("        } else") << endl;
         }
@@ -1368,12 +1632,15 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
         bout << QStringLiteral("    }") << endl;
         bout << QStringLiteral("    r.readStructEnd();") << endl;
 
-        for(const Parser::Field & field : s.fields)
+        for(const auto & field : s.m_fields)
         {
-            if (field.required != Parser::Field::RequiredFlag::Optional) {
-                bout << QStringLiteral("    if(!") << field.name
-                     << QStringLiteral("_isset) throw ThriftException(ThriftException::Type::INVALID_DATA, QStringLiteral(\"")
-                     << s.name << QStringLiteral(".") << field.name << QStringLiteral(" has no value\"));")
+            if (field.m_required != Parser::Field::RequiredFlag::Optional) {
+                bout << QStringLiteral("    if(!") << field.m_name
+                     << QStringLiteral("_isset) throw ThriftException(")
+                     << QStringLiteral("ThriftException::Type::INVALID_DATA, ")
+                     << QStringLiteral("QStringLiteral(\"")
+                     << s.m_name << QStringLiteral(".") << field.m_name
+                     << QStringLiteral(" has no value\"));")
                      << endl;
             }
         }
@@ -1393,142 +1660,180 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
 
     const QString headerOutPath = generatedHeaderOutputPath(outPath);
     const QString headerFileName = QStringLiteral("services.h");
+
     QFile headerFile(QDir(headerOutPath).absoluteFilePath(headerFileName));
     if(!headerFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8("Can't open the generated header file for writing: %1").arg(headerFile.fileName()).toStdString());
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open the generated header file for writing: %1")
+            .arg(headerFile.fileName()).toStdString());
     }
 
     QTextStream hout(&headerFile);
     hout.setCodec("UTF-8");
 
-    QStringList additionalPreIncludes = QStringList() << QStringLiteral("../AsyncResult.h")
-                                                      << QStringLiteral("constants.h")
-                                                      << QStringLiteral("types.h");
-    QStringList additionalPostIncludes = QStringList() << QStringLiteral("<QObject>");
+    QStringList additionalPreIncludes = QStringList()
+        << QStringLiteral("../AsyncResult.h") << QStringLiteral("constants.h")
+        << QStringLiteral("types.h");
 
-    writeHeaderHeader(hout, headerFileName, additionalPreIncludes, additionalPostIncludes);
+    QStringList additionalPostIncludes = QStringList()
+        << QStringLiteral("<QObject>");
 
-    QList<Parser::Service> services = parser->services();
-    for(auto it = services.constBegin(), end = services.constEnd(); it != end; ++it)
+    writeHeaderHeader(
+        hout, headerFileName, additionalPreIncludes, additionalPostIncludes);
+
+    const auto & services = parser->services();
+    for(const auto & s: services)
     {
-        const Parser::Service & s = *it;
-
-        if (!s.extends.isEmpty()) {
+        if (!s.m_extends.isEmpty()) {
             throw std::runtime_error("extending services is not supported");
         }
 
-        if (!s.docComment.isEmpty()) {
-            hout << s.docComment << endl;
+        if (!s.m_docComment.isEmpty()) {
+            hout << s.m_docComment << endl;
         }
 
-        hout << QStringLiteral("class QEVERCLOUD_EXPORT ") << s.name << QStringLiteral(": public QObject") << endl
-             << QStringLiteral("{") << endl;
-        hout << QStringLiteral("    Q_OBJECT") << endl;
-        hout << QStringLiteral("    Q_DISABLE_COPY(") << s.name << QStringLiteral(")") << endl;
-        hout << QStringLiteral("public:") << endl;
+        hout << "class QEVERCLOUD_EXPORT " << s.m_name << ": public QObject"
+            << endl << "{" << endl;
+        hout << "    Q_OBJECT" << endl;
+        hout << "    Q_DISABLE_COPY(" << s.m_name << ")" << endl;
+        hout << "public:" << endl;
 
-        if (s.name == QStringLiteral("UserStore")) {
-            hout << QStringLiteral("    explicit UserStore(QString host, QString authenticationToken = QString(), QObject * parent = 0);")
-                 << endl << endl;
-        }
-        else {
-            hout << QStringLiteral("    explicit NoteStore(QString noteStoreUrl = QString(), QString authenticationToken = QString(), QObject * parent = 0);") << endl;
-            hout << QStringLiteral("    explicit NoteStore(QObject * parent);") << endl << endl;
-            hout << QStringLiteral("    void setNoteStoreUrl(QString noteStoreUrl) { m_url = noteStoreUrl; }") << endl;
-            hout << QStringLiteral("    QString noteStoreUrl() { return m_url; }") << endl << endl;
-        }
-
-        hout << QStringLiteral("    void setAuthenticationToken(QString authenticationToken) { m_authenticationToken = authenticationToken; }") << endl;
-        hout << QStringLiteral("    QString authenticationToken() { return m_authenticationToken; }") << endl << endl;
-
-        for(const Parser::Function & func: s.functions)
+        if (s.m_name == QStringLiteral("UserStore"))
         {
-            if (func.isOneway) {
+            hout << "    explicit UserStore(QString host, "
+                << "QString authenticationToken = QString(), "
+                << "QObject * parent = nullptr);"
+                << endl << endl;
+        }
+        else
+        {
+            hout << "    explicit NoteStore("
+                << "QString noteStoreUrl = QString(), "
+                << "QString authenticationToken = QString(), "
+                << "QObject * parent = nullptr);" << endl;
+
+            hout << "    explicit NoteStore(QObject * parent);" << endl << endl;
+            hout << "    void setNoteStoreUrl(QString noteStoreUrl)"
+                << " { m_url = noteStoreUrl; }" << endl;
+            hout << "    QString noteStoreUrl() { return m_url; }" << endl
+                << endl;
+        }
+
+        hout << "    void setAuthenticationToken(QString authenticationToken) "
+            << "{ m_authenticationToken = authenticationToken; }" << endl;
+        hout << "    QString authenticationToken() "
+            << "{ return m_authenticationToken; }" << endl << endl;
+
+        for(const auto & func: qAsConst(s.m_functions))
+        {
+            if (func.m_isOneway) {
                 throw std::runtime_error("oneway functions are not supported");
             }
 
-            if (!func.docComment.isEmpty())
+            if (!func.m_docComment.isEmpty())
             {
-                QStringList lines = func.docComment.split(QStringLiteral("\n"));
-                for(auto lit = lines.constBegin(), lend = lines.constEnd(); lit != lend; ++lit) {
-                    hout << QStringLiteral("    ") << *lit << endl;
+                QStringList lines = func.m_docComment.split(
+                    QChar::fromLatin1('\n'));
+
+                for(const auto & line: lines) {
+                    hout << "    " << line << endl;
                 }
             }
 
-            hout << QStringLiteral("    ") << typeToStr(func.type, func.name) << QStringLiteral(" ")
-                 << func.name << QStringLiteral("(");
-            int lastId = func.params.last().id;
+            hout << "    " << typeToStr(func.m_type, func.m_name) << " "
+                 << func.m_name << "(";
+            int lastId = func.m_params.last().m_id;
             bool tokenParamIsPresent = false;
-            for(const Parser::Field & param: func.params)
+            for(const auto & param: qAsConst(func.m_params))
             {
-                if (param.name == QStringLiteral("authenticationToken"))
+                if (param.m_name == QStringLiteral("authenticationToken"))
                 {
                     tokenParamIsPresent = true;
                 }
                 else
                 {
-                    hout << typeToStr(param.type, func.name + QStringLiteral(", ") + param.name, MethodType::FuncParamType)
-                         << QStringLiteral(" ") << param.name;
-                    if (param.initializer) {
-                        hout << QStringLiteral(" = ") << valueToStr(param.initializer, param.type, func.name + QStringLiteral(", ") + param.name);
+                    hout << typeToStr(
+                        param.m_type,
+                        func.m_name + QStringLiteral(", ") + param.m_name,
+                        MethodType::FuncParamType);
+                    hout << " " << param.m_name;
+                    if (param.m_initializer) {
+                        hout << " = " << valueToStr(
+                            param.m_initializer, param.m_type,
+                            func.m_name + QStringLiteral(", ") + param.m_name);
                     }
 
-                    if (param.id != lastId || tokenParamIsPresent) {
-                        hout << QStringLiteral(", ");
+                    if (param.m_id != lastId || tokenParamIsPresent) {
+                        hout << ", ";
                     }
                 }
             }
 
             if (tokenParamIsPresent) {
-                hout << QStringLiteral("QString authenticationToken = QString()");
+                hout << "QString authenticationToken = QString()";
             }
-            hout << QStringLiteral(");") << endl << endl;
+            hout << ");" << endl << endl;
 
-            hout << QStringLiteral("    /** Asynchronous version of @link ") << func.name << QStringLiteral(" @endlink */") << endl;
-            hout << QStringLiteral("    AsyncResult * ") << func.name << QStringLiteral("Async(");
+            hout << "    /** Asynchronous version of @link " << func.m_name
+                << " @endlink */" << endl;
+            hout << "    AsyncResult * " << func.m_name << "Async(";
             tokenParamIsPresent = false;
-            for(const Parser::Field & param: func.params)
+            for(const auto & param: qAsConst(func.m_params))
             {
-                if (param.name == QStringLiteral("authenticationToken"))
+                if (param.m_name == QStringLiteral("authenticationToken"))
                 {
                     tokenParamIsPresent = true;
                 }
                 else
                 {
-                    hout << typeToStr(param.type, func.name + QStringLiteral(", ") + param.name, MethodType::FuncParamType)
-                         << QStringLiteral(" ") << param.name;
-                    if (param.initializer) {
-                        hout << QStringLiteral(" = ") << valueToStr(param.initializer, param.type, func.name + QStringLiteral(", ") + param.name);
+                    hout << typeToStr(
+                        param.m_type,
+                        func.m_name + QStringLiteral(", ") + param.m_name,
+                        MethodType::FuncParamType);
+                    hout << " " << param.m_name;
+                    if (param.m_initializer) {
+                        hout << " = " << valueToStr(
+                            param.m_initializer,
+                            param.m_type,
+                            func.m_name + QStringLiteral(", ") + param.m_name);
                     }
 
-                    if(param.id != lastId || tokenParamIsPresent) {
-                        hout << QStringLiteral(", ");
+                    if (param.m_id != lastId || tokenParamIsPresent) {
+                        hout << ", ";
                     }
                 }
             }
 
             if (tokenParamIsPresent) {
-                hout << QStringLiteral("QString authenticationToken = QString()");
+                hout << "QString authenticationToken = QString()";
             }
-            hout << QStringLiteral(");") << endl << endl;
+            hout << ");" << endl << endl;
         }
 
-        hout << QStringLiteral("private:") << endl;
-        hout << QStringLiteral("    QString m_url;") << endl;
-        hout << QStringLiteral("    QString m_authenticationToken;") << endl;
-        hout << QStringLiteral("};") << endl << endl;
+        hout << "private:" << endl;
+        hout << "    QString m_url;" << endl;
+        hout << "    QString m_authenticationToken;" << endl;
+        hout << "};" << endl << endl;
     }
 
     QStringList metatypeDeclarations;
     metatypeDeclarations.reserve(6);
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::Notebook >)");
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::Tag >)");
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::SavedSearch >)");
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::NoteVersionId >)");
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::SharedNotebook >)");
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::LinkedNotebook >)");
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::BusinessInvitation >)");
-    metatypeDeclarations << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::UserProfile >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::Notebook >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::Tag >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::SavedSearch >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::NoteVersionId >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::SharedNotebook >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::LinkedNotebook >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::BusinessInvitation >)");
+    metatypeDeclarations
+        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::UserProfile >)");
 
     writeHeaderFooter(hout, headerFileName, metatypeDeclarations);
 
@@ -1536,9 +1841,12 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
 
     const QString sourceOutPath = generatedSourceOutputPath(outPath);
     const QString bodyFileName = QStringLiteral("services.cpp");
+
     QFile bodyFile(QDir(sourceOutPath).absoluteFilePath(bodyFileName));
     if (!bodyFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8("Can't open the generated source file for writing: %1").arg(bodyFile.fileName()).toStdString());
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open the generated source file for writing: %1")
+            .arg(bodyFile.fileName()).toStdString());
     }
 
     QTextStream bout(&bodyFile);
@@ -1546,294 +1854,347 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
 
     additionalPreIncludes.clear();
     additionalPreIncludes << QStringLiteral("../impl.h")
-                          << QStringLiteral("types_impl.h")
-                          << QStringLiteral("<qt4helpers.h>");
+        << QStringLiteral("types_impl.h")
+        << QStringLiteral("<Helpers.h>");
     writeHeaderBody(bout, headerFileName, additionalPreIncludes);
 
-    for(auto it = services.constBegin(), end = services.constEnd(); it != end; ++it)
+    for(const auto & s: services)
     {
-        const Parser::Service & s = *it;
-
-        for(const Parser::Function & func : s.functions)
+        for(const auto & f: s.m_functions)
         {
-            QString prepareParamsName = s.name + QStringLiteral("_") + func.name + QStringLiteral("_prepareParams");
-            QString readReplyName = s.name + QStringLiteral("_") + func.name + QStringLiteral("_readReply");
-            int lastId = func.params.last().id;
-            bool isVoidResult = !func.type.dynamicCast<Parser::VoidType>().isNull();
+            QString prepareParamsName = s.m_name + QStringLiteral("_") +
+                f.m_name + QStringLiteral("_prepareParams");
 
-            bout << QStringLiteral("QByteArray ") << prepareParamsName << QStringLiteral("(");
-            for(const Parser::Field & param : func.params)
+            QString readReplyName = s.m_name + QStringLiteral("_") + f.m_name +
+                QStringLiteral("_readReply");
+
+            int lastId = f.m_params.last().m_id;
+
+            bool isVoidResult =
+                !f.m_type.dynamicCast<Parser::VoidType>().isNull();
+
+            bout << "QByteArray " << prepareParamsName << "(";
+            for(const auto & param: f.m_params)
             {
-                bout << typeToStr(param.type, func.name + QStringLiteral(", ") + param.name, MethodType::FuncParamType)
-                     << QStringLiteral(" ") << param.name;
-                if (param.id != lastId) {
-                    bout << QStringLiteral(", ");
+                bout << typeToStr(
+                    param.m_type,
+                    f.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                bout << " " << param.m_name;
+                if (param.m_id != lastId) {
+                    bout << ", ";
                 }
             }
 
-            bout << QStringLiteral(")") << endl;
-            bout << QStringLiteral("{") << endl;
-            bout << QStringLiteral("    ThriftBinaryBufferWriter w;") << endl;
-            bout << QStringLiteral("    qint32 cseqid = 0;") << endl;
-            bout << QStringLiteral("    w.writeMessageBegin(QStringLiteral(\"") << func.name
-                 << QStringLiteral("\"), ThriftMessageType::T_CALL, cseqid);") << endl;
-            bout << QStringLiteral("    w.writeStructBegin(QStringLiteral(\"") << s.name
-                 << QStringLiteral("_") << func.name << QStringLiteral("_pargs\"));") << endl;
-            writeThriftWriteFields(bout, func.params, func.name, QStringLiteral(""));
-            bout << QStringLiteral("    w.writeFieldStop();") << endl;
-            bout << QStringLiteral("    w.writeStructEnd();") << endl;
-            bout << QStringLiteral("    w.writeMessageEnd();") << endl;
-            bout << QStringLiteral("    return w.buffer();") << endl;
-            bout << QStringLiteral("}") << endl << endl;
+            bout << ")" << endl;
+            bout << "{" << endl;
+            bout << "    ThriftBinaryBufferWriter w;" << endl;
+            bout << "    qint32 cseqid = 0;" << endl;
+            bout << "    w.writeMessageBegin(QStringLiteral(\"" << f.m_name
+                 << "\"), ThriftMessageType::T_CALL, cseqid);" << endl;
+            bout << "    w.writeStructBegin(QStringLiteral(\"" << s.m_name
+                 << "_" << f.m_name << "_pargs\"));" << endl;
 
-            bout << (isVoidResult ? QStringLiteral("void") : typeToStr(func.type, func.name))
-                 << QStringLiteral(" ") << readReplyName << QStringLiteral("(QByteArray reply)") << endl;
-            bout << QStringLiteral("{") << endl;
+            writeThriftWriteFields(
+                bout, f.m_params, f.m_name, QLatin1Literal(""));
+
+            bout << "    w.writeFieldStop();" << endl;
+            bout << "    w.writeStructEnd();" << endl;
+            bout << "    w.writeMessageEnd();" << endl;
+            bout << "    return w.buffer();" << endl;
+            bout << "}" << endl << endl;
+
+            bout << (isVoidResult
+                     ? QStringLiteral("void")
+                     : typeToStr(f.m_type, f.m_name))
+                 << " " << readReplyName << "(QByteArray reply)" << endl;
+            bout << "{" << endl;
 
             if (!isVoidResult) {
-                bout << QStringLiteral("    bool resultIsSet = false;") << endl;
-                bout << QStringLiteral("    ") << typeToStr(func.type, func.name) << QStringLiteral(" result = ")
-                     << typeToStr(func.type, func.name) << QStringLiteral("();") << endl;
+                bout << "    bool resultIsSet = false;" << endl;
+                bout << "    " << typeToStr(f.m_type, f.m_name)
+                    << " result = " << typeToStr(f.m_type, f.m_name)
+                    << "();" << endl;
             }
 
-            bout << QStringLiteral("    ThriftBinaryBufferReader r(reply);") << endl;
-            bout << QStringLiteral("    qint32 rseqid = 0;") << endl;
-            bout << QStringLiteral("    QString fname;") << endl;
-            bout << QStringLiteral("    ThriftMessageType::type mtype;") << endl;
-            bout << QStringLiteral("    r.readMessageBegin(fname, mtype, rseqid);") << endl;
-            bout << QStringLiteral("    if (mtype == ThriftMessageType::T_EXCEPTION) {") << endl;
-            bout << QStringLiteral("      ThriftException e = readThriftException(r);") << endl;
-            bout << QStringLiteral("      r.readMessageEnd();") << endl;
-            bout << QStringLiteral("      throw e;") << endl;
-            bout << QStringLiteral("    }") << endl;
-            bout << QStringLiteral("    if (mtype != ThriftMessageType::T_REPLY) {") << endl;
-            bout << QStringLiteral("      r.skip(ThriftFieldType::T_STRUCT);") << endl;
-            bout << QStringLiteral("      r.readMessageEnd();") << endl;
-            bout << QStringLiteral("      throw ThriftException(ThriftException::Type::INVALID_MESSAGE_TYPE);") << endl;
-            bout << QStringLiteral("    }") << endl;
-            bout << QStringLiteral("    if (fname.compare(QStringLiteral(\"") << func.name << QStringLiteral("\")) != 0) {") << endl;
-            bout << QStringLiteral("      r.skip(ThriftFieldType::T_STRUCT);") << endl;
-            bout << QStringLiteral("      r.readMessageEnd();") << endl;
-            bout << QStringLiteral("      throw ThriftException(ThriftException::Type::WRONG_METHOD_NAME);") << endl;
-            bout << QStringLiteral("    }") << endl << endl;
+            bout << "    ThriftBinaryBufferReader r(reply);" << endl;
+            bout << "    qint32 rseqid = 0;" << endl;
+            bout << "    QString fname;" << endl;
+            bout << "    ThriftMessageType::type mtype;" << endl;
+            bout << "    r.readMessageBegin(fname, mtype, rseqid);" << endl;
+            bout << "    if (mtype == ThriftMessageType::T_EXCEPTION) {" << endl;
+            bout << "      ThriftException e = readThriftException(r);" << endl;
+            bout << "      r.readMessageEnd();" << endl;
+            bout << "      throw e;" << endl;
+            bout << "    }" << endl;
+            bout << "    if (mtype != ThriftMessageType::T_REPLY) {" << endl;
+            bout << "      r.skip(ThriftFieldType::T_STRUCT);" << endl;
+            bout << "      r.readMessageEnd();" << endl;
+            bout << "      throw ThriftException(ThriftException::Type::"
+                << "INVALID_MESSAGE_TYPE);" << endl;
+            bout << "    }" << endl;
+            bout << "    if (fname.compare(QStringLiteral(\"" << f.m_name
+                << "\")) != 0) {" << endl;
+            bout << "      r.skip(ThriftFieldType::T_STRUCT);" << endl;
+            bout << "      r.readMessageEnd();" << endl;
+            bout << "      throw ThriftException(ThriftException::Type::"
+                << "WRONG_METHOD_NAME);" << endl;
+            bout << "    }" << endl << endl;
 
-            bout << QStringLiteral("    ThriftFieldType::type fieldType;") << endl;
-            bout << QStringLiteral("    qint16 fieldId;") << endl;
-            bout << QStringLiteral("    r.readStructBegin(fname);") << endl;
-            bout << QStringLiteral("    while(true) {") << endl;
-            bout << QStringLiteral("        r.readFieldBegin(fname, fieldType, fieldId);") << endl;
-            bout << QStringLiteral("        if(fieldType == ThriftFieldType::T_STOP) break;") << endl;
+            bout << "    ThriftFieldType::type fieldType;" << endl;
+            bout << "    qint16 fieldId;" << endl;
+            bout << "    r.readStructBegin(fname);" << endl;
+            bout << "    while(true) {" << endl;
+            bout << "        r.readFieldBegin(fname, fieldType, fieldId);"
+                << endl;
+            bout << "        if(fieldType == ThriftFieldType::T_STOP) break;"
+                << endl;
 
             if (!isVoidResult)
             {
                 Parser::Field result;
-                result.id = 0;
-                result.name = QStringLiteral("result");
-                result.required = Parser::Field::RequiredFlag::Required;
-                result.type = func.type;
-                bout << QStringLiteral("        if(fieldId == 0) {") << endl;
-                bout << QStringLiteral("            if(fieldType == ") << typeToStr(func.type, func.name, MethodType::ThriftFieldType)
-                     << QStringLiteral(") {") << endl;
-                bout << QStringLiteral("                resultIsSet = true;") << endl;
-                writeThriftReadField(bout, result, func.name + QStringLiteral("."), QStringLiteral(""));
-                bout << QStringLiteral("            } else {") << endl;
-                bout << QStringLiteral("                r.skip(fieldType);") << endl;
-                bout << QStringLiteral("            }") << endl;
-                bout << QStringLiteral("        }") << endl;
+                result.m_id = 0;
+                result.m_name = QStringLiteral("result");
+                result.m_required = Parser::Field::RequiredFlag::Required;
+                result.m_type = f.m_type;
+                bout << "        if(fieldId == 0) {" << endl;
+                bout << "            if(fieldType == "
+                    << typeToStr(
+                        f.m_type, f.m_name, MethodType::ThriftFieldType)
+                     << ") {" << endl;
+                bout << "                resultIsSet = true;" << endl;
+
+                writeThriftReadField(
+                    bout, result, f.m_name + QStringLiteral("."),
+                    QLatin1Literal(""));
+
+                bout << "            } else {" << endl;
+                bout << "                r.skip(fieldType);" << endl;
+                bout << "            }" << endl;
+                bout << "        }" << endl;
             }
 
             bool firstThrow = isVoidResult;
-            for(const Parser::Field & th: func.throws)
+            for(const auto & th: f.m_throws)
             {
                 if (firstThrow) {
                     firstThrow = false;
-                    bout << QStringLiteral("        ");
+                    bout << "        ";
                 }
                 else {
-                    bout << QStringLiteral("       else ");
+                    bout << "       else ";
                 }
 
-                bout << QStringLiteral("if (fieldId == ")  << th.id << QStringLiteral(") {") << endl;
-                QString exceptionType = typeToStr(th.type, func.name + QStringLiteral(", ") + th.name);
-                bout << QStringLiteral("            if (fieldType == ThriftFieldType::T_STRUCT) {") << endl;
-                bout << QStringLiteral("                ") << exceptionType << QStringLiteral(" e;") << endl;
-                bout << QStringLiteral("                read") << exceptionType << QStringLiteral("(r, e);") << endl;
+                bout << "if (fieldId == "  << th.m_id
+                    << ") {" << endl;
+
+                QString exceptionType = typeToStr(
+                    th.m_type, f.m_name + QStringLiteral(", ") + th.m_name);
+
+                bout << "            if (fieldType == ThriftFieldType::"
+                    << "T_STRUCT) {" << endl;
+                bout << "                " << exceptionType << " e;" << endl;
+                bout << "                read" << exceptionType << "(r, e);"
+                    << endl;
 
                 if (exceptionType == QStringLiteral("EDAMSystemException")) {
-                    bout << QStringLiteral("                throwEDAMSystemException(e);") << endl;
+                    bout << "                throwEDAMSystemException(e);"
+                        << endl;
                 }
                 else {
-                    bout << QStringLiteral("                throw e;") << endl;
+                    bout << "                throw e;" << endl;
                 }
 
-                bout << QStringLiteral("            }") << endl;
-                bout << QStringLiteral("            else {") << endl;
-                bout << QStringLiteral("                r.skip(fieldType);") << endl;
-                bout << QStringLiteral("            }") << endl;
-                bout << QStringLiteral("        }") << endl;
+                bout << "            }" << endl;
+                bout << "            else {" << endl;
+                bout << "                r.skip(fieldType);" << endl;
+                bout << "            }" << endl;
+                bout << "        }" << endl;
             }
 
-            bout << QStringLiteral("        else {") << endl;
-            bout << QStringLiteral("            r.skip(fieldType);") << endl;
-            bout << QStringLiteral("        }") << endl;
-            bout << QStringLiteral("        r.readFieldEnd();") << endl;
-            bout << QStringLiteral("    }") << endl;
-            bout << QStringLiteral("    r.readStructEnd();") << endl;
+            bout << "        else {" << endl;
+            bout << "            r.skip(fieldType);" << endl;
+            bout << "        }" << endl;
+            bout << "        r.readFieldEnd();" << endl;
+            bout << "    }" << endl;
+            bout << "    r.readStructEnd();" << endl;
 
-            bout << QStringLiteral("    r.readMessageEnd();") << endl;
+            bout << "    r.readMessageEnd();" << endl;
 
             if (!isVoidResult) {
-                bout << QStringLiteral("    if (!resultIsSet) {") << endl;
-                bout << QStringLiteral("        throw ThriftException(ThriftException::Type::MISSING_RESULT, QStringLiteral(\"")
-                     << func.name << QStringLiteral(": missing result\"));") << endl;
-                bout << QStringLiteral("    }") << endl;
-                bout << QStringLiteral("    return result;") << endl;
+                bout << "    if (!resultIsSet) {" << endl;
+                bout << "        throw ThriftException(ThriftException::Type::"
+                    << "MISSING_RESULT, QStringLiteral(\""
+                    << f.m_name << ": missing result\"));" << endl;
+                bout << "    }" << endl;
+                bout << "    return result;" << endl;
             }
 
-            bout << QStringLiteral("}") << endl << endl;
+            bout << "}" << endl << endl;
 
-            QString asyncReadFunctionName = readReplyName + QStringLiteral("Async");
-            bout << QStringLiteral("QVariant ") << asyncReadFunctionName << QStringLiteral("(QByteArray reply)") << endl;
-            bout << QStringLiteral("{") << endl;
+            QString asyncReadFunctionName =
+                readReplyName + QStringLiteral("Async");
+            bout << "QVariant " << asyncReadFunctionName << "(QByteArray reply)"
+                << endl;
+            bout << "{" << endl;
             if (isVoidResult) {
-                bout << QStringLiteral("    ") << readReplyName << QStringLiteral("(reply);") << endl;
-                bout << QStringLiteral("    return QVariant();") << endl;
+                bout << "    " << readReplyName << "(reply);" << endl;
+                bout << "    return QVariant();" << endl;
             }
             else {
-                bout << QStringLiteral("    return QVariant::fromValue(") << readReplyName << QStringLiteral("(reply));") << endl;
+                bout << "    return QVariant::fromValue(" << readReplyName
+                    << "(reply));" << endl;
             }
-            bout << QStringLiteral("}") << endl << endl;
+            bout << "}" << endl << endl;
 
-            bout << typeToStr(func.type, func.name) << " " << s.name << "::" << func.name << "(";
+            bout << typeToStr(f.m_type, f.m_name) << " "
+                << s.m_name << "::" << f.m_name << "(";
             bool tokenParamIsPresent = false;
-            for(const Parser::Field& param : func.params)
+            for(const auto & param : f.m_params)
             {
-                if (param.name == QStringLiteral("authenticationToken")) {
-                    tokenParamIsPresent = true;
-                }
-                else {
-                    bout << typeToStr(param.type, func.name + ", " + param.name, MethodType::FuncParamType) << " " << param.name;
-                    if(param.id != lastId || tokenParamIsPresent) bout << ", ";
-                }
-            }
-
-            if (tokenParamIsPresent) {
-                bout << QStringLiteral("QString authenticationToken");
-            }
-            bout << QStringLiteral(")") << endl;
-            bout << QStringLiteral("{") << endl;
-
-            if (tokenParamIsPresent) {
-                bout << QStringLiteral("    if (authenticationToken.isEmpty()) {") << endl;
-                bout << QStringLiteral("        authenticationToken = m_authenticationToken;") << endl;
-                bout << QStringLiteral("    }") << endl;
-            }
-
-            bout << QStringLiteral("    QByteArray params = ") << prepareParamsName << QStringLiteral("(");
-            for(const Parser::Field & param : func.params) {
-                bout << param.name;
-                if(param.id != lastId) bout << QStringLiteral(", ");
-            }
-            bout << QStringLiteral(");") << endl;
-
-            bout << QStringLiteral("    QByteArray reply = askEvernote(m_url, params);") << endl;
-            if (isVoidResult) {
-                bout << QStringLiteral("    ") << readReplyName << QStringLiteral("(reply);") << endl;
-            }
-            else {
-                bout << QStringLiteral("    return ") << readReplyName << QStringLiteral("(reply);") << endl;
-            }
-
-            bout << QStringLiteral("}") << endl << endl;
-
-
-            bout << QStringLiteral("AsyncResult* ") << s.name << QStringLiteral("::") << func.name << QStringLiteral("Async(");
-            tokenParamIsPresent = false;
-            for(const Parser::Field & param : func.params)
-            {
-                if (param.name == QStringLiteral("authenticationToken"))
+                if (param.m_name == QStringLiteral("authenticationToken"))
                 {
                     tokenParamIsPresent = true;
                 }
                 else
                 {
-                    bout << typeToStr(param.type, func.name + QStringLiteral(", ") + param.name, MethodType::FuncParamType)
-                         << QStringLiteral(" ") << param.name;
-
-                    if (param.id != lastId || tokenParamIsPresent) {
-                        bout << QStringLiteral(", ");
+                    bout << typeToStr(
+                        param.m_type, f.m_name + ", " + param.m_name,
+                        MethodType::FuncParamType);
+                    bout << " " << param.m_name;
+                    if (param.m_id != lastId || tokenParamIsPresent) {
+                        bout << ", ";
                     }
                 }
             }
 
             if (tokenParamIsPresent) {
-                bout << QStringLiteral("QString authenticationToken");
+                bout << "QString authenticationToken";
             }
-            bout << QStringLiteral(")") << endl;
-            bout << QStringLiteral("{") << endl;
+            bout << ")" << endl;
+            bout << "{" << endl;
 
             if (tokenParamIsPresent) {
-                bout << QStringLiteral("    if (authenticationToken.isEmpty()) {") << endl;
-                bout << QStringLiteral("        authenticationToken = m_authenticationToken;") << endl;
-                bout << QStringLiteral("    }") << endl;
+                bout << "    if (authenticationToken.isEmpty()) {" << endl;
+                bout << "        authenticationToken = m_authenticationToken;"
+                    << endl;
+                bout << "    }" << endl;
             }
 
-            bout << QStringLiteral("    QByteArray params = ") << prepareParamsName << QStringLiteral("(");
-            for(const Parser::Field & param: func.params)
-            {
-                bout << param.name;
-                if (param.id != lastId) {
-                    bout << QStringLiteral(", ");
+            bout << "    QByteArray params = " << prepareParamsName << "(";
+            for(const auto & param : f.m_params) {
+                bout << param.m_name;
+                if (param.m_id != lastId) {
+                    bout << ", ";
                 }
             }
-            bout << QStringLiteral(");") << endl;
-            bout << QStringLiteral("    return new AsyncResult(m_url, params, ") << asyncReadFunctionName << QStringLiteral(");") << endl;
+            bout << ");" << endl;
 
-            bout << QStringLiteral("}") << endl << endl;
+            bout << "    QByteArray reply = askEvernote(m_url, params);" << endl;
+            if (isVoidResult) {
+                bout << "    " << readReplyName << "(reply);" << endl;
+            }
+            else {
+                bout << "    return " << readReplyName << "(reply);" << endl;
+            }
+
+            bout << "}" << endl << endl;
+
+
+            bout << "AsyncResult* " << s.m_name << "::" << f.m_name << "Async(";
+            tokenParamIsPresent = false;
+            for(const auto & param : f.m_params)
+            {
+                if (param.m_name == QStringLiteral("authenticationToken"))
+                {
+                    tokenParamIsPresent = true;
+                }
+                else
+                {
+                    bout << typeToStr(
+                        param.m_type,
+                        f.m_name + QStringLiteral(", ") + param.m_name,
+                        MethodType::FuncParamType);
+                    bout << " " << param.m_name;
+
+                    if (param.m_id != lastId || tokenParamIsPresent) {
+                        bout << ", ";
+                    }
+                }
+            }
+
+            if (tokenParamIsPresent) {
+                bout << "QString authenticationToken";
+            }
+            bout << ")" << endl;
+            bout << "{" << endl;
+
+            if (tokenParamIsPresent) {
+                bout << "    if (authenticationToken.isEmpty()) {" << endl;
+                bout << "        authenticationToken = m_authenticationToken;"
+                    << endl;
+                bout << "    }" << endl;
+            }
+
+            bout << "    QByteArray params = " << prepareParamsName << "(";
+            for(const auto & param: f.m_params)
+            {
+                bout << param.m_name;
+                if (param.m_id != lastId) {
+                    bout << ", ";
+                }
+            }
+            bout << ");" << endl;
+            bout << "    return new AsyncResult(m_url, params, "
+                << asyncReadFunctionName << ");" << endl;
+
+            bout << "}" << endl << endl;
         }
     }
 
     writeBodyFooter(bout);
 }
 
-void Generator::generateSources(Parser * parser, QString outPath)
+void Generator::generateSources(Parser * parser, const QString & outPath)
 {
     if (parser->unions().count() > 0) {
         throw std::runtime_error("unions are not suported.");
     }
 
-    baseTypes_ << QStringLiteral("bool") << QStringLiteral("byte") << QStringLiteral("i16") << QStringLiteral("i32")
-               << QStringLiteral("i64") << QStringLiteral("double") << QStringLiteral("string") << QStringLiteral("binary");
+    m_baseTypes << QStringLiteral("bool") << QStringLiteral("byte")
+        << QStringLiteral("i16") << QStringLiteral("i32")
+        << QStringLiteral("i64") << QStringLiteral("double")
+        << QStringLiteral("string") << QStringLiteral("binary");
 
-    QList<Parser::Structure> structures = parser->structures();
-    for(auto it = structures.constBegin(), end = structures.constEnd(); it != end; ++it) {
-        allstructs_ << it->name;
+    const auto & structures = parser->structures();
+    for(const auto & s: structures) {
+        m_allStructs << s.m_name;
     }
 
-    QList<Parser::Structure> exceptions = parser->exceptions();
-    for(auto it = exceptions.constBegin(), end = exceptions.constEnd(); it != end; ++it) {
-        allexceptions_ << it->name;
+    const auto & exceptions = parser->exceptions();
+    for(const auto & e: exceptions) {
+        m_allExceptions << e.m_name;
     }
 
-    QList<Parser::Enumeration> enumerations = parser->enumerations();
-    for(auto it = enumerations.constBegin(), end = enumerations.constEnd(); it != end; ++it) {
-        allenums_ << it->name;
+    const auto & enumerations = parser->enumerations();
+    for(const auto & e: enumerations) {
+        m_allEnums << e.m_name;
     }
 
-    QList<Parser::Include> includes = parser->includes();
-    for(auto it = includes.constBegin(), end = includes.constEnd(); it != end; ++it) {
-        QString s = it->name;
-        s.replace(QStringLiteral("\""), QStringLiteral(""));
+    const auto & includes = parser->includes();
+    for(const auto & include: includes) {
+        QString s = include.m_name;
+        s.replace(QStringLiteral("\""), QLatin1Literal(""));
         s.chop(QStringLiteral("thrift").length());
-        includeList_ << s;
+        m_includeList << s;
     }
 
-    QList<Parser::TypeDefinition> typedefs = parser->typedefs();
-    for(auto it = typedefs.constBegin(), end = typedefs.constEnd(); it != end; ++it)
+    const auto & typedefs = parser->typedefs();
+    for(const auto & t: typedefs)
     {
-        auto casted = it->type.dynamicCast<Parser::BaseType>();
+        auto casted = t.m_type.dynamicCast<Parser::BaseType>();
         if (!casted.isNull()) {
-            typedefMap_[it->name] = casted->basetype;
+            m_typedefMap[t.m_name] = casted->m_baseType;
         }
     }
 

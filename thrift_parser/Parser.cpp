@@ -152,19 +152,19 @@ void Parser::addTypedef(
     QString name, QSharedPointer<Type> type, QString docComment)
 {
     TypeDefinition td;
-    td.file = m_fileName;
-    td.name = name;
-    td.type = type;
-    td.docComment = docComment;
+    td.m_fileName = m_fileName;
+    td.m_name = name;
+    td.m_type = type;
+    td.m_docComment = docComment;
     m_typedefs.append(td);
 }
 
 void Parser::addNamespace(QString scope, QString name)
 {
     Namespace n;
-    n.file = m_fileName;
-    n.name = name;
-    n.scope = scope;
+    n.m_fileName = m_fileName;
+    n.m_name = name;
+    n.m_scope = scope;
     m_namespaces.append(n);
 }
 
@@ -173,48 +173,48 @@ void Parser::addConst(
     QString docComment)
 {
     Constant c;
-    c.file = m_fileName;
-    c.name = name;
-    c.type = type;
-    c.value = value;
-    c.docComment = docComment;
+    c.m_fileName = m_fileName;
+    c.m_name = name;
+    c.m_type = type;
+    c.m_value = value;
+    c.m_docComment = docComment;
     m_constants.append(c);
 }
 
 void Parser::addInclude(QString name)
 {
     Include i;
-    i.file = m_fileName;
-    i.name = name;
+    i.m_fileName = m_fileName;
+    i.m_name = name;
     m_includes.append(i);
 }
 
 void Parser::addStructure(QString name, QList<Field> fields, QString docComment)
 {
    Structure s;
-   s.file = m_fileName;
-   s.name = name;
-   s.fields = fields;
-   s.parseStuctComment(docComment);
+   s.m_fileName = m_fileName;
+   s.m_name = name;
+   s.m_fields = fields;
+   s.parseStructComment(docComment);
    m_structures.append(s);
 }
 
 void Parser::addUnion(QString name, QList<Field> fields)
 {
     Structure s;
-    s.file = m_fileName;
-    s.name = name;
-    s.fields = fields;
+    s.m_fileName = m_fileName;
+    s.m_name = name;
+    s.m_fields = fields;
     m_unions.append(s);
 }
 
 void Parser::addException(QString name, QList<Field> fields, QString docComment)
 {
     Structure s;
-    s.file = m_fileName;
-    s.name = name;
-    s.fields = fields;
-    s.docComment = docComment;
+    s.m_fileName = m_fileName;
+    s.m_name = name;
+    s.m_fields = fields;
+    s.m_docComment = docComment;
     m_exceptions.append(s);
 }
 
@@ -223,11 +223,11 @@ void Parser::addService(
     QString docComment)
 {
     Service s;
-    s.file = m_fileName;
-    s.name = name;
-    s.extends = extends;
-    s.functions = functions;
-    s.docComment = docComment;
+    s.m_fileName = m_fileName;
+    s.m_name = name;
+    s.m_extends = extends;
+    s.m_functions = functions;
+    s.m_docComment = docComment;
     m_services.append(s);
 }
 
@@ -235,52 +235,58 @@ void Parser::addEnumeration(
     QString name, QList<QPair<QString, QString> > values, QString docComment)
 {
     Enumeration e;
-    e.file = m_fileName;
-    e.name = name;
-    e.values = values;
-    e.docComment = docComment;
+    e.m_fileName = m_fileName;
+    e.m_name = name;
+    e.m_values = values;
+    e.m_docComment = docComment;
     m_enumerations.append(e);
 }
 
-void Parser::Structure::parseStuctComment(QString rawComment)
+void Parser::Structure::parseStructComment(QString rawComment)
 {
     int pos = rawComment.indexOf("<dl>");
-    if(pos < 0) {
+    if (pos < 0) {
         pos = rawComment.indexOf("<dt>");
     }
-    if(pos < 0) {
-        docComment = rawComment;
+    if (pos < 0) {
+        m_docComment = rawComment;
         return;
     }
-    docComment = rawComment.left(pos) + "*/";
+    m_docComment = rawComment.left(pos) + "*/";
     rawComment = rawComment.mid(pos);
     rawComment.remove("*/").remove("<dl>").remove("</dl>");
     rawComment.replace("\n *", "\n");
     rawComment = rawComment.trimmed();
 
-    while(!rawComment.isEmpty()) {
+    while(!rawComment.isEmpty())
+    {
         int pos = rawComment.indexOf("<dt>");
         rawComment = rawComment.mid(pos + 4);
+
         pos = rawComment.indexOf("</dt>");
-        if(pos < 0) {
+        if (pos < 0) {
             pos = rawComment.indexOf("\n");
         }
+
         QString fieldName = rawComment.left(pos).remove(':');
         QString fieldComment;
         rawComment = rawComment.mid(pos);
         rawComment.remove("</dt>");
         pos = rawComment.indexOf("</dd>");
-        if(pos < 0) {
+        if (pos < 0) {
             pos = rawComment.indexOf("<dt>");
         }
-        if(pos < 0) {
+
+        if (pos < 0) {
             fieldComment = rawComment.trimmed();
             rawComment = "";
-        } else {
+        }
+        else {
             fieldComment = rawComment.left(pos);
             rawComment = rawComment.mid(pos);
         }
+
         fieldComment = fieldComment.remove("</dd>").remove("<dd>").trimmed();
-        this->fieldComments[fieldName] = "/**\n" + fieldComment + "\n*/";
+        m_fieldComments[fieldName] = "/**\n" + fieldComment + "\n*/";
     }
 }

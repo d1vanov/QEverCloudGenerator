@@ -53,46 +53,46 @@ void Parser::feed(Lexer::TerminalSymbolType type, const QString & value)
 {
     if (m_delims.isEmpty())
     {
-        m_delims["("] = TERM_PAREN_OPEN;
-        m_delims[")"] = TERM_PAREN_CLOSE;
-        m_delims[":"] = TERM_COLON;
-        m_delims["="] = TERM_EQ;
-        m_delims["{"] = TERM_CURLY_OPEN;
-        m_delims["}"] = TERM_CURLY_CLOSE;
-        m_delims[","] = TERM_LISTSEP;
-        m_delims[";"] = TERM_LISTSEP;
-        m_delims["<"] = TERM_LT;
-        m_delims[">"] = TERM_GT;
-        m_delims["["] = TERM_BRACKET_OPEN;
-        m_delims["]"] = TERM_BRACKET_CLOSE;
+        m_delims[QStringLiteral("(")] = TERM_PAREN_OPEN;
+        m_delims[QStringLiteral(")")] = TERM_PAREN_CLOSE;
+        m_delims[QStringLiteral(":")] = TERM_COLON;
+        m_delims[QStringLiteral("=")] = TERM_EQ;
+        m_delims[QStringLiteral("{")] = TERM_CURLY_OPEN;
+        m_delims[QStringLiteral("}")] = TERM_CURLY_CLOSE;
+        m_delims[QStringLiteral(",")] = TERM_LISTSEP;
+        m_delims[QStringLiteral(";")] = TERM_LISTSEP;
+        m_delims[QStringLiteral("<")] = TERM_LT;
+        m_delims[QStringLiteral(">")] = TERM_GT;
+        m_delims[QStringLiteral("[")] = TERM_BRACKET_OPEN;
+        m_delims[QStringLiteral("]")] = TERM_BRACKET_CLOSE;
 
-        m_reserved["include"] = TERM_INCLUDE;
-        m_reserved["cpp_include"] = TERM_CPP_INCLUDE;
-        m_reserved["namespace"] = TERM_NAMESPACE;
-        m_reserved["const"] = TERM_CONST;
-        m_reserved["typedef"] = TERM_TYPEDEF;
-        m_reserved["enum"] = TERM_ENUM;
-        m_reserved["struct"] = TERM_STRUCT;
-        m_reserved["union"] = TERM_UNION;
-        m_reserved["exception"] = TERM_EXCEPTION;
-        m_reserved["service"] = TERM_SERVICE;
-        m_reserved["extends"] = TERM_EXTENDS;
-        m_reserved["required"] = TERM_REQUIRED;
-        m_reserved["optional"] = TERM_OPTIONAL;
-        m_reserved["oneway"] = TERM_ONEWAY;
-        m_reserved["void"] = TERM_VOID;
-        m_reserved["throws"] = TERM_THROWS;
-        m_reserved["bool"] = TERM_BOOL;
-        m_reserved["byte"] = TERM_BYTE;
-        m_reserved["i16"] = TERM_I16;
-        m_reserved["i32"] = TERM_I32;
-        m_reserved["i64"] = TERM_I64;
-        m_reserved["double"] = TERM_DOUBLE;
-        m_reserved["string"] = TERM_STRING;
-        m_reserved["binary"] = TERM_BINARY;
-        m_reserved["map"] = TERM_MAP;
-        m_reserved["set"] = TERM_SET;
-        m_reserved["list"] = TERM_LIST;
+        m_reserved[QStringLiteral("include")] = TERM_INCLUDE;
+        m_reserved[QStringLiteral("cpp_include")] = TERM_CPP_INCLUDE;
+        m_reserved[QStringLiteral("namespace")] = TERM_NAMESPACE;
+        m_reserved[QStringLiteral("const")] = TERM_CONST;
+        m_reserved[QStringLiteral("typedef")] = TERM_TYPEDEF;
+        m_reserved[QStringLiteral("enum")] = TERM_ENUM;
+        m_reserved[QStringLiteral("struct")] = TERM_STRUCT;
+        m_reserved[QStringLiteral("union")] = TERM_UNION;
+        m_reserved[QStringLiteral("exception")] = TERM_EXCEPTION;
+        m_reserved[QStringLiteral("service")] = TERM_SERVICE;
+        m_reserved[QStringLiteral("extends")] = TERM_EXTENDS;
+        m_reserved[QStringLiteral("required")] = TERM_REQUIRED;
+        m_reserved[QStringLiteral("optional")] = TERM_OPTIONAL;
+        m_reserved[QStringLiteral("oneway")] = TERM_ONEWAY;
+        m_reserved[QStringLiteral("void")] = TERM_VOID;
+        m_reserved[QStringLiteral("throws")] = TERM_THROWS;
+        m_reserved[QStringLiteral("bool")] = TERM_BOOL;
+        m_reserved[QStringLiteral("byte")] = TERM_BYTE;
+        m_reserved[QStringLiteral("i16")] = TERM_I16;
+        m_reserved[QStringLiteral("i32")] = TERM_I32;
+        m_reserved[QStringLiteral("i64")] = TERM_I64;
+        m_reserved[QStringLiteral("double")] = TERM_DOUBLE;
+        m_reserved[QStringLiteral("string")] = TERM_STRING;
+        m_reserved[QStringLiteral("binary")] = TERM_BINARY;
+        m_reserved[QStringLiteral("map")] = TERM_MAP;
+        m_reserved[QStringLiteral("set")] = TERM_SET;
+        m_reserved[QStringLiteral("list")] = TERM_LIST;
     }
 
     int yymajor = 0;
@@ -244,49 +244,53 @@ void Parser::addEnumeration(
 
 void Parser::Structure::parseStructComment(QString rawComment)
 {
-    int pos = rawComment.indexOf("<dl>");
+    int pos = rawComment.indexOf(QStringLiteral("<dl>"));
     if (pos < 0) {
-        pos = rawComment.indexOf("<dt>");
+        pos = rawComment.indexOf(QStringLiteral("<dt>"));
     }
     if (pos < 0) {
         m_docComment = rawComment;
         return;
     }
-    m_docComment = rawComment.left(pos) + "*/";
+    m_docComment = rawComment.left(pos) + QStringLiteral("*/");
     rawComment = rawComment.mid(pos);
-    rawComment.remove("*/").remove("<dl>").remove("</dl>");
-    rawComment.replace("\n *", "\n");
+    rawComment.remove(QStringLiteral("*/")).remove(QStringLiteral("<dl>"))
+        .remove(QStringLiteral("</dl>"));
+    rawComment.replace(QStringLiteral("\n *"), QStringLiteral("\n"));
     rawComment = rawComment.trimmed();
 
     while(!rawComment.isEmpty())
     {
-        int pos = rawComment.indexOf("<dt>");
+        int pos = rawComment.indexOf(QStringLiteral("<dt>"));
         rawComment = rawComment.mid(pos + 4);
 
-        pos = rawComment.indexOf("</dt>");
+        pos = rawComment.indexOf(QStringLiteral("</dt>"));
         if (pos < 0) {
-            pos = rawComment.indexOf("\n");
+            pos = rawComment.indexOf(QStringLiteral("\n"));
         }
 
-        QString fieldName = rawComment.left(pos).remove(':');
+        QString fieldName = rawComment.left(pos).remove(QChar::fromLatin1(':'));
         QString fieldComment;
         rawComment = rawComment.mid(pos);
-        rawComment.remove("</dt>");
-        pos = rawComment.indexOf("</dd>");
+        rawComment.remove(QStringLiteral("</dt>"));
+        pos = rawComment.indexOf(QStringLiteral("</dd>"));
         if (pos < 0) {
-            pos = rawComment.indexOf("<dt>");
+            pos = rawComment.indexOf(QStringLiteral("<dt>"));
         }
 
         if (pos < 0) {
             fieldComment = rawComment.trimmed();
-            rawComment = "";
+            rawComment = QLatin1Literal("");
         }
         else {
             fieldComment = rawComment.left(pos);
             rawComment = rawComment.mid(pos);
         }
 
-        fieldComment = fieldComment.remove("</dd>").remove("<dd>").trimmed();
-        m_fieldComments[fieldName] = "/**\n" + fieldComment + "\n*/";
+        fieldComment = fieldComment.remove(QStringLiteral("</dd>"))
+            .remove(QStringLiteral("<dd>")).trimmed();
+
+        m_fieldComments[fieldName] =
+            QStringLiteral("/**\n") + fieldComment + QStringLiteral("\n*/");
     }
 }

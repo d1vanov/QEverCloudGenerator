@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
         QDir dir(thriftDir);
 
         QStringList thriftFilesMask;
-        thriftFilesMask << "*.thrift";
+        thriftFilesMask << QStringLiteral("*.thrift");
 
         QStringList thriftFiles = dir.entryList(
             thriftFilesMask, QDir::Files, QDir::Name);
@@ -73,13 +73,13 @@ int main(int argc, char *argv[])
             if (parser->isError())
             {
                 QString error = parser->errorMessage();
-                error += " in file ";
+                error += QStringLiteral(" in file ");
                 error += term.m_fileName;
-                error += " at line ";
+                error += QStringLiteral(" at line ");
                 error += QString::number(term.m_lineNum);
-                error += ": ";
+                error += QStringLiteral(": ");
                 error += term.m_data;
-                error += "\ndetected token type: ";
+                error += QStringLiteral("\ndetected token type: ");
                 error += QString::number(static_cast<int>(term.m_type));
                 throw std::runtime_error(error.toStdString());
             }
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
         parser->complete();
         if (parser->isError()) {
             throw std::runtime_error(
-                QString("Parser error at completion: %1")
+                QString::fromUtf8("Parser error at completion: %1")
                 .arg(parser->errorMessage()).toStdString());
         }
 

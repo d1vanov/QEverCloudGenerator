@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.5.1)
 
 include(QEverCloudGeneratorCMakePolicies)
 SET_POLICIES()
@@ -39,6 +39,11 @@ set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/thrift_lemon.cpp" PROPERTY SKIP
 
 add_executable(QEverCloudGenerator ${HEADERS} ${SOURCES} ${IDL_COMPILED_FILES})
 target_link_libraries(QEverCloudGenerator ${QT_LIBRARIES})
+
+target_compile_features(QEverCloudGenerator INTERFACE
+  cxx_auto_type
+  cxx_nullptr
+  cxx_range_for)
 
 add_dependencies(QEverCloudGenerator pre_build)
 

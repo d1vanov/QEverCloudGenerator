@@ -19,15 +19,15 @@
 
 %syntax_error
 {
-    pParser->setErrorFlag("Syntax error");
+    pParser->setErrorFlag(QStringLiteral("Syntax error"));
 }
 %parse_failure
 {
-    pParser->setErrorFlag("Parser failure");
+    pParser->setErrorFlag(QStringLiteral("Parser failure"));
 }
 %stack_overflow
 {
-    pParser->setErrorFlag("Stack overflow");
+    pParser->setErrorFlag(QStringLiteral("Stack overflow"));
 }
 
 thrift ::= body END_OF_FILE.
@@ -314,7 +314,7 @@ functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist
   A->m_name = *D;
   A->m_params = *E;
   A->m_throws = *F;
-  A->m_docComment = "";
+  A->m_docComment = QLatin1Literal("");
   delete C;
   delete D;
   delete E;

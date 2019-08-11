@@ -31,6 +31,8 @@
 #include <QMap>
 #include <QString>
 
+using namespace qevercloud;
+
 static const char * disclaimer =
     "/**\n"
     " * Original work: Copyright (c) 2014 Sergey Skoblikov\n"
@@ -945,11 +947,9 @@ void Generator::writeThriftWriteFields(
                 << QStringLiteral(", ") << fieldMoniker
                 << QStringLiteral(".size());") << endl;
 
-            out << ident
-                << QStringLiteral("    for(auto it = ")
-                << fieldMoniker << QStringLiteral(".constBegin(), end = ")
-                << fieldMoniker
-                << QStringLiteral(".constEnd(); it != end; ++it) {") << endl;
+            out << ident << QStringLiteral("    for(const auto & it: ")
+                << QStringLiteral("toRange(") << fieldMoniker
+                << QStringLiteral(")) {") << endl;
 
             QString keyWriteMethod = typeToStr(
                 keyType, identPrefix + QStringLiteral(",") + field.m_name,

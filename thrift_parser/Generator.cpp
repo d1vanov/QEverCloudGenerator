@@ -1527,7 +1527,7 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
         for(const auto & v : e.m_values) {
             QString value = e.m_name + QStringLiteral("::") + v.first;
             bout << QStringLiteral("    case static_cast<int>(")
-                << value << QStringLiteral(": e = ") << value
+                << value << QStringLiteral("): e = ") << value
                 << QStringLiteral("; break;") << endl;
         }
 

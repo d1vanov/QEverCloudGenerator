@@ -16,9 +16,10 @@ environment:
     secure: rLuHhO0prerqoGCYmfOoyxqcwwamCXtuZtl4Jzqeu3aGgflk0mnX1fogLq68YcRW
   matrix:
     - prepare_mode: YES
+      APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       name: win32-prepare
       platform: amd64_x86
-      qt: msvc2015
+      qt: msvc2017
     - prepare_mode: NO
       APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
       name: win32
@@ -48,7 +49,7 @@ init:
   - if %platform%==mingw set DEPLOYMENT_TARGET=qevercloud-generator-windows-qt55-%BUILD_SUITE%.zip
   - if not %platform%==mingw set DEPLOYMENT_TARGET=qevercloud-generator-windows-qt513-%BUILD_SUITE%.zip
   - if %platform%==amd64 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
-  - if %platform%==amd64_x86 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars.bat"
+  - if %platform%==amd64_x86 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" x86
   - if not %platform%==mingw (set makefiles="NMake Makefiles") else (set makefiles="MinGW Makefiles")
   - if not %platform%==mingw set PATH="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\15.0\Bin";%PATH%
 

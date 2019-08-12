@@ -1168,15 +1168,13 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
                 houtEDAMErrorCode << e.m_docComment << endl;
             }
 
-            houtEDAMErrorCode << "struct QEVERCLOUD_EXPORT " << e.m_name
-                << endl << "{" << endl;
-
-            houtEDAMErrorCode << "    enum type" << endl << "    {" << endl;
+            houtEDAMErrorCode << "enum class " << e.m_name << endl << "{"
+                << endl;
 
             for(int i = 0; i< e.m_values.length(); i++)
             {
                 const QPair<QString, QString>& v = e.m_values[i];
-                houtEDAMErrorCode << "        " << v.first;
+                houtEDAMErrorCode << "    " << v.first;
 
                 if (!v.second.isEmpty()) {
                     houtEDAMErrorCode << " = " << v.second;
@@ -1189,7 +1187,6 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
                 houtEDAMErrorCode << endl;
             }
 
-            houtEDAMErrorCode << "    };" << endl;
             houtEDAMErrorCode << "};" << endl << endl;
         }
         else
@@ -1198,14 +1195,12 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
                 hout << e.m_docComment << endl;
             }
 
-            hout << "struct QEVERCLOUD_EXPORT "
-                << e.m_name << " {" << endl;
-            hout << "    enum type {" << endl;
+            hout << "enum class " << e.m_name << endl << "{" << endl;
 
             for(int i = 0; i< e.m_values.length(); i++)
             {
                 const QPair<QString, QString> & v = e.m_values[i];
-                hout << "        " << v.first;
+                hout << "    " << v.first;
 
                 if (!v.second.isEmpty()) {
                     hout << " = " << v.second;
@@ -1218,7 +1213,6 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
                 hout << endl;
             }
 
-            hout << "    };" << endl;
             hout << "};" << endl << endl;
         }
     }
@@ -1233,8 +1227,8 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
             hout << t.m_docComment << endl;
         }
 
-        hout << "typedef " << typeToStr(t.m_type, t.m_name)
-             << " " << t.m_name << ";" << endl << endl;
+        hout << "using " << t.m_name << " = " << typeToStr(t.m_type, t.m_name)
+            << ";" << endl << endl;
     }
     hout << endl;
 

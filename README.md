@@ -5,6 +5,8 @@ QEverCloudGenerator
 
 Travis CI (Linux, OS X): [![Build Status](https://travis-ci.org/d1vanov/QEverCloudGenerator.svg?branch=master)](https://travis-ci.org/d1vanov/QEverCloudGenerator)
 
+AppVeyor CI (Windows): [![Build status](https://ci.appveyor.com/api/projects/status/lx8t6mql7vywcgfm/branch/master?svg=true)](https://ci.appveyor.com/project/d1vanov/qevercloudgenerator/branch/master)
+
 ## What's this
 
 Evernote delivers its API to thirdparty developers in the form of SDKs for various programming languages. All these SDKs actually consist of automatically generated code, maybe just slightly adjusted by hand after the fact. The real source for all the automatically generated code is the set of [Thrift IDL](https://github.com/evernote/evernote-thrift) files where IDL stands for "interface definition language". The [Thrift software framework](https://thrift.apache.org) mentored by the [Apache Software Foundation](https://www.apache.org) contains a code generation engine capable of creating source code in various programming languages from the same set of Thrift IDL files. That engine can generate the C++ code as well and Evernote does ship the [official C++ SDK](https://github.com/evernote/evernote-sdk-cpp) but it is not very comfortable to use along with Qt framework because it uses a lot of non-Qt data types so that the SDK client has to convert between `std::string` and `QString` here and there + that official C++ SDK has runtime dependencies on Thrift libraries.

@@ -23,6 +23,12 @@ matrix:
           env: CMAKE_BUILD_TYPE=RelWithDebInfo
           compiler: clang
 
+cache:
+    directories:
+        - $HOME/Library/Caches/Homebrew
+
+before_cache:
+    - brew cleanup
 
 before_install:
     - |

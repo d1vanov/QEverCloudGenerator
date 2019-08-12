@@ -48,7 +48,7 @@ init:
   - if %platform%==mingw set DEPLOYMENT_TARGET=qevercloud-generator-windows-qt55-%BUILD_SUITE%.zip
   - if not %platform%==mingw set DEPLOYMENT_TARGET=qevercloud-generator-windows-qt513-%BUILD_SUITE%.zip
   - if %platform%==amd64 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
-  - if %platform%==amd64_x86 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarall.bat" win32
+  - if %platform%==amd64_x86 call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" win32
   - if not %platform%==mingw (set makefiles="NMake Makefiles") else (set makefiles="MinGW Makefiles")
   - if not %platform%==mingw set PATH="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\15.0\Bin";%PATH%
 

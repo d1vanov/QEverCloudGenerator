@@ -45,6 +45,9 @@ static const char * disclaimer =
     " * This file was generated from Evernote Thrift API\n"
     " */\n";
 
+static const char * blockSeparator = "/////////////////////////////////////////"
+                                     "///////////////////////////////////////";
+
 QString Generator::generatedHeaderOutputPath(const QString & outPath)
 {
     QString headerOutPath = outPath + QStringLiteral("/headers/generated");
@@ -101,13 +104,73 @@ QString Generator::clearTypedef(const QString & s) const
     return s;
 }
 
+void Generator::writeEnumeration(
+    QTextStream & out, const Parser::Enumeration & e) const
+{
+    if (!e.m_docComment.isEmpty()) {
+        out << e.m_docComment << endl;
+    }
+
+    out << "enum class " << e.m_name << endl << "{" << endl;
+
+    size_t i = 0;
+    size_t numValues = e.m_values.size();
+    for(const auto & v: e.m_values)
+    {
+        out << "    " << v.first;
+
+        if (!v.second.isEmpty()) {
+            out << " = " << v.second;
+        }
+
+        if (i < (numValues - 1)) {
+            out << ",";
+        }
+
+        out << endl;
+        ++i;
+    }
+
+    out << "};" << endl << endl;
+}
+
+void Generator::writeEnumerationPrintDeclaration(
+    QTextStream & out, const Parser::Enumeration & e,
+    const char * printer) const
+{
+    out << "QEVERCLOUD_EXPORT " << printer << " & operator<<(" << printer
+        << " & out, const " << e.m_name << " value);" << endl << endl;
+}
+
+void Generator::writeEnumerationPrintDefinition(
+    QTextStream & out, const Parser::Enumeration & e,
+    const char * printer) const
+{
+    out << printer << " & operator<<(" << printer << " & out, const "
+        << e.m_name << " value)" << endl << "{" << endl
+        << "    switch(value)" << endl
+        << "    {" << endl;
+
+    for(const auto & value: e.m_values) {
+        out << "    case " << e.m_name << "::" << value.first << ":" << endl
+            << "        out << \"" << e.m_name << "::" << value.first << "\";"
+            << endl << "        break;" << endl;
+    }
+
+    out << "    default:" << endl
+        << "        out << \"Unknown (\" << static_cast<qint64>(value) << \")\";"
+        << endl << "        break;" << endl
+        << "    }" << endl
+        << "    return out;" << endl
+        << "}" << endl << endl;
+}
+
 void Generator::writeHeaderHeader(
     QTextStream & out, const QString & fileName,
     const QStringList & additionalPreIncludes,
     const QStringList & additionalPostIncludes)
 {
     out << disclaimer << endl;
-    out << endl;
 
     QString guard =
         QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H")
@@ -115,51 +178,42 @@ void Generator::writeHeaderHeader(
     out << "#ifndef " << guard << endl;
     out << "#define " << guard << endl;
     out << endl;
+    out << "#include \"../export.h\"" << endl;
+    out << endl;
 
-    if (fileName != QStringLiteral("EDAMErrorCode.h"))
+    for(const auto & include: qAsConst(additionalPreIncludes))
     {
-        if (fileName != QStringLiteral("types_impl.h")) {
-            out << "#include \"../Optional.h\"" << endl;
-            out << "#include \"../export.h\"" << endl;
+        if (include.startsWith(QChar::fromLatin1('<'))) {
+            out << "#include " << include << endl;
         }
         else {
-            out << "#include <Optional.h>" << endl;
+            out << "#include \"" << include << "\"" << endl;
         }
-
-        for(const auto & include: qAsConst(additionalPreIncludes))
-        {
-            if (include.startsWith(QChar::fromLatin1('<'))) {
-                out << "#include " << include << endl;
-            }
-            else {
-                out << "#include \"" << include << "\"" << endl;
-            }
-        }
-
-        auto includes = QStringList()
-            << QStringLiteral("QMap") << QStringLiteral("QList")
-            << QStringLiteral("QSet") << QStringLiteral("QString")
-            << QStringLiteral("QStringList") << QStringLiteral("QByteArray")
-            << QStringLiteral("QDateTime") << QStringLiteral("QMetaType");
-        for(const auto & include: qAsConst(includes)) {
-            out << "#include <" << include << ">" << endl;
-        }
-
-        for(const auto & include: qAsConst(additionalPostIncludes))
-        {
-            if (include.startsWith(QChar::fromLatin1('<'))) {
-                out << "#include " << include << endl;
-            }
-            else {
-                out << "#include \"" << include << "\"" << endl;
-            }
-        }
-
-        out << endl;
     }
-    else
+
+    // FIXME: consider removing this
+    /*
+    auto includes = QStringList()
+        << QStringLiteral("QMap") << QStringLiteral("QList")
+        << QStringLiteral("QSet") << QStringLiteral("QString")
+        << QStringLiteral("QStringList") << QStringLiteral("QByteArray")
+        << QStringLiteral("QDateTime") << QStringLiteral("QMetaType");
+    for(const auto & include: qAsConst(includes)) {
+        out << "#include <" << include << ">" << endl;
+    }
+    */
+
+    for(const auto & include: qAsConst(additionalPostIncludes))
     {
-        out << "#include \"../export.h\"" << endl;
+        if (include.startsWith(QChar::fromLatin1('<'))) {
+            out << "#include " << include << endl;
+        }
+        else {
+            out << "#include \"" << include << "\"" << endl;
+        }
+    }
+
+    if (!additionalPreIncludes.isEmpty() || !additionalPostIncludes.isEmpty()) {
         out << endl;
     }
 
@@ -173,7 +227,6 @@ void Generator::writeHeaderBody(
     const QStringList & additionalIncludes)
 {
     out << disclaimer << endl;
-    out << endl;
     out << "#include <generated/" << headerFileName << ">" << endl;
     out << "#include \"../impl.h\"" << endl;
 
@@ -189,6 +242,10 @@ void Generator::writeHeaderBody(
 
     out << endl;
     out << "namespace qevercloud {";
+    out << endl;
+    out << endl;
+    out << blockSeparator;
+    out << endl;
     out << endl;
 }
 
@@ -215,7 +272,6 @@ void Generator::writeHeaderFooter(
 
 void Generator::writeBodyFooter(QTextStream & out)
 {
-    out << endl;
     out << "} // namespace qevercloud" << endl;
 }
 
@@ -477,18 +533,12 @@ QString Generator::typeToStr(
         else if (methodType == MethodType::TypeName)
         {
             result = nameOfType;
-            if (m_allEnums.contains(result)) {
-                result = result + QStringLiteral("::type");
-            }
         }
         else if(methodType == MethodType::ReadTypeName)
         {
             result = (nameOfType == QStringLiteral("Timestamp")
                       ? QStringLiteral("qint64")
                       : nameOfType);
-            if (m_allEnums.contains(result)) {
-                result = result + QStringLiteral("::type");
-            }
         }
         else
         {
@@ -811,6 +861,7 @@ void Generator::generateConstants(Parser * parser, const QString & outPath)
              << ";" << endl;
     }
 
+    bout << endl;
     writeBodyFooter(bout);
 }
 
@@ -1119,6 +1170,84 @@ void Generator::writeThriftReadField(
     out << indent << fieldParent << field.m_name << " = v;" << endl;
 }
 
+void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
+{
+    const QString headerOutPath = generatedHeaderOutputPath(outPath);
+
+    const QString headerFileName = QStringLiteral("EDAMErrorCode.h");
+    QFile headerFile(QDir(headerOutPath).absoluteFilePath(headerFileName));
+    if (!headerFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open generated header file for writing: %1")
+            .arg(headerFile.fileName()).toStdString());
+    }
+
+    QTextStream hout(&headerFile);
+    hout.setCodec("UTF-8");
+
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("<QTextStream>") << QStringLiteral("<QDebug>");
+
+    writeHeaderHeader(hout, headerFileName, {}, additionalIncludes);
+
+    const auto & enumerations = parser->enumerations();
+    int enumerationsCount = enumerations.size();
+    int i = 0;
+    for(const auto & e: enumerations)
+    {
+        writeEnumeration(hout, e);
+        hout << blockSeparator << endl << endl;
+
+        writeEnumerationPrintDeclaration(hout, e, "QTextStream");
+        hout << blockSeparator << endl << endl;
+
+        writeEnumerationPrintDeclaration(hout, e, "QDebug");
+        if (i != (enumerationsCount - 1)) {
+            hout << blockSeparator << endl << endl;
+        }
+
+        ++i;
+    }
+
+    writeHeaderFooter(hout, headerFileName);
+}
+
+void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
+{
+    const QString cppOutPath = generatedSourceOutputPath(outPath);
+
+    const QString cppFileName = QStringLiteral("EDAMErrorCode.cpp");
+    QFile cppFile(QDir(cppOutPath).absoluteFilePath(cppFileName));
+    if (!cppFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        throw std::runtime_error(QString::fromUtf8(
+            "Can't open generated cpp file for writing: %1")
+            .arg(cppFile.fileName()).toStdString());
+    }
+
+    QTextStream out(&cppFile);
+    out.setCodec("UTF-8");
+
+    writeHeaderBody(out, QStringLiteral("EDAMErrorCode.h"));
+
+    const auto & enumerations = parser->enumerations();
+    int enumerationsCount = enumerations.size();
+    int i = 0;
+    for(const auto & e: enumerations)
+    {
+        writeEnumerationPrintDefinition(out, e, "QTextStream");
+        out << blockSeparator << endl << endl;
+
+        writeEnumerationPrintDefinition(out, e, "QDebug");
+        if (i != (enumerationsCount - 1)) {
+            out << blockSeparator << endl << endl;
+        }
+
+        ++i;
+    }
+
+    writeBodyFooter(out);
+}
+
 void Generator::generateTypes(Parser * parser, const QString & outPath)
 {
     const QString headerOutPath = generatedHeaderOutputPath(outPath);
@@ -1134,91 +1263,14 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     QTextStream hout(&headerFile);
     hout.setCodec("UTF-8");
 
-    const QString EDAMErrorCodeHeaderFileName =
-        QStringLiteral("EDAMErrorCode.h");
-
-    QStringList additionalPreIncludes =
-        QStringList() << EDAMErrorCodeHeaderFileName;
+    QStringList additionalPreIncludes = QStringList()
+        << QStringLiteral("EDAMErrorCode.h") << QStringLiteral("../Optional.h");
 
     QStringList additionalPostIncludes = QStringList()
         << QStringLiteral("<QSharedPointer>") << QStringLiteral("<QMetaType>");
 
     writeHeaderHeader(
         hout, headerFileName, additionalPreIncludes, additionalPostIncludes);
-
-    QFile EDAMErrorCodeHeaderFile(
-        QDir(headerOutPath).absoluteFilePath(EDAMErrorCodeHeaderFileName));
-    if (!EDAMErrorCodeHeaderFile.open(QIODevice::WriteOnly|QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8(
-            "Can't open the generated header file for writing: %1")
-            .arg(EDAMErrorCodeHeaderFile.fileName()).toStdString());
-    }
-
-    QTextStream houtEDAMErrorCode(&EDAMErrorCodeHeaderFile);
-    houtEDAMErrorCode.setCodec("UTF-8");
-
-    writeHeaderHeader(houtEDAMErrorCode, EDAMErrorCodeHeaderFileName);
-
-    const auto & enumerations = parser->enumerations();
-    for(const auto & e: enumerations)
-    {
-        if (e.m_name == QStringLiteral("EDAMErrorCode"))
-        {
-            if (!e.m_docComment.isEmpty()) {
-                houtEDAMErrorCode << e.m_docComment << endl;
-            }
-
-            houtEDAMErrorCode << "enum class " << e.m_name << endl << "{"
-                << endl;
-
-            for(int i = 0; i< e.m_values.length(); i++)
-            {
-                const QPair<QString, QString>& v = e.m_values[i];
-                houtEDAMErrorCode << "    " << v.first;
-
-                if (!v.second.isEmpty()) {
-                    houtEDAMErrorCode << " = " << v.second;
-                }
-
-                if (i < (e.m_values.length() - 1)) {
-                    houtEDAMErrorCode << ",";
-                }
-
-                houtEDAMErrorCode << endl;
-            }
-
-            houtEDAMErrorCode << "};" << endl << endl;
-        }
-        else
-        {
-            if (!e.m_docComment.isEmpty()) {
-                hout << e.m_docComment << endl;
-            }
-
-            hout << "enum class " << e.m_name << endl << "{" << endl;
-
-            for(int i = 0; i< e.m_values.length(); i++)
-            {
-                const QPair<QString, QString> & v = e.m_values[i];
-                hout << "    " << v.first;
-
-                if (!v.second.isEmpty()) {
-                    hout << " = " << v.second;
-                }
-
-                if (i < (e.m_values.length() - 1)) {
-                    hout << ",";
-                }
-
-                hout << endl;
-            }
-
-            hout << "};" << endl << endl;
-        }
-    }
-
-    hout << endl;
-    houtEDAMErrorCode << endl;
 
     const auto & typedefs = parser->typedefs();
     for(const auto & t: typedefs)
@@ -1407,8 +1459,6 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     }
     hout << endl;
 
-    writeHeaderFooter(houtEDAMErrorCode, EDAMErrorCodeHeaderFileName);
-
     hout << endl;
     hout << "} // namespace qevercloud" << endl<< endl;
 
@@ -1440,7 +1490,12 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     additionalPreIncludes << QStringLiteral("<generated/types.h>")
                           << QStringLiteral("../impl.h");
 
-    writeHeaderHeader(hout2, typesImplHeaderFileName, additionalPreIncludes);
+    additionalPostIncludes = QStringList()
+        << QStringLiteral("<Optional.h>");
+
+    writeHeaderHeader(
+        hout2, typesImplHeaderFileName, additionalPreIncludes,
+        additionalPostIncludes);
 
     hout2 << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
 
@@ -1457,10 +1512,11 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     }
     hout2 << endl;
 
+    const auto & enumerations = parser->enumerations();
     for(const auto & e: enumerations) {
         hout2 << "void readEnum" << e.m_name
             << "(ThriftBinaryBufferReader & r, "
-            << e.m_name << "::type & e);" << endl;
+            << e.m_name << " & e);" << endl;
     }
     hout2 << endl;
     hout2 << "/** @endcond */" << endl;
@@ -1491,7 +1547,7 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     {
         bout <<  "void readEnum" << e.m_name
             << "(ThriftBinaryBufferReader & r, "
-            << e.m_name << "::type & e) {" << endl;
+            << e.m_name << " & e) {" << endl;
 
         bout << "    qint32 i;" << endl;
         bout << "    r.readI32(i);" << endl;
@@ -1620,7 +1676,7 @@ void Generator::generateTypes(Parser * parser, const QString & outPath)
     bout << endl;
 
     bout << "/** @endcond */" << endl << endl;
-    bout << endl;
+    bout << endl << endl;
 
     writeBodyFooter(bout);
 }
@@ -1643,8 +1699,8 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
     hout.setCodec("UTF-8");
 
     QStringList additionalPreIncludes = QStringList()
-        << QStringLiteral("../AsyncResult.h") << QStringLiteral("constants.h")
-        << QStringLiteral("types.h");
+        << QStringLiteral("../AsyncResult.h") << QStringLiteral("../Optional.h")
+        << QStringLiteral("constants.h") << QStringLiteral("types.h");
 
     QStringList additionalPostIncludes = QStringList()
         << QStringLiteral("<QObject>");
@@ -2123,6 +2179,7 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
         }
     }
 
+    bout << endl;
     writeBodyFooter(bout);
 }
 
@@ -2170,6 +2227,8 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
     }
 
     generateConstants(parser, outPath);
+    generateErrorsHeader(parser, outPath);
+    generateErrorsCpp(parser, outPath);
     generateTypes(parser, outPath);
     generateServices(parser, outPath);
 }

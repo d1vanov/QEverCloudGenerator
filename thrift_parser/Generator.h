@@ -38,6 +38,8 @@ private:
     QString generatedSourceOutputPath(const QString & outPath);
 
     void generateConstants(Parser * parser, const QString & outPath);
+    void generateErrorsHeader(Parser * parser, const QString & outPath);
+    void generateErrorsCpp(Parser * parser, const QString & outPath);
     void generateTypes(Parser * parser, const QString & outPath);
     void generateServices(Parser * parser, const QString & outPath);
 
@@ -96,6 +98,19 @@ private:
 
     QString clearInclude(const QString & s) const;
     QString clearTypedef(const QString & s) const;
+
+    // Write methods for particular parsed fields
+
+    void writeEnumeration(
+        QTextStream & out, const Parser::Enumeration & e) const;
+
+    void writeEnumerationPrintDeclaration(
+        QTextStream & out, const Parser::Enumeration & e,
+        const char * printer) const;
+
+    void writeEnumerationPrintDefinition(
+        QTextStream & out, const Parser::Enumeration & e,
+        const char * printer) const;
 
 private:
     QStringList m_includeList;

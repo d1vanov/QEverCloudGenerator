@@ -28,19 +28,46 @@
 
 #include "Parser.h"
 
+#include <QFile>
+
+////////////////////////////////////////////////////////////////////////////////
+
+enum class OutputFileType
+{
+    Interface,
+    Implementation
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
 class Generator
 {
 public:
     void generateSources(Parser * parser, const QString & outPath);
 
 private:
-    QString generatedHeaderOutputPath(const QString & outPath);
-    QString generatedSourceOutputPath(const QString & outPath);
+    struct OutputFileContext
+    {
+        OutputFileContext(
+            const QString & fileName,
+            const QString & outPath,
+            const OutputFileType type);
 
-    void generateConstants(Parser * parser, const QString & outPath);
+        QFile m_file;
+        QTextStream m_out;
+    };
+
+    void generateConstantsHeader(Parser * parser, const QString & outPath);
+    void generateConstantsCpp(Parser * parser, const QString & outPath);
+
     void generateErrorsHeader(Parser * parser, const QString & outPath);
     void generateErrorsCpp(Parser * parser, const QString & outPath);
-    void generateTypes(Parser * parser, const QString & outPath);
+
+    void generateTypesIOHeader(Parser * parser, const QString & outPath);
+
+    void generateTypesHeader(Parser * parser, const QString & outPath);
+    void generateTypesCpp(Parser * parser, const QString & outPath);
+
     void generateServices(Parser * parser, const QString & outPath);
 
     // Methods for writing header and source files
@@ -56,7 +83,8 @@ private:
 
     void writeHeaderFooter(
         QTextStream & out, const QString & fileName,
-        const QStringList & extraContent = QStringList());
+        const QStringList & extraLinesInsideNamespace = QStringList(),
+        const QStringList & exytaLinesOutsideNamespace = QStringList());
 
     void writeBodyFooter(QTextStream & out);
 

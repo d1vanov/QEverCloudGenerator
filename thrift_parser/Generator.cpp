@@ -160,6 +160,12 @@ void Generator::writeEnumeration(
     }
 
     out << "};" << endl << endl;
+
+    out << "inline uint qHash(" << e.m_name << " value)"
+        << endl
+        << "{" << endl
+        << "    return static_cast<uint>(value);" << endl
+        << "}" << endl << endl;
 }
 
 void Generator::writeEnumerationPrintDeclaration(
@@ -195,8 +201,8 @@ void Generator::writeEnumerationPrintDefinition(
 
 void Generator::writeHeaderHeader(
     QTextStream & out, const QString & fileName,
-    const QStringList & additionalPreIncludes,
-    const QStringList & additionalPostIncludes)
+    const QStringList & additionalIncludes,
+    const HeaderKind headerKind)
 {
     out << disclaimer << endl;
 
@@ -206,10 +212,18 @@ void Generator::writeHeaderHeader(
     out << "#ifndef " << guard << endl;
     out << "#define " << guard << endl;
     out << endl;
-    out << "#include \"../export.h\"" << endl;
-    out << endl;
 
-    for(const auto & include: qAsConst(additionalPreIncludes))
+    if (headerKind == HeaderKind::Public)
+    {
+        out << "#include \"../Export.h\"" << endl;
+        out << endl;
+
+        if (!additionalIncludes.isEmpty()) {
+            out << endl;
+        }
+    }
+
+    for(const auto & include: qAsConst(additionalIncludes))
     {
         if (include.startsWith(QChar::fromLatin1('<'))) {
             out << "#include " << include << endl;
@@ -219,29 +233,7 @@ void Generator::writeHeaderHeader(
         }
     }
 
-    // FIXME: consider removing this
-    /*
-    auto includes = QStringList()
-        << QStringLiteral("QMap") << QStringLiteral("QList")
-        << QStringLiteral("QSet") << QStringLiteral("QString")
-        << QStringLiteral("QStringList") << QStringLiteral("QByteArray")
-        << QStringLiteral("QDateTime") << QStringLiteral("QMetaType");
-    for(const auto & include: qAsConst(includes)) {
-        out << "#include <" << include << ">" << endl;
-    }
-    */
-
-    for(const auto & include: qAsConst(additionalPostIncludes))
-    {
-        if (include.startsWith(QChar::fromLatin1('<'))) {
-            out << "#include " << include << endl;
-        }
-        else {
-            out << "#include \"" << include << "\"" << endl;
-        }
-    }
-
-    if (!additionalPreIncludes.isEmpty() || !additionalPostIncludes.isEmpty()) {
+    if (!additionalIncludes.isEmpty()) {
         out << endl;
     }
 
@@ -256,7 +248,7 @@ void Generator::writeHeaderBody(
 {
     out << disclaimer << endl;
     out << "#include <generated/" << headerFileName << ">" << endl;
-    out << "#include \"../impl.h\"" << endl;
+    out << "#include \"../Impl.h\"" << endl;
 
     for(const auto & include: additionalIncludes)
     {
@@ -811,7 +803,7 @@ QString Generator::valueToStr(
 void Generator::generateConstantsHeader(
     Parser * parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("constants.h");
+    const QString fileName = QStringLiteral("Constants.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     writeHeaderHeader(ctx.m_out, fileName);
@@ -839,14 +831,14 @@ void Generator::generateConstantsHeader(
 
 void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("constants.cpp");
+    const QString fileName = QStringLiteral("Constants.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     QStringList additionalPreIncludes;
     additionalPreIncludes << QStringLiteral("<Helpers.h>");
 
     writeHeaderBody(
-        ctx.m_out, QStringLiteral("constants.h"), additionalPreIncludes);
+        ctx.m_out, QStringLiteral("Constants.h"), additionalPreIncludes);
 
     const auto & constants = parser->constants();
     for(const auto & c: constants)
@@ -1195,7 +1187,7 @@ void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
     auto additionalIncludes = QStringList()
         << QStringLiteral("<QTextStream>") << QStringLiteral("<QDebug>");
 
-    writeHeaderHeader(hout, headerFileName, {}, additionalIncludes);
+    writeHeaderHeader(hout, headerFileName, additionalIncludes);
 
     const auto & enumerations = parser->enumerations();
     int enumerationsCount = enumerations.size();
@@ -1259,27 +1251,33 @@ void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
 
 void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("types_io.h");
+    const QString fileName = QStringLiteral("Types_io.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("<generated/types.h>") << QStringLiteral("../impl.h")
+        << QStringLiteral("<generated/Types.h>") << QStringLiteral("../Impl.h")
         << QStringLiteral("<Optional.h>");
 
-    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
+    writeHeaderHeader(
+        ctx.m_out, fileName, additionalIncludes, HeaderKind::Private);
 
     ctx.m_out << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
 
-    auto structsAndExceptions = parser->structures();
-    structsAndExceptions << parser->exceptions();
+    QList<const QList<Parser::Structure>*> lists;
+    lists.reserve(2);
+    lists << &parser->structures();
+    lists << &parser->exceptions();
 
-    for(const auto & s: qAsConst(structsAndExceptions)) {
-        ctx.m_out << "void write" << s.m_name
-            << "(ThriftBinaryBufferWriter & w, const "
-            << s.m_name << " & s);" << endl;
-        ctx.m_out << "void read" << s.m_name
-            << "(ThriftBinaryBufferReader & r, "
-            << s.m_name << " & s);" << endl;
+    for(const auto & pList: qAsConst(lists))
+    {
+        for(const auto & s: *pList) {
+            ctx.m_out << "void write" << s.m_name
+                << "(ThriftBinaryBufferWriter & w, const "
+                << s.m_name << " & s);" << endl;
+            ctx.m_out << "void read" << s.m_name
+                << "(ThriftBinaryBufferReader & r, "
+                << s.m_name << " & s);" << endl;
+        }
     }
     ctx.m_out << endl;
 
@@ -1296,14 +1294,18 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
 
 void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("types.h");
+    const QString fileName = QStringLiteral("Types.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("EDAMErrorCode.h") << QStringLiteral("../Optional.h")
-        << QStringLiteral("<QSharedPointer>") << QStringLiteral("<QMetaType>");
+        << QStringLiteral("<QSharedPointer>") << QStringLiteral("<QMetaType>")
+        << QStringLiteral("<QList>") << QStringLiteral("<QMap>")
+        << QStringLiteral("<QSet>") << QStringLiteral("<QStringList>")
+        << QStringLiteral("<QByteArray>") << QStringLiteral("<QDateTime>")
+        << QStringLiteral("<QMetaType>");
 
-    writeHeaderHeader(ctx.m_out, fileName);
+    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
 
     const auto & typedefs = parser->typedefs();
     for(const auto & t: typedefs)
@@ -1509,14 +1511,14 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
 void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("types.cpp");
+    const QString fileName = QStringLiteral("Types.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../impl.h") << QStringLiteral("types_impl.h")
+        << QStringLiteral("../Impl.h") << QStringLiteral("Types_io.h")
         << QStringLiteral("<Helpers.h>");
 
-    writeHeaderBody(ctx.m_out, QStringLiteral("types.h"), additionalIncludes);
+    writeHeaderBody(ctx.m_out, QStringLiteral("Types.h"), additionalIncludes);
 
     ctx.m_out << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
 
@@ -1678,7 +1680,7 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
         outPath, OutputFileType::Interface);
     ensureFileDirExists(headerOutPath);
 
-    const QString headerFileName = QStringLiteral("services.h");
+    const QString headerFileName = QStringLiteral("Services.h");
 
     QFile headerFile(QDir(headerOutPath).absoluteFilePath(headerFileName));
     if(!headerFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -1690,15 +1692,13 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
     QTextStream hout(&headerFile);
     hout.setCodec("UTF-8");
 
-    QStringList additionalPreIncludes = QStringList()
+    QStringList additionalIncludes = QStringList()
         << QStringLiteral("../AsyncResult.h") << QStringLiteral("../Optional.h")
-        << QStringLiteral("constants.h") << QStringLiteral("types.h");
-
-    QStringList additionalPostIncludes = QStringList()
+        << QStringLiteral("Constants.h") << QStringLiteral("Types.h")
         << QStringLiteral("<QObject>");
 
     writeHeaderHeader(
-        hout, headerFileName, additionalPreIncludes, additionalPostIncludes);
+        hout, headerFileName, additionalIncludes);
 
     const auto & services = parser->services();
     for(const auto & s: services)
@@ -1854,14 +1854,14 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
     metatypeDeclarations
         << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::UserProfile >)");
 
-    writeHeaderFooter(hout, headerFileName, metatypeDeclarations);
+    writeHeaderFooter(hout, headerFileName, {}, metatypeDeclarations);
 
     // Generate source
 
     const QString sourceOutPath = generatedFileOutputPath(outPath, OutputFileType::Implementation);
     ensureFileDirExists(sourceOutPath);
 
-    const QString bodyFileName = QStringLiteral("services.cpp");
+    const QString bodyFileName = QStringLiteral("Services.cpp");
 
     QFile bodyFile(QDir(sourceOutPath).absoluteFilePath(bodyFileName));
     if (!bodyFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -1873,11 +1873,11 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
     QTextStream bout(&bodyFile);
     bout.setCodec("UTF-8");
 
-    additionalPreIncludes.clear();
-    additionalPreIncludes << QStringLiteral("../impl.h")
-        << QStringLiteral("types_impl.h")
+    additionalIncludes.clear();
+    additionalIncludes << QStringLiteral("../Impl.h")
+        << QStringLiteral("Types_io.h")
         << QStringLiteral("<Helpers.h>");
-    writeHeaderBody(bout, headerFileName, additionalPreIncludes);
+    writeHeaderBody(bout, headerFileName, additionalIncludes);
 
     for(const auto & s: services)
     {

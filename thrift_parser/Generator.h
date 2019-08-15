@@ -72,10 +72,16 @@ private:
 
     // Methods for writing header and source files
 
+    enum class HeaderKind
+    {
+        Public,
+        Private
+    };
+
     void writeHeaderHeader(
         QTextStream & out, const QString & fileName,
-        const QStringList & additionalPreIncludes = QStringList(),
-        const QStringList & additionalPostIncludes = QStringList());
+        const QStringList & additionalIncludes = QStringList(),
+        const HeaderKind headerKind = HeaderKind::Public);
 
     void writeHeaderBody(
         QTextStream & out, const QString & headerFileName,

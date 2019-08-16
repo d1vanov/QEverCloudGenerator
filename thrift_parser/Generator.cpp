@@ -31,6 +31,8 @@
 #include <QMap>
 #include <QString>
 
+#include <algorithm>
+
 using namespace qevercloud;
 
 namespace {
@@ -213,14 +215,9 @@ void Generator::writeHeaderHeader(
     out << "#define " << guard << endl;
     out << endl;
 
-    if (headerKind == HeaderKind::Public)
-    {
+    if (headerKind == HeaderKind::Public) {
         out << "#include \"../Export.h\"" << endl;
         out << endl;
-
-        if (!additionalIncludes.isEmpty()) {
-            out << endl;
-        }
     }
 
     for(const auto & include: qAsConst(additionalIncludes))
@@ -278,7 +275,15 @@ void Generator::writeHeaderFooter(
         out << line << endl;
     }
 
+    if (!extraLinesInsideNamespace.empty()) {
+        out << endl;
+    }
+
     out << "} // namespace qevercloud" << endl;
+
+    if (!extraLinesOutsideNamespace.empty()) {
+        out << endl;
+    }
 
     for(const auto & line: extraLinesOutsideNamespace) {
         out << line << endl;
@@ -834,11 +839,11 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
     const QString fileName = QStringLiteral("Constants.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    QStringList additionalPreIncludes;
-    additionalPreIncludes << QStringLiteral("<Helpers.h>");
+    auto additionalIncludes = QStringList() << QStringLiteral("<Helpers.h>");
+    sortIncludes(additionalIncludes);
 
     writeHeaderBody(
-        ctx.m_out, QStringLiteral("Constants.h"), additionalPreIncludes);
+        ctx.m_out, QStringLiteral("Constants.h"), additionalIncludes);
 
     const auto & constants = parser->constants();
     for(const auto & c: constants)
@@ -1167,86 +1172,129 @@ void Generator::writeThriftReadField(
     out << indent << fieldParent << field.m_name << " = v;" << endl;
 }
 
+void Generator::sortIncludes(QStringList & includes) const
+{
+    std::sort(includes.begin(), includes.end(),
+          [&] (const QString & lhs, const QString & rhs) {
+              if (!lhs.startsWith(QChar::fromLatin1('<')))
+              {
+                  if (!rhs.startsWith(QChar::fromLatin1('<'))) {
+                      return lhs < rhs;
+                  }
+
+                  return true;
+              }
+
+              if (lhs.startsWith(QChar::fromLatin1('<')) &&
+                  lhs.endsWith(QStringLiteral(".h>")))
+              {
+                  if (!rhs.startsWith(QChar::fromLatin1('<'))) {
+                      return false;
+                  }
+
+                  if (rhs.endsWith(QStringLiteral(".h>"))) {
+                      return lhs < rhs;
+                  }
+
+                  return true;
+              }
+
+              if (lhs.startsWith(QStringLiteral("<Q")) &&
+                  !lhs.endsWith(QStringLiteral(".h>")))
+              {
+                  if (!rhs.startsWith(QChar::fromLatin1('<'))) {
+                      return false;
+                  }
+
+                  if (rhs.endsWith(QStringLiteral(".h>"))) {
+                      return false;
+                  }
+
+                  if (rhs.startsWith(QStringLiteral("<Q")) &&
+                      !rhs.endsWith(QStringLiteral(".h>")))
+                  {
+                      return lhs < rhs;
+                  }
+
+                  return true;
+              }
+
+              if (!rhs.startsWith(QChar::fromLatin1('<'))) {
+                  return false;
+              }
+
+              if (rhs.endsWith(QStringLiteral(".h>"))) {
+                  return false;
+              }
+
+              if (rhs.startsWith(QStringLiteral("<Q")) &&
+                  !rhs.endsWith(QStringLiteral(".h>")))
+              {
+                  return false;
+              }
+
+              return lhs < rhs;
+          });
+}
+
 void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
 {
-    const QString headerOutPath = generatedFileOutputPath(
-        outPath, OutputFileType::Interface);
-    ensureFileDirExists(headerOutPath);
-
-    const QString headerFileName = QStringLiteral("EDAMErrorCode.h");
-    QFile headerFile(QDir(headerOutPath).absoluteFilePath(headerFileName));
-    if (!headerFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8(
-            "Can't open generated header file for writing: %1")
-            .arg(headerFile.fileName()).toStdString());
-    }
-
-    QTextStream hout(&headerFile);
-    hout.setCodec("UTF-8");
+    const QString fileName = QStringLiteral("EDAMErrorCode.h");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     auto additionalIncludes = QStringList()
         << QStringLiteral("<QTextStream>") << QStringLiteral("<QDebug>");
 
-    writeHeaderHeader(hout, headerFileName, additionalIncludes);
+    sortIncludes(additionalIncludes);
+
+    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
 
     const auto & enumerations = parser->enumerations();
     int enumerationsCount = enumerations.size();
     int i = 0;
     for(const auto & e: enumerations)
     {
-        writeEnumeration(hout, e);
-        hout << blockSeparator << endl << endl;
+        writeEnumeration(ctx.m_out, e);
+        ctx.m_out << blockSeparator << endl << endl;
 
-        writeEnumerationPrintDeclaration(hout, e, "QTextStream");
-        hout << blockSeparator << endl << endl;
+        writeEnumerationPrintDeclaration(ctx.m_out, e, "QTextStream");
+        ctx.m_out << blockSeparator << endl << endl;
 
-        writeEnumerationPrintDeclaration(hout, e, "QDebug");
+        writeEnumerationPrintDeclaration(ctx.m_out, e, "QDebug");
         if (i != (enumerationsCount - 1)) {
-            hout << blockSeparator << endl << endl;
+            ctx.m_out << blockSeparator << endl << endl;
         }
 
         ++i;
     }
 
-    writeHeaderFooter(hout, headerFileName);
+    writeHeaderFooter(ctx.m_out, fileName);
 }
 
 void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
 {
-    const QString cppOutPath = generatedFileOutputPath(
-        outPath, OutputFileType::Implementation);
-    ensureFileDirExists(cppOutPath);
+    const QString fileName = QStringLiteral("EDAMErrorCode.cpp");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    const QString cppFileName = QStringLiteral("EDAMErrorCode.cpp");
-    QFile cppFile(QDir(cppOutPath).absoluteFilePath(cppFileName));
-    if (!cppFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8(
-            "Can't open generated cpp file for writing: %1")
-            .arg(cppFile.fileName()).toStdString());
-    }
-
-    QTextStream out(&cppFile);
-    out.setCodec("UTF-8");
-
-    writeHeaderBody(out, QStringLiteral("EDAMErrorCode.h"));
+    writeHeaderBody(ctx.m_out, QStringLiteral("EDAMErrorCode.h"));
 
     const auto & enumerations = parser->enumerations();
     int enumerationsCount = enumerations.size();
     int i = 0;
     for(const auto & e: enumerations)
     {
-        writeEnumerationPrintDefinition(out, e, "QTextStream");
-        out << blockSeparator << endl << endl;
+        writeEnumerationPrintDefinition(ctx.m_out, e, "QTextStream");
+        ctx.m_out << blockSeparator << endl << endl;
 
-        writeEnumerationPrintDefinition(out, e, "QDebug");
+        writeEnumerationPrintDefinition(ctx.m_out, e, "QDebug");
         if (i != (enumerationsCount - 1)) {
-            out << blockSeparator << endl << endl;
+            ctx.m_out << blockSeparator << endl << endl;
         }
 
         ++i;
     }
 
-    writeBodyFooter(out);
+    writeBodyFooter(ctx.m_out);
 }
 
 void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
@@ -1257,6 +1305,7 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
     auto additionalIncludes = QStringList()
         << QStringLiteral("<generated/Types.h>") << QStringLiteral("../Impl.h")
         << QStringLiteral("<Optional.h>");
+    sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
         ctx.m_out, fileName, additionalIncludes, HeaderKind::Private);
@@ -1304,6 +1353,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         << QStringLiteral("<QSet>") << QStringLiteral("<QStringList>")
         << QStringLiteral("<QByteArray>") << QStringLiteral("<QDateTime>")
         << QStringLiteral("<QMetaType>");
+    sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
 
@@ -1514,9 +1564,9 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     const QString fileName = QStringLiteral("Types.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    auto additionalIncludes = QStringList()
-        << QStringLiteral("../Impl.h") << QStringLiteral("Types_io.h")
-        << QStringLiteral("<Helpers.h>");
+    auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
+        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>");
+    sortIncludes(additionalIncludes);
 
     writeHeaderBody(ctx.m_out, QStringLiteral("Types.h"), additionalIncludes);
 
@@ -1672,33 +1722,18 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     writeBodyFooter(ctx.m_out);
 }
 
-void Generator::generateServices(Parser * parser, const QString & outPath)
+void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
 {
-    // Generate header
-
-    const QString headerOutPath = generatedFileOutputPath(
-        outPath, OutputFileType::Interface);
-    ensureFileDirExists(headerOutPath);
-
-    const QString headerFileName = QStringLiteral("Services.h");
-
-    QFile headerFile(QDir(headerOutPath).absoluteFilePath(headerFileName));
-    if(!headerFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8(
-            "Can't open the generated header file for writing: %1")
-            .arg(headerFile.fileName()).toStdString());
-    }
-
-    QTextStream hout(&headerFile);
-    hout.setCodec("UTF-8");
+    const QString fileName = QStringLiteral("Services.h");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("../AsyncResult.h") << QStringLiteral("../Optional.h")
         << QStringLiteral("Constants.h") << QStringLiteral("Types.h")
         << QStringLiteral("<QObject>");
+    sortIncludes(additionalIncludes);
 
-    writeHeaderHeader(
-        hout, headerFileName, additionalIncludes);
+    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
 
     const auto & services = parser->services();
     for(const auto & s: services)
@@ -1708,39 +1743,40 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
         }
 
         if (!s.m_docComment.isEmpty()) {
-            hout << s.m_docComment << endl;
+            ctx.m_out << s.m_docComment << endl;
         }
 
-        hout << "class QEVERCLOUD_EXPORT " << s.m_name << ": public QObject"
-            << endl << "{" << endl;
-        hout << "    Q_OBJECT" << endl;
-        hout << "    Q_DISABLE_COPY(" << s.m_name << ")" << endl;
-        hout << "public:" << endl;
+        ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
+            << ": public QObject" << endl << "{" << endl;
+        ctx.m_out << "    Q_OBJECT" << endl;
+        ctx.m_out << "    Q_DISABLE_COPY(" << s.m_name << ")" << endl;
+        ctx.m_out << "public:" << endl;
 
         if (s.m_name == QStringLiteral("UserStore"))
         {
-            hout << "    explicit UserStore(QString host, "
+            ctx.m_out << "    explicit UserStore(QString host, "
                 << "QString authenticationToken = QString(), "
                 << "QObject * parent = nullptr);"
                 << endl << endl;
         }
         else
         {
-            hout << "    explicit NoteStore("
+            ctx.m_out << "    explicit NoteStore("
                 << "QString noteStoreUrl = QString(), "
                 << "QString authenticationToken = QString(), "
                 << "QObject * parent = nullptr);" << endl;
 
-            hout << "    explicit NoteStore(QObject * parent);" << endl << endl;
-            hout << "    void setNoteStoreUrl(QString noteStoreUrl)"
+            ctx.m_out << "    explicit NoteStore(QObject * parent);" << endl
+                << endl;
+            ctx.m_out << "    void setNoteStoreUrl(QString noteStoreUrl)"
                 << " { m_url = noteStoreUrl; }" << endl;
-            hout << "    QString noteStoreUrl() { return m_url; }" << endl
+            ctx.m_out << "    QString noteStoreUrl() { return m_url; }" << endl
                 << endl;
         }
 
-        hout << "    void setAuthenticationToken(QString authenticationToken) "
+        ctx.m_out << "    void setAuthenticationToken(QString authenticationToken) "
             << "{ m_authenticationToken = authenticationToken; }" << endl;
-        hout << "    QString authenticationToken() "
+        ctx.m_out << "    QString authenticationToken() "
             << "{ return m_authenticationToken; }" << endl << endl;
 
         for(const auto & func: qAsConst(s.m_functions))
@@ -1755,11 +1791,11 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
                     QChar::fromLatin1('\n'));
 
                 for(const auto & line: lines) {
-                    hout << "    " << line << endl;
+                    ctx.m_out << "    " << line << endl;
                 }
             }
 
-            hout << "    " << typeToStr(func.m_type, func.m_name) << " "
+            ctx.m_out << "    " << typeToStr(func.m_type, func.m_name) << " "
                  << func.m_name << "(";
             int lastId = func.m_params.last().m_id;
             bool tokenParamIsPresent = false;
@@ -1771,31 +1807,31 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
                 }
                 else
                 {
-                    hout << typeToStr(
+                    ctx.m_out << typeToStr(
                         param.m_type,
                         func.m_name + QStringLiteral(", ") + param.m_name,
                         MethodType::FuncParamType);
-                    hout << " " << param.m_name;
+                    ctx.m_out << " " << param.m_name;
                     if (param.m_initializer) {
-                        hout << " = " << valueToStr(
+                        ctx.m_out << " = " << valueToStr(
                             param.m_initializer, param.m_type,
                             func.m_name + QStringLiteral(", ") + param.m_name);
                     }
 
                     if (param.m_id != lastId || tokenParamIsPresent) {
-                        hout << ", ";
+                        ctx.m_out << ", ";
                     }
                 }
             }
 
             if (tokenParamIsPresent) {
-                hout << "QString authenticationToken = QString()";
+                ctx.m_out << "QString authenticationToken = QString()";
             }
-            hout << ");" << endl << endl;
+            ctx.m_out << ");" << endl << endl;
 
-            hout << "    /** Asynchronous version of @link " << func.m_name
+            ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
                 << " @endlink */" << endl;
-            hout << "    AsyncResult * " << func.m_name << "Async(";
+            ctx.m_out << "    AsyncResult * " << func.m_name << "Async(";
             tokenParamIsPresent = false;
             for(const auto & param: qAsConst(func.m_params))
             {
@@ -1805,79 +1841,70 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
                 }
                 else
                 {
-                    hout << typeToStr(
+                    ctx.m_out << typeToStr(
                         param.m_type,
                         func.m_name + QStringLiteral(", ") + param.m_name,
                         MethodType::FuncParamType);
-                    hout << " " << param.m_name;
+                    ctx.m_out << " " << param.m_name;
                     if (param.m_initializer) {
-                        hout << " = " << valueToStr(
+                        ctx.m_out << " = " << valueToStr(
                             param.m_initializer,
                             param.m_type,
                             func.m_name + QStringLiteral(", ") + param.m_name);
                     }
 
                     if (param.m_id != lastId || tokenParamIsPresent) {
-                        hout << ", ";
+                        ctx.m_out << ", ";
                     }
                 }
             }
 
             if (tokenParamIsPresent) {
-                hout << "QString authenticationToken = QString()";
+                ctx.m_out << "QString authenticationToken = QString()";
             }
-            hout << ");" << endl << endl;
+            ctx.m_out << ");" << endl << endl;
         }
 
-        hout << "private:" << endl;
-        hout << "    QString m_url;" << endl;
-        hout << "    QString m_authenticationToken;" << endl;
-        hout << "};" << endl << endl;
+        ctx.m_out << "private:" << endl;
+        ctx.m_out << "    QString m_url;" << endl;
+        ctx.m_out << "    QString m_authenticationToken;" << endl;
+        ctx.m_out << "};" << endl << endl;
     }
 
     QStringList metatypeDeclarations;
     metatypeDeclarations.reserve(6);
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::Notebook >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::Notebook>)");
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::Tag >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::Tag>)");
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::SavedSearch >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::SavedSearch>)");
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::NoteVersionId >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::NoteVersionId>)");
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::SharedNotebook >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::SharedNotebook>)");
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::LinkedNotebook >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::LinkedNotebook>)");
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::BusinessInvitation >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::BusinessInvitation>)");
     metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList< qevercloud::UserProfile >)");
+        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::UserProfile>)");
 
-    writeHeaderFooter(hout, headerFileName, {}, metatypeDeclarations);
+    writeHeaderFooter(ctx.m_out, fileName, {}, metatypeDeclarations);
+}
 
-    // Generate source
+void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Services.cpp");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    const QString sourceOutPath = generatedFileOutputPath(outPath, OutputFileType::Implementation);
-    ensureFileDirExists(sourceOutPath);
+    auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
+        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>");
+    sortIncludes(additionalIncludes);
 
-    const QString bodyFileName = QStringLiteral("Services.cpp");
+    writeHeaderBody(ctx.m_out, QStringLiteral("Services.h"), additionalIncludes);
 
-    QFile bodyFile(QDir(sourceOutPath).absoluteFilePath(bodyFileName));
-    if (!bodyFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        throw std::runtime_error(QString::fromUtf8(
-            "Can't open the generated source file for writing: %1")
-            .arg(bodyFile.fileName()).toStdString());
-    }
-
-    QTextStream bout(&bodyFile);
-    bout.setCodec("UTF-8");
-
-    additionalIncludes.clear();
-    additionalIncludes << QStringLiteral("../Impl.h")
-        << QStringLiteral("Types_io.h")
-        << QStringLiteral("<Helpers.h>");
-    writeHeaderBody(bout, headerFileName, additionalIncludes);
+    const auto & services = parser->services();
 
     for(const auto & s: services)
     {
@@ -1894,81 +1921,81 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
             bool isVoidResult =
                 !f.m_type.dynamicCast<Parser::VoidType>().isNull();
 
-            bout << "QByteArray " << prepareParamsName << "(";
+            ctx.m_out << "QByteArray " << prepareParamsName << "(";
             for(const auto & param: f.m_params)
             {
-                bout << typeToStr(
+                ctx.m_out << typeToStr(
                     param.m_type,
                     f.m_name + QStringLiteral(", ") + param.m_name,
                     MethodType::FuncParamType);
-                bout << " " << param.m_name;
+                ctx.m_out << " " << param.m_name;
                 if (param.m_id != lastId) {
-                    bout << ", ";
+                    ctx.m_out << ", ";
                 }
             }
 
-            bout << ")" << endl;
-            bout << "{" << endl;
-            bout << "    ThriftBinaryBufferWriter w;" << endl;
-            bout << "    qint32 cseqid = 0;" << endl;
-            bout << "    w.writeMessageBegin(QStringLiteral(\"" << f.m_name
-                 << "\"), ThriftMessageType::T_CALL, cseqid);" << endl;
-            bout << "    w.writeStructBegin(QStringLiteral(\"" << s.m_name
-                 << "_" << f.m_name << "_pargs\"));" << endl;
+            ctx.m_out << ")" << endl;
+            ctx.m_out << "{" << endl;
+            ctx.m_out << "    ThriftBinaryBufferWriter w;" << endl;
+            ctx.m_out << "    qint32 cseqid = 0;" << endl;
+            ctx.m_out << "    w.writeMessageBegin(QStringLiteral(\"" << f.m_name
+                << "\"), ThriftMessageType::T_CALL, cseqid);" << endl;
+            ctx.m_out << "    w.writeStructBegin(QStringLiteral(\"" << s.m_name
+                << "_" << f.m_name << "_pargs\"));" << endl;
 
             writeThriftWriteFields(
-                bout, f.m_params, f.m_name, QLatin1Literal(""));
+                ctx.m_out, f.m_params, f.m_name, QLatin1Literal(""));
 
-            bout << "    w.writeFieldStop();" << endl;
-            bout << "    w.writeStructEnd();" << endl;
-            bout << "    w.writeMessageEnd();" << endl;
-            bout << "    return w.buffer();" << endl;
-            bout << "}" << endl << endl;
+            ctx.m_out << "    w.writeFieldStop();" << endl;
+            ctx.m_out << "    w.writeStructEnd();" << endl;
+            ctx.m_out << "    w.writeMessageEnd();" << endl;
+            ctx.m_out << "    return w.buffer();" << endl;
+            ctx.m_out << "}" << endl << endl;
 
-            bout << (isVoidResult
+            ctx.m_out << (isVoidResult
                      ? QStringLiteral("void")
                      : typeToStr(f.m_type, f.m_name))
                  << " " << readReplyName << "(QByteArray reply)" << endl;
-            bout << "{" << endl;
+            ctx.m_out << "{" << endl;
 
             if (!isVoidResult) {
-                bout << "    bool resultIsSet = false;" << endl;
-                bout << "    " << typeToStr(f.m_type, f.m_name)
+                ctx.m_out << "    bool resultIsSet = false;" << endl
+                    << "    " << typeToStr(f.m_type, f.m_name)
                     << " result = " << typeToStr(f.m_type, f.m_name)
                     << "();" << endl;
             }
 
-            bout << "    ThriftBinaryBufferReader r(reply);" << endl;
-            bout << "    qint32 rseqid = 0;" << endl;
-            bout << "    QString fname;" << endl;
-            bout << "    ThriftMessageType::type mtype;" << endl;
-            bout << "    r.readMessageBegin(fname, mtype, rseqid);" << endl;
-            bout << "    if (mtype == ThriftMessageType::T_EXCEPTION) {" << endl;
-            bout << "      ThriftException e = readThriftException(r);" << endl;
-            bout << "      r.readMessageEnd();" << endl;
-            bout << "      throw e;" << endl;
-            bout << "    }" << endl;
-            bout << "    if (mtype != ThriftMessageType::T_REPLY) {" << endl;
-            bout << "      r.skip(ThriftFieldType::T_STRUCT);" << endl;
-            bout << "      r.readMessageEnd();" << endl;
-            bout << "      throw ThriftException(ThriftException::Type::"
-                << "INVALID_MESSAGE_TYPE);" << endl;
-            bout << "    }" << endl;
-            bout << "    if (fname.compare(QStringLiteral(\"" << f.m_name
-                << "\")) != 0) {" << endl;
-            bout << "      r.skip(ThriftFieldType::T_STRUCT);" << endl;
-            bout << "      r.readMessageEnd();" << endl;
-            bout << "      throw ThriftException(ThriftException::Type::"
-                << "WRONG_METHOD_NAME);" << endl;
-            bout << "    }" << endl << endl;
+            ctx.m_out << "    ThriftBinaryBufferReader r(reply);" << endl
+                << "    qint32 rseqid = 0;" << endl
+                << "    QString fname;" << endl
+                << "    ThriftMessageType::type mtype;" << endl
+                << "    r.readMessageBegin(fname, mtype, rseqid);" << endl
+                << "    if (mtype == ThriftMessageType::T_EXCEPTION) {" << endl
+                << "      ThriftException e = readThriftException(r);" << endl
+                << "      r.readMessageEnd();" << endl
+                << "      throw e;" << endl
+                << "    }" << endl
+                << "    if (mtype != ThriftMessageType::T_REPLY) {" << endl
+                << "      r.skip(ThriftFieldType::T_STRUCT);" << endl
+                << "      r.readMessageEnd();" << endl
+                << "      throw ThriftException(ThriftException::Type::"
+                << "INVALID_MESSAGE_TYPE);" << endl
+                << "    }" << endl
+                << "    if (fname.compare(QStringLiteral(\"" << f.m_name
+                << "\")) != 0) {" << endl
+                << "      r.skip(ThriftFieldType::T_STRUCT);" << endl
+                << "      r.readMessageEnd();" << endl
+                << "      throw ThriftException(ThriftException::Type::"
+                << "WRONG_METHOD_NAME);" << endl
+                << "    }" << endl << endl;
 
-            bout << "    ThriftFieldType::type fieldType;" << endl;
-            bout << "    qint16 fieldId;" << endl;
-            bout << "    r.readStructBegin(fname);" << endl;
-            bout << "    while(true) {" << endl;
-            bout << "        r.readFieldBegin(fname, fieldType, fieldId);"
-                << endl;
-            bout << "        if(fieldType == ThriftFieldType::T_STOP) break;"
+            ctx.m_out << "    ThriftFieldType::type fieldType;" << endl
+                << "    qint16 fieldId;" << endl
+                << "    r.readStructBegin(fname);" << endl
+                << "    while(true) {" << endl
+                << "        r.readFieldBegin(fname, fieldType, fieldId);"
+                << endl
+                << "        if(fieldType == ThriftFieldType::T_STOP) break;"
                 << endl;
 
             if (!isVoidResult)
@@ -1978,21 +2005,22 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
                 result.m_name = QStringLiteral("result");
                 result.m_required = Parser::Field::RequiredFlag::Required;
                 result.m_type = f.m_type;
-                bout << "        if(fieldId == 0) {" << endl;
-                bout << "            if(fieldType == "
+
+                ctx.m_out << "        if(fieldId == 0) {" << endl
+                    << "            if(fieldType == "
                     << typeToStr(
                         f.m_type, f.m_name, MethodType::ThriftFieldType)
-                     << ") {" << endl;
-                bout << "                resultIsSet = true;" << endl;
+                    << ") {" << endl
+                    << "                resultIsSet = true;" << endl;
 
                 writeThriftReadField(
-                    bout, result, f.m_name + QStringLiteral("."),
+                    ctx.m_out, result, f.m_name + QStringLiteral("."),
                     QLatin1Literal(""));
 
-                bout << "            } else {" << endl;
-                bout << "                r.skip(fieldType);" << endl;
-                bout << "            }" << endl;
-                bout << "        }" << endl;
+                ctx.m_out << "            } else {" << endl
+                    << "                r.skip(fieldType);" << endl
+                    << "            }" << endl
+                    << "        }" << endl;
             }
 
             bool firstThrow = isVoidResult;
@@ -2000,75 +2028,75 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
             {
                 if (firstThrow) {
                     firstThrow = false;
-                    bout << "        ";
+                    ctx.m_out << "        ";
                 }
                 else {
-                    bout << "       else ";
+                    ctx.m_out << "       else ";
                 }
 
-                bout << "if (fieldId == "  << th.m_id
+                ctx.m_out << "if (fieldId == "  << th.m_id
                     << ") {" << endl;
 
                 QString exceptionType = typeToStr(
                     th.m_type, f.m_name + QStringLiteral(", ") + th.m_name);
 
-                bout << "            if (fieldType == ThriftFieldType::"
-                    << "T_STRUCT) {" << endl;
-                bout << "                " << exceptionType << " e;" << endl;
-                bout << "                read" << exceptionType << "(r, e);"
+                ctx.m_out << "            if (fieldType == ThriftFieldType::"
+                    << "T_STRUCT) {" << endl
+                    << "                " << exceptionType << " e;" << endl
+                    << "                read" << exceptionType << "(r, e);"
                     << endl;
 
                 if (exceptionType == QStringLiteral("EDAMSystemException")) {
-                    bout << "                throwEDAMSystemException(e);"
+                    ctx.m_out << "                throwEDAMSystemException(e);"
                         << endl;
                 }
                 else {
-                    bout << "                throw e;" << endl;
+                    ctx.m_out << "                throw e;" << endl;
                 }
 
-                bout << "            }" << endl;
-                bout << "            else {" << endl;
-                bout << "                r.skip(fieldType);" << endl;
-                bout << "            }" << endl;
-                bout << "        }" << endl;
+                ctx.m_out << "            }" << endl
+                    << "            else {" << endl
+                    << "                r.skip(fieldType);" << endl
+                    << "            }" << endl
+                    << "        }" << endl;
             }
 
-            bout << "        else {" << endl;
-            bout << "            r.skip(fieldType);" << endl;
-            bout << "        }" << endl;
-            bout << "        r.readFieldEnd();" << endl;
-            bout << "    }" << endl;
-            bout << "    r.readStructEnd();" << endl;
+            ctx.m_out << "        else {" << endl
+                << "            r.skip(fieldType);" << endl
+                << "        }" << endl
+                << "        r.readFieldEnd();" << endl
+                << "    }" << endl
+                << "    r.readStructEnd();" << endl;
 
-            bout << "    r.readMessageEnd();" << endl;
+            ctx.m_out << "    r.readMessageEnd();" << endl;
 
             if (!isVoidResult) {
-                bout << "    if (!resultIsSet) {" << endl;
-                bout << "        throw ThriftException(ThriftException::Type::"
+                ctx.m_out << "    if (!resultIsSet) {" << endl
+                    << "        throw ThriftException(ThriftException::Type::"
                     << "MISSING_RESULT, QStringLiteral(\""
-                    << f.m_name << ": missing result\"));" << endl;
-                bout << "    }" << endl;
-                bout << "    return result;" << endl;
+                    << f.m_name << ": missing result\"));" << endl
+                    << "    }" << endl
+                    << "    return result;" << endl;
             }
 
-            bout << "}" << endl << endl;
+            ctx.m_out << "}" << endl << endl;
 
             QString asyncReadFunctionName =
                 readReplyName + QStringLiteral("Async");
-            bout << "QVariant " << asyncReadFunctionName << "(QByteArray reply)"
+            ctx.m_out << "QVariant " << asyncReadFunctionName << "(QByteArray reply)"
                 << endl;
-            bout << "{" << endl;
+            ctx.m_out << "{" << endl;
             if (isVoidResult) {
-                bout << "    " << readReplyName << "(reply);" << endl;
-                bout << "    return QVariant();" << endl;
+                ctx.m_out << "    " << readReplyName << "(reply);" << endl
+                    << "    return QVariant();" << endl;
             }
             else {
-                bout << "    return QVariant::fromValue(" << readReplyName
+                ctx.m_out << "    return QVariant::fromValue(" << readReplyName
                     << "(reply));" << endl;
             }
-            bout << "}" << endl << endl;
+            ctx.m_out << "}" << endl << endl;
 
-            bout << typeToStr(f.m_type, f.m_name) << " "
+            ctx.m_out << typeToStr(f.m_type, f.m_name) << " "
                 << s.m_name << "::" << f.m_name << "(";
             bool tokenParamIsPresent = false;
             for(const auto & param : f.m_params)
@@ -2079,50 +2107,52 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
                 }
                 else
                 {
-                    bout << typeToStr(
+                    ctx.m_out << typeToStr(
                         param.m_type, f.m_name + QStringLiteral(", ") + param.m_name,
                         MethodType::FuncParamType);
-                    bout << " " << param.m_name;
+                    ctx.m_out << " " << param.m_name;
                     if (param.m_id != lastId || tokenParamIsPresent) {
-                        bout << ", ";
+                        ctx.m_out << ", ";
                     }
                 }
             }
 
             if (tokenParamIsPresent) {
-                bout << "QString authenticationToken";
+                ctx.m_out << "QString authenticationToken";
             }
-            bout << ")" << endl;
-            bout << "{" << endl;
+            ctx.m_out << ")" << endl
+                << "{" << endl;
 
             if (tokenParamIsPresent) {
-                bout << "    if (authenticationToken.isEmpty()) {" << endl;
-                bout << "        authenticationToken = m_authenticationToken;"
-                    << endl;
-                bout << "    }" << endl;
+                ctx.m_out << "    if (authenticationToken.isEmpty()) {" << endl
+                    << "        authenticationToken = m_authenticationToken;"
+                    << endl
+                    << "    }" << endl;
             }
 
-            bout << "    QByteArray params = " << prepareParamsName << "(";
+            ctx.m_out << "    QByteArray params = " << prepareParamsName << "(";
             for(const auto & param : f.m_params) {
-                bout << param.m_name;
+                ctx.m_out << param.m_name;
                 if (param.m_id != lastId) {
-                    bout << ", ";
+                    ctx.m_out << ", ";
                 }
             }
-            bout << ");" << endl;
+            ctx.m_out << ");" << endl;
 
-            bout << "    QByteArray reply = askEvernote(m_url, params);" << endl;
+            ctx.m_out << "    QByteArray reply = askEvernote(m_url, params);"
+                << endl;
             if (isVoidResult) {
-                bout << "    " << readReplyName << "(reply);" << endl;
+                ctx.m_out << "    " << readReplyName << "(reply);" << endl;
             }
             else {
-                bout << "    return " << readReplyName << "(reply);" << endl;
+                ctx.m_out << "    return " << readReplyName << "(reply);"
+                    << endl;
             }
 
-            bout << "}" << endl << endl;
+            ctx.m_out << "}" << endl << endl;
 
-
-            bout << "AsyncResult* " << s.m_name << "::" << f.m_name << "Async(";
+            ctx.m_out << "AsyncResult* " << s.m_name << "::" << f.m_name
+                << "Async(";
             tokenParamIsPresent = false;
             for(const auto & param : f.m_params)
             {
@@ -2132,49 +2162,49 @@ void Generator::generateServices(Parser * parser, const QString & outPath)
                 }
                 else
                 {
-                    bout << typeToStr(
+                    ctx.m_out << typeToStr(
                         param.m_type,
                         f.m_name + QStringLiteral(", ") + param.m_name,
                         MethodType::FuncParamType);
-                    bout << " " << param.m_name;
+                    ctx.m_out << " " << param.m_name;
 
                     if (param.m_id != lastId || tokenParamIsPresent) {
-                        bout << ", ";
+                        ctx.m_out << ", ";
                     }
                 }
             }
 
             if (tokenParamIsPresent) {
-                bout << "QString authenticationToken";
+                ctx.m_out << "QString authenticationToken";
             }
-            bout << ")" << endl;
-            bout << "{" << endl;
+            ctx.m_out << ")" << endl
+                << "{" << endl;
 
             if (tokenParamIsPresent) {
-                bout << "    if (authenticationToken.isEmpty()) {" << endl;
-                bout << "        authenticationToken = m_authenticationToken;"
-                    << endl;
-                bout << "    }" << endl;
+                ctx.m_out << "    if (authenticationToken.isEmpty()) {" << endl
+                    << "        authenticationToken = m_authenticationToken;"
+                    << endl
+                    << "    }" << endl;
             }
 
-            bout << "    QByteArray params = " << prepareParamsName << "(";
+            ctx.m_out << "    QByteArray params = " << prepareParamsName << "(";
             for(const auto & param: f.m_params)
             {
-                bout << param.m_name;
+                ctx.m_out << param.m_name;
                 if (param.m_id != lastId) {
-                    bout << ", ";
+                    ctx.m_out << ", ";
                 }
             }
-            bout << ");" << endl;
-            bout << "    return new AsyncResult(m_url, params, "
+            ctx.m_out << ");" << endl
+                << "    return new AsyncResult(m_url, params, "
                 << asyncReadFunctionName << ");" << endl;
 
-            bout << "}" << endl << endl;
+            ctx.m_out << "}" << endl << endl;
         }
     }
 
-    bout << endl;
-    writeBodyFooter(bout);
+    ctx.m_out << endl;
+    writeBodyFooter(ctx.m_out);
 }
 
 void Generator::generateSources(Parser * parser, const QString & outPath)
@@ -2230,6 +2260,7 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
     generateTypesHeader(parser, outPath);
     generateTypesCpp(parser, outPath);
 
-    generateServices(parser, outPath);
+    generateServicesHeader(parser, outPath);
+    generateServicesCpp(parser, outPath);
 }
 

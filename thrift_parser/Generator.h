@@ -68,6 +68,9 @@ private:
     void generateTypesHeader(Parser * parser, const QString & outPath);
     void generateTypesCpp(Parser * parser, const QString & outPath);
 
+    void generateServicesHeader(Parser * parser, const QString & outPath);
+    void generateServicesCpp(Parser * parser, const QString & outPath);
+
     void generateServices(Parser * parser, const QString & outPath);
 
     // Methods for writing header and source files
@@ -90,18 +93,20 @@ private:
     void writeHeaderFooter(
         QTextStream & out, const QString & fileName,
         const QStringList & extraLinesInsideNamespace = QStringList(),
-        const QStringList & exytaLinesOutsideNamespace = QStringList());
+        const QStringList & extraLinesOutsideNamespace = QStringList());
 
     void writeBodyFooter(QTextStream & out);
+
+    void writeThriftWriteFields(
+        QTextStream & out, const QList<Parser::Field> & fields,
+        const QString & identPrefix, const QString & fieldPrefix);
 
     void writeThriftReadField(
         QTextStream & out, const Parser::Field & field,
         const QString & identPrefix,
         const QString & fieldParent);
 
-    void writeThriftWriteFields(
-        QTextStream & out, const QList<Parser::Field> & fields,
-        const QString & identPrefix, const QString & fieldPrefix);
+    void sortIncludes(QStringList & includes) const;
 
     // Methods for taking a string representation of things
 

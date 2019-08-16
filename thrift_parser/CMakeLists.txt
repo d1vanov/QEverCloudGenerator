@@ -43,8 +43,11 @@ target_link_libraries(QEverCloudGenerator ${QT_LIBRARIES})
 target_compile_features(QEverCloudGenerator INTERFACE
   cxx_auto_type
   cxx_nullptr
-  cxx_range_for
   cxx_strong_enums)
+
+target_compile_features(QEverCloudGenerator PRIVATE
+  cxx_lambdas
+  cxx_range_for)
 
 add_dependencies(QEverCloudGenerator pre_build)
 

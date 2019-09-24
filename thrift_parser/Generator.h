@@ -113,7 +113,8 @@ private:
     QString valueToStr(
         QSharedPointer<Parser::ConstValue> value,
         QSharedPointer<Parser::Type> type,
-        const QString & identifier);
+        const QString & identifier,
+        const QString & offset = QString());
 
     QString fieldToStr(const Parser::Field & field);
 

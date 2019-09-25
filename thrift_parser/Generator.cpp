@@ -175,15 +175,17 @@ void Generator::writeEnumerationPrintDeclaration(
     QTextStream & out, const Parser::Enumeration & e,
     const char * printer) const
 {
-    out << "QEVERCLOUD_EXPORT " << printer << " & operator<<(" << printer
-        << " & out, const " << e.m_name << " value);" << endl << endl;
+    out << "QEVERCLOUD_EXPORT " << printer << " & operator<<(" << endl
+        << "    " << printer << " & out, const " << e.m_name << " value);"
+        << endl << endl;
 }
 
 void Generator::writeEnumerationPrintDefinition(
     QTextStream & out, const Parser::Enumeration & e,
     const char * printer) const
 {
-    out << printer << " & operator<<(" << printer << " & out, const "
+    out << printer << " & operator<<(" << endl
+        << "    " << printer << " & out, const "
         << e.m_name << " value)" << endl << "{" << endl
         << "    switch(value)" << endl
         << "    {" << endl;

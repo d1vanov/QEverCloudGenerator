@@ -1757,50 +1757,17 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
             ctx.m_out << s.m_docComment << endl;
         }
 
-        ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
+        ctx.m_out << "class QEVERCLOUD_EXPORT I" << s.m_name
             << ": public QObject" << endl << "{" << endl;
         ctx.m_out << "    Q_OBJECT" << endl;
-        ctx.m_out << "    Q_DISABLE_COPY(" << s.m_name << ")" << endl;
+        ctx.m_out << "    Q_DISABLE_COPY(I" << s.m_name << ")" << endl;
         ctx.m_out << "public:" << endl;
 
-        if (s.m_name == QStringLiteral("UserStore"))
-        {
-            ctx.m_out << "    explicit UserStore(" << endl
-                << "        QString host," << endl
-                << "        QString authenticationToken = QString()," << endl
-                << "        QObject * parent = nullptr);"
-                << endl << endl;
-        }
-        else
-        {
-            ctx.m_out << "    explicit NoteStore(" << endl
-                << "        QString noteStoreUrl = QString()," << endl
-                << "        QString authenticationToken = QString()," << endl
-                << "        QObject * parent = nullptr);" << endl << endl;
-
-            ctx.m_out << "    explicit NoteStore(QObject * parent);" << endl
-                << endl;
-            ctx.m_out << "    void setNoteStoreUrl(QString noteStoreUrl)" << endl
-                << "    {" << endl
-                << "        m_url = noteStoreUrl;" << endl
-                << "    }"
-                << endl << endl;
-            ctx.m_out << "    QString noteStoreUrl()" << endl
-                << "    {" << endl
-                << "        return m_url;" << endl
-                << "    }"
-                << endl << endl;
-        }
-
-        ctx.m_out << "    void setAuthenticationToken(QString authenticationToken)"
-            << endl << "    {" << endl
-            << "        m_authenticationToken = authenticationToken;" << endl
-            << "    }"
+        ctx.m_out << "    virtual void setAuthenticationToken("
+            << "QString authenticationToken) = 0;"
             << endl << endl;
-        ctx.m_out << "    QString authenticationToken()" << endl
-            << "    {" << endl
-            << "        return m_authenticationToken;" << endl
-            << "    }"
+
+        ctx.m_out << "    virtual QString authenticationToken() const = 0;"
             << endl << endl;
 
         for(const auto & func: qAsConst(s.m_functions))
@@ -1819,7 +1786,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
                 }
             }
 
-            ctx.m_out << "    " << typeToStr(func.m_type, func.m_name) << " "
+            ctx.m_out << "    virtual " << typeToStr(func.m_type, func.m_name) << " "
                  << func.m_name << "(";
             if (!func.m_params.isEmpty()) {
                 ctx.m_out << endl;
@@ -1855,11 +1822,11 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
             if (tokenParamIsPresent) {
                 ctx.m_out << "        QString authenticationToken = QString()";
             }
-            ctx.m_out << ");" << endl << endl;
+            ctx.m_out << ") = 0;" << endl << endl;
 
             ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
                 << " @endlink */" << endl;
-            ctx.m_out << "    AsyncResult * " << func.m_name << "Async(" << endl;
+            ctx.m_out << "    virtual AsyncResult * " << func.m_name << "Async(" << endl;
             tokenParamIsPresent = false;
             for(const auto & param: qAsConst(func.m_params))
             {
@@ -1890,13 +1857,33 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
             if (tokenParamIsPresent) {
                 ctx.m_out << "        QString authenticationToken = QString()";
             }
-            ctx.m_out << ");" << endl << endl;
+            ctx.m_out << ") = 0;" << endl << endl;
         }
 
-        ctx.m_out << "private:" << endl;
-        ctx.m_out << "    QString m_url;" << endl;
-        ctx.m_out << "    QString m_authenticationToken;" << endl;
         ctx.m_out << "};" << endl << endl;
+    }
+
+    if (!services.isEmpty())
+    {
+        ctx.m_out << blockSeparator << endl << endl;
+
+        for(const auto & s: services)
+        {
+            ctx.m_out << "I" << s.m_name << " * create" << s.m_name << "(" << endl;
+
+            if (s.m_name == QStringLiteral("UserStore")) {
+                ctx.m_out << "    QString host," << endl
+                    << "    QString authenticationToken = QString()," << endl
+                    << "    QObject * parent = nullptr);" << endl
+                    << endl;
+            }
+            else {
+                ctx.m_out << "    QString noteStoreUrl = QString()," << endl
+                    << "    QString authenticationToken = QString()," << endl
+                    << "    QObject * parent = nullptr);" << endl
+                    << endl;
+            }
+        }
     }
 
     QStringList metatypeDeclarations;
@@ -1933,6 +1920,142 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     writeHeaderBody(ctx.m_out, QStringLiteral("Services.h"), additionalIncludes);
 
     const auto & services = parser->services();
+
+    for(const auto & s: services)
+    {
+        ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name
+            << ": public I" << s.m_name << endl << "{" << endl;
+        ctx.m_out << "    Q_OBJECT" << endl;
+        ctx.m_out << "    Q_DISABLE_COPY(" << s.m_name << ")" << endl;
+        ctx.m_out << "public:" << endl;
+
+        if (s.m_name == QStringLiteral("UserStore"))
+        {
+            ctx.m_out << "    explicit UserStore(" << endl
+                << "        QString host," << endl
+                << "        QString authenticationToken = QString()," << endl
+                << "        QObject * parent = nullptr);"
+                << endl << endl;
+        }
+        else
+        {
+            ctx.m_out << "    explicit NoteStore(" << endl
+                << "        QString noteStoreUrl = QString()," << endl
+                << "        QString authenticationToken = QString()," << endl
+                << "        QObject * parent = nullptr);" << endl << endl;
+
+            ctx.m_out << "    explicit NoteStore(QObject * parent);" << endl
+                << endl;
+            ctx.m_out << "    void setNoteStoreUrl(QString noteStoreUrl)" << endl
+                << "    {" << endl
+                << "        m_url = noteStoreUrl;" << endl
+                << "    }"
+                << endl << endl;
+            ctx.m_out << "    QString noteStoreUrl()" << endl
+                << "    {" << endl
+                << "        return m_url;" << endl
+                << "    }"
+                << endl << endl;
+        }
+
+        ctx.m_out << "    virtual void setAuthenticationToken("
+            << "QString authenticationToken) Q_DECL_OVERRIDE" << endl
+            << "    {" << endl
+            << "        m_authenticaionToken = authenticationToken;" << endl
+            << "    }" << endl
+            << endl;
+
+        ctx.m_out << "    virtual QString authenticationToken() const Q_DECL_OVERRIDE"
+            << endl << "    {" << endl
+            << "        return m_authenticationToken;" << endl
+            << "    }" << endl
+            << endl;
+
+        for(const auto & func: qAsConst(s.m_functions))
+        {
+            if (func.m_isOneway) {
+                throw std::runtime_error("oneway functions are not supported");
+            }
+
+            ctx.m_out << "    virtual " << typeToStr(func.m_type, func.m_name) << " "
+                 << func.m_name << "(";
+            if (!func.m_params.isEmpty()) {
+                ctx.m_out << endl;
+            }
+
+            int lastId = func.m_params.last().m_id;
+            bool tokenParamIsPresent = false;
+            for(const auto & param: qAsConst(func.m_params))
+            {
+                if (param.m_name == QStringLiteral("authenticationToken"))
+                {
+                    tokenParamIsPresent = true;
+                }
+                else
+                {
+                    ctx.m_out << "        " << typeToStr(
+                        param.m_type,
+                        func.m_name + QStringLiteral(", ") + param.m_name,
+                        MethodType::FuncParamType);
+                    ctx.m_out << " " << param.m_name;
+                    if (param.m_initializer) {
+                        ctx.m_out << " = " << valueToStr(
+                            param.m_initializer, param.m_type,
+                            func.m_name + QStringLiteral(", ") + param.m_name);
+                    }
+
+                    if (param.m_id != lastId || tokenParamIsPresent) {
+                        ctx.m_out << "," << endl;
+                    }
+                }
+            }
+
+            if (tokenParamIsPresent) {
+                ctx.m_out << "        QString authenticationToken = QString()";
+            }
+            ctx.m_out << ") Q_DECL_OVERRIDE;" << endl << endl;
+
+            ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
+                << " @endlink */" << endl;
+            ctx.m_out << "    virtual AsyncResult * " << func.m_name << "Async(" << endl;
+            tokenParamIsPresent = false;
+            for(const auto & param: qAsConst(func.m_params))
+            {
+                if (param.m_name == QStringLiteral("authenticationToken"))
+                {
+                    tokenParamIsPresent = true;
+                }
+                else
+                {
+                    ctx.m_out << "        " << typeToStr(
+                        param.m_type,
+                        func.m_name + QStringLiteral(", ") + param.m_name,
+                        MethodType::FuncParamType);
+                    ctx.m_out << " " << param.m_name;
+                    if (param.m_initializer) {
+                        ctx.m_out << " = " << valueToStr(
+                            param.m_initializer,
+                            param.m_type,
+                            func.m_name + QStringLiteral(", ") + param.m_name);
+                    }
+
+                    if (param.m_id != lastId || tokenParamIsPresent) {
+                        ctx.m_out << "," << endl;
+                    }
+                }
+            }
+
+            if (tokenParamIsPresent) {
+                ctx.m_out << "        QString authenticationToken = QString()";
+            }
+            ctx.m_out << ") Q_DECL_OVERRIDE;" << endl << endl;
+        }
+
+        ctx.m_out << "private:" << endl;
+        ctx.m_out << "    QString m_url;" << endl;
+        ctx.m_out << "    QString m_authenticationToken;" << endl;
+        ctx.m_out << "};" << endl << endl;
+    }
 
     for(const auto & s: services)
     {
@@ -2237,8 +2360,40 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
         }
     }
 
-    ctx.m_out << endl;
+    ctx.m_out << blockSeparator << endl << endl;
+
+    for(const auto & s: services)
+    {
+        ctx.m_out << "I" << s.m_name << " * create" << s.m_name << "(" << endl;
+
+        if (s.m_name == QStringLiteral("UserStore")) {
+            ctx.m_out << "    QString host," << endl
+                << "    QString authenticationToken = QString()," << endl
+                << "    QObject * parent = nullptr)" << endl
+                << "{" << endl
+                << "    return new " << s.m_name
+                << "(host, authenticationToken, parent);" << endl
+                << "}" << endl
+                << endl;
+        }
+        else {
+            ctx.m_out << "    QString noteStoreUrl = QString()," << endl
+                << "    QString authenticationToken = QString()," << endl
+                << "    QObject * parent = nullptr)" << endl
+                << "{" << endl
+                << "    return new " << s.m_name
+                << "(noteStoreUrl, authenticationToken, parent);" << endl
+                << "}" << endl
+                << endl;
+        }
+    }
+
     writeBodyFooter(ctx.m_out);
+
+    ctx.m_out << endl;
+    for(const auto & s: services) {
+        ctx.m_out << "#include " << s.m_name << ".moc" << endl;
+    }
 }
 
 void Generator::generateSources(Parser * parser, const QString & outPath)

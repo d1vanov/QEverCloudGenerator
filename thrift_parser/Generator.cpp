@@ -556,7 +556,7 @@ QString Generator::typeToStr(
                 }
                 else {
                     QTextStream strm(&result);
-                    strm << "const " << typeName << "&";
+                    strm << "const " << typeName << " &";
                 }
             }
         }
@@ -1741,10 +1741,47 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("../AsyncResult.h") << QStringLiteral("../Optional.h")
         << QStringLiteral("Constants.h") << QStringLiteral("Types.h")
-        << QStringLiteral("<QObject>");
+        << QStringLiteral("<QObject>") << QStringLiteral("<QSharedPointer>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
+
+    ctx.m_out << blockSeparator << endl;
+
+    ctx.m_out << R""""(
+/**
+ * Configuration options for service requests
+ */
+struct QEVERCLOUD_EXPORT RequestConfig
+{
+    QString authenticationToken;
+
+    /** Request timeout in milliseconds */
+    quint64 requestTimeout = 10000;
+
+    /**
+     * Should timeout be increased exponentially until maxRequestTimeout
+     * is reached when retrying a request
+     */
+    bool exponentialTimeoutIncrease = true;
+
+    /** Max request timeout in milliseconds */
+    quint64 maxRequestTimeout = 600000;
+
+    /** Max number of attemts to retry a request */
+    quint32 maxRetryCount = 10;
+
+    friend QEVERCLOUD_EXPORT QTextStream & operator<<(
+        QTextStream & strm, const RequestConfig & config);
+
+    friend QEVERCLOUD_EXPORT QDebug & operator<<(
+        QDebug & strm, const RequestConfig & config);
+};
+
+using RequestConfigPtr = QSharedPointer<RequestConfig>;
+)"""";
+
+    ctx.m_out << endl << blockSeparator << endl << endl;
 
     const auto & services = parser->services();
     for(const auto & s: services)
@@ -1762,13 +1799,6 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
         ctx.m_out << "    Q_OBJECT" << endl;
         ctx.m_out << "    Q_DISABLE_COPY(I" << s.m_name << ")" << endl;
         ctx.m_out << "public:" << endl;
-
-        ctx.m_out << "    virtual void setAuthenticationToken("
-            << "QString authenticationToken) = 0;"
-            << endl << endl;
-
-        ctx.m_out << "    virtual QString authenticationToken() const = 0;"
-            << endl << endl;
 
         for(const auto & func: qAsConst(s.m_functions))
         {
@@ -1792,71 +1822,56 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
                 ctx.m_out << endl;
             }
 
-            int lastId = func.m_params.last().m_id;
-            bool tokenParamIsPresent = false;
             for(const auto & param: qAsConst(func.m_params))
             {
-                if (param.m_name == QStringLiteral("authenticationToken"))
-                {
-                    tokenParamIsPresent = true;
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of RequestConfig class
+                    continue;
                 }
-                else
-                {
-                    ctx.m_out << "        " << typeToStr(
-                        param.m_type,
-                        func.m_name + QStringLiteral(", ") + param.m_name,
-                        MethodType::FuncParamType);
-                    ctx.m_out << " " << param.m_name;
-                    if (param.m_initializer) {
-                        ctx.m_out << " = " << valueToStr(
-                            param.m_initializer, param.m_type,
-                            func.m_name + QStringLiteral(", ") + param.m_name);
-                    }
 
-                    if (param.m_id != lastId || tokenParamIsPresent) {
-                        ctx.m_out << "," << endl;
-                    }
+                ctx.m_out << "        " << typeToStr(
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                ctx.m_out << " " << param.m_name;
+                if (param.m_initializer) {
+                    ctx.m_out << " = " << valueToStr(
+                        param.m_initializer, param.m_type,
+                        func.m_name + QStringLiteral(", ") + param.m_name);
                 }
+
+                ctx.m_out << "," << endl;
             }
 
-            if (tokenParamIsPresent) {
-                ctx.m_out << "        QString authenticationToken = QString()";
-            }
+            ctx.m_out << "        const RequestConfigPtr & config = {}";
             ctx.m_out << ") = 0;" << endl << endl;
 
             ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
                 << " @endlink */" << endl;
             ctx.m_out << "    virtual AsyncResult * " << func.m_name << "Async(" << endl;
-            tokenParamIsPresent = false;
             for(const auto & param: qAsConst(func.m_params))
             {
-                if (param.m_name == QStringLiteral("authenticationToken"))
-                {
-                    tokenParamIsPresent = true;
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of RequestConfig class
+                    continue;
                 }
-                else
-                {
-                    ctx.m_out << "        " << typeToStr(
+
+                ctx.m_out << "        " << typeToStr(
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                ctx.m_out << " " << param.m_name;
+                if (param.m_initializer) {
+                    ctx.m_out << " = " << valueToStr(
+                        param.m_initializer,
                         param.m_type,
-                        func.m_name + QStringLiteral(", ") + param.m_name,
-                        MethodType::FuncParamType);
-                    ctx.m_out << " " << param.m_name;
-                    if (param.m_initializer) {
-                        ctx.m_out << " = " << valueToStr(
-                            param.m_initializer,
-                            param.m_type,
-                            func.m_name + QStringLiteral(", ") + param.m_name);
-                    }
-
-                    if (param.m_id != lastId || tokenParamIsPresent) {
-                        ctx.m_out << "," << endl;
-                    }
+                        func.m_name + QStringLiteral(", ") + param.m_name);
                 }
+
+                ctx.m_out << "," << endl;
             }
 
-            if (tokenParamIsPresent) {
-                ctx.m_out << "        QString authenticationToken = QString()";
-            }
+            ctx.m_out << "        const RequestConfigPtr & config = {}";
             ctx.m_out << ") = 0;" << endl << endl;
         }
 
@@ -1873,13 +1888,13 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
 
             if (s.m_name == QStringLiteral("UserStore")) {
                 ctx.m_out << "    QString host," << endl
-                    << "    QString authenticationToken = QString()," << endl
+                    << "    const RequestConfig & config = {}," << endl
                     << "    QObject * parent = nullptr);" << endl
                     << endl;
             }
             else {
                 ctx.m_out << "    QString noteStoreUrl = QString()," << endl
-                    << "    QString authenticationToken = QString()," << endl
+                    << "    const RequestConfig & config = {}," << endl
                     << "    QObject * parent = nullptr);" << endl
                     << endl;
             }
@@ -1933,7 +1948,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
         {
             ctx.m_out << "    explicit UserStore(" << endl
                 << "        QString host," << endl
-                << "        QString authenticationToken = QString()," << endl
+                << "        const RequestConfig & config = {}," << endl
                 << "        QObject * parent = nullptr);"
                 << endl << endl;
         }
@@ -1941,7 +1956,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
         {
             ctx.m_out << "    explicit NoteStore(" << endl
                 << "        QString noteStoreUrl = QString()," << endl
-                << "        QString authenticationToken = QString()," << endl
+                << "        const RequestConfig & config = {}," << endl
                 << "        QObject * parent = nullptr);" << endl << endl;
 
             ctx.m_out << "    explicit NoteStore(QObject * parent);" << endl
@@ -1958,19 +1973,6 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
                 << endl << endl;
         }
 
-        ctx.m_out << "    virtual void setAuthenticationToken("
-            << "QString authenticationToken) Q_DECL_OVERRIDE" << endl
-            << "    {" << endl
-            << "        m_authenticaionToken = authenticationToken;" << endl
-            << "    }" << endl
-            << endl;
-
-        ctx.m_out << "    virtual QString authenticationToken() const Q_DECL_OVERRIDE"
-            << endl << "    {" << endl
-            << "        return m_authenticationToken;" << endl
-            << "    }" << endl
-            << endl;
-
         for(const auto & func: qAsConst(s.m_functions))
         {
             if (func.m_isOneway) {
@@ -1983,77 +1985,61 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
                 ctx.m_out << endl;
             }
 
-            int lastId = func.m_params.last().m_id;
-            bool tokenParamIsPresent = false;
             for(const auto & param: qAsConst(func.m_params))
             {
-                if (param.m_name == QStringLiteral("authenticationToken"))
-                {
-                    tokenParamIsPresent = true;
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of RequestConfig class
+                    continue;
                 }
-                else
-                {
-                    ctx.m_out << "        " << typeToStr(
-                        param.m_type,
-                        func.m_name + QStringLiteral(", ") + param.m_name,
-                        MethodType::FuncParamType);
-                    ctx.m_out << " " << param.m_name;
-                    if (param.m_initializer) {
-                        ctx.m_out << " = " << valueToStr(
-                            param.m_initializer, param.m_type,
-                            func.m_name + QStringLiteral(", ") + param.m_name);
-                    }
 
-                    if (param.m_id != lastId || tokenParamIsPresent) {
-                        ctx.m_out << "," << endl;
-                    }
+                ctx.m_out << "        " << typeToStr(
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                ctx.m_out << " " << param.m_name;
+                if (param.m_initializer) {
+                    ctx.m_out << " = " << valueToStr(
+                        param.m_initializer, param.m_type,
+                        func.m_name + QStringLiteral(", ") + param.m_name);
                 }
+
+                ctx.m_out << "," << endl;
             }
 
-            if (tokenParamIsPresent) {
-                ctx.m_out << "        QString authenticationToken = QString()";
-            }
+            ctx.m_out << "        const RequestConfigPtr & config = {}";
             ctx.m_out << ") Q_DECL_OVERRIDE;" << endl << endl;
 
-            ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
-                << " @endlink */" << endl;
-            ctx.m_out << "    virtual AsyncResult * " << func.m_name << "Async(" << endl;
-            tokenParamIsPresent = false;
+            ctx.m_out << "    virtual AsyncResult * " << func.m_name
+                << "Async(" << endl;
             for(const auto & param: qAsConst(func.m_params))
             {
-                if (param.m_name == QStringLiteral("authenticationToken"))
-                {
-                    tokenParamIsPresent = true;
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of RequestConfig class
+                    continue;
                 }
-                else
-                {
-                    ctx.m_out << "        " << typeToStr(
+
+                ctx.m_out << "        " << typeToStr(
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                ctx.m_out << " " << param.m_name;
+                if (param.m_initializer) {
+                    ctx.m_out << " = " << valueToStr(
+                        param.m_initializer,
                         param.m_type,
-                        func.m_name + QStringLiteral(", ") + param.m_name,
-                        MethodType::FuncParamType);
-                    ctx.m_out << " " << param.m_name;
-                    if (param.m_initializer) {
-                        ctx.m_out << " = " << valueToStr(
-                            param.m_initializer,
-                            param.m_type,
-                            func.m_name + QStringLiteral(", ") + param.m_name);
-                    }
-
-                    if (param.m_id != lastId || tokenParamIsPresent) {
-                        ctx.m_out << "," << endl;
-                    }
+                        func.m_name + QStringLiteral(", ") + param.m_name);
                 }
+
+                ctx.m_out << "," << endl;
             }
 
-            if (tokenParamIsPresent) {
-                ctx.m_out << "        QString authenticationToken = QString()";
-            }
+            ctx.m_out << "        const RequestConfigPtr & config = {}";
             ctx.m_out << ") Q_DECL_OVERRIDE;" << endl << endl;
         }
 
         ctx.m_out << "private:" << endl;
         ctx.m_out << "    QString m_url;" << endl;
-        ctx.m_out << "    QString m_authenticationToken;" << endl;
+        ctx.m_out << "    RequestConfigPtr m_requestConfig;" << endl;
         ctx.m_out << "};" << endl << endl;
     }
 
@@ -2368,21 +2354,21 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
 
         if (s.m_name == QStringLiteral("UserStore")) {
             ctx.m_out << "    QString host," << endl
-                << "    QString authenticationToken = QString()," << endl
-                << "    QObject * parent = nullptr)" << endl
+                << "    const RequestConfig & config," << endl
+                << "    QObject * parent)" << endl
                 << "{" << endl
                 << "    return new " << s.m_name
-                << "(host, authenticationToken, parent);" << endl
+                << "(host, config, parent);" << endl
                 << "}" << endl
                 << endl;
         }
         else {
-            ctx.m_out << "    QString noteStoreUrl = QString()," << endl
-                << "    QString authenticationToken = QString()," << endl
-                << "    QObject * parent = nullptr)" << endl
+            ctx.m_out << "    QString noteStoreUrl," << endl
+                << "    const RequestConfig & config," << endl
+                << "    QObject * parent)" << endl
                 << "{" << endl
                 << "    return new " << s.m_name
-                << "(noteStoreUrl, authenticationToken, parent);" << endl
+                << "(noteStoreUrl, config, parent);" << endl
                 << "}" << endl
                 << endl;
         }
@@ -2392,7 +2378,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
 
     ctx.m_out << endl;
     for(const auto & s: services) {
-        ctx.m_out << "#include " << s.m_name << ".moc" << endl;
+        ctx.m_out << "#include <" << s.m_name << ".moc>" << endl;
     }
 }
 

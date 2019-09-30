@@ -71,8 +71,16 @@ private:
     void generateServicesHeader(Parser * parser, const QString & outPath);
     void generateServicesCpp(Parser * parser, const QString & outPath);
 
+    enum class ServiceClassType
+    {
+        NonDurable,
+        Durable
+    };
+
     void generateServiceClassDeclaration(
-        const Parser::Service & service, OutputFileContext & ctx);
+        const Parser::Service & service,
+        const ServiceClassType serviceClassType,
+        OutputFileContext & ctx);
 
     void generateServiceClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);

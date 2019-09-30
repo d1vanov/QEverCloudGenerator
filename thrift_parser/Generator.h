@@ -71,7 +71,11 @@ private:
     void generateServicesHeader(Parser * parser, const QString & outPath);
     void generateServicesCpp(Parser * parser, const QString & outPath);
 
-    void generateServices(Parser * parser, const QString & outPath);
+    void generateServiceClassDeclaration(
+        const Parser::Service & service, OutputFileContext & ctx);
+
+    void generateServiceClassDefinition(
+        const Parser::Service & service, OutputFileContext & ctx);
 
     // Methods for writing header and source files
 

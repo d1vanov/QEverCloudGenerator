@@ -2100,6 +2100,8 @@ void Generator::generateServiceClassDefinition(
         bool isVoidResult =
             !f.m_type.dynamicCast<Parser::VoidType>().isNull();
 
+        ctx.m_out << "namespace {" << endl << endl;
+
         ctx.m_out << "QByteArray " << prepareParamsName << "(" << endl;
         for(const auto & param: f.m_params)
         {
@@ -2278,6 +2280,8 @@ void Generator::generateServiceClassDefinition(
                 << "(reply));" << endl;
         }
         ctx.m_out << "}" << endl << endl;
+
+        ctx.m_out << "} // namespace" << endl << endl;
 
         ctx.m_out << typeToStr(f.m_type, f.m_name) << " "
             << service.m_name << "::" << f.m_name << "(" << endl;

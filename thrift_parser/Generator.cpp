@@ -1922,6 +1922,14 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     }
 
     ctx.m_out << blockSeparator << endl << endl;
+    generateDurableServiceCommonCode(ctx);
+
+    for(const auto & s: services) {
+        ctx.m_out << blockSeparator << endl << endl;
+        generateDurableServiceClassDefinition(s, ctx);
+    }
+
+    ctx.m_out << blockSeparator << endl << endl;
 
     for(const auto & s: services)
     {
@@ -1986,8 +1994,13 @@ void Generator::generateServiceClassDeclaration(
 
         ctx.m_out << "            IRequestContextPtr ctx = {}," << endl
             << "            QObject * parent = nullptr) :" << endl
-            << "        IUserStore(parent)," << endl
-            << "        m_ctx(std::move(ctx))" << endl
+            << "        IUserStore(parent)," << endl;
+
+        if (serviceClassType == ServiceClassType::Durable) {
+            ctx.m_out << "        m_service(std::move(service))," << endl;
+        }
+
+        ctx.m_out << "        m_ctx(std::move(ctx))" << endl
             << "    {" << endl
             << "        if (!m_ctx) {" << endl
             << "            m_ctx = newRequestContext();" << endl
@@ -2022,6 +2035,9 @@ void Generator::generateServiceClassDeclaration(
 
         if (serviceClassType == ServiceClassType::NonDurable) {
             ctx.m_out << "        m_url(std::move(noteStoreUrl))," << endl;
+        }
+        else {
+            ctx.m_out << "        m_service(std::move(service))," << endl;
         }
 
         ctx.m_out << "        m_ctx(std::move(ctx))" << endl
@@ -2124,6 +2140,9 @@ void Generator::generateServiceClassDeclaration(
 
     if (serviceClassType == ServiceClassType::NonDurable) {
         ctx.m_out << "    QString m_url;" << endl;
+    }
+    else {
+        ctx.m_out << "    I" << service.m_name << "Ptr m_service;" << endl;
     }
 
     ctx.m_out << "    IRequestContextPtr m_ctx;" << endl;
@@ -2333,7 +2352,7 @@ void Generator::generateServiceClassDefinition(
 
         ctx.m_out << typeToStr(f.m_type, f.m_name) << " "
             << service.m_name << "::" << f.m_name << "(" << endl;
-        for(const auto & param : f.m_params)
+        for(const auto & param: f.m_params)
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
                 continue;
@@ -2428,6 +2447,113 @@ void Generator::generateServiceClassDefinition(
             << asyncReadFunctionName << ");" << endl;
 
         ctx.m_out << "}" << endl << endl;
+    }
+}
+
+void Generator::generateDurableServiceCommonCode(OutputFileContext & ctx)
+{
+    ctx.m_out << "struct RetryState" << endl
+        << "{" << endl
+        << "    const quint64 m_started = QDateTime::currentMSecsSinceEpoch();"
+        << endl
+        << "    quint32 m_retryCount = 0;" << endl
+        << "};" << endl << endl;
+
+    ctx.m_out << "template <class T>" << endl
+        << "struct RequestState" << endl
+        << "{" << endl
+        << "    T m_request;" << endl
+        << "    AsyncResult * m_response;" << endl << endl
+        << "    RequestState(T && request, AsyncResult * response) :" << endl
+        << "        m_request(std::move(request))," << endl
+        << "        m_response(response)" << endl
+        << "    {}" << endl
+        << "}" << endl;
+}
+
+void Generator::generateDurableServiceClassDefinition(
+    const Parser::Service & service, OutputFileContext & ctx)
+{
+    for(const auto & func: qAsConst(service.m_functions))
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        ctx.m_out << typeToStr(func.m_type, func.m_name) << " "
+            << "Durable" << service.m_name << "::" << func.m_name << "(" << endl;
+        for(const auto & param: func.m_params)
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                continue;
+            }
+
+            ctx.m_out << "    " << typeToStr(
+                param.m_type, func.m_name + QStringLiteral(", ") + param.m_name,
+                MethodType::FuncParamType);
+            ctx.m_out << " " << param.m_name;
+            ctx.m_out << "," << endl;
+        }
+
+        ctx.m_out << "    IRequestContextPtr ctx";
+        ctx.m_out << ")" << endl
+            << "{" << endl;
+
+        ctx.m_out << "    if (!ctx) {" << endl
+            << "        ctx = m_ctx;" << endl
+            << "    }" << endl << endl;
+
+        ctx.m_out << "    RetryState state;" << endl;
+        ctx.m_out << "    state.m_retryCount = ctx->maxRequestRetryCount();"
+            << endl;
+        ctx.m_out << "    while(state.m_retryCount)" << endl
+            << "    {" << endl
+            << "        try" << endl
+            << "        {" << endl;
+
+        ctx.m_out << "            ";
+        bool isVoidResult =
+            !func.m_type.dynamicCast<Parser::VoidType>().isNull();
+        if (!isVoidResult) {
+            ctx.m_out << "auto res = ";
+        }
+
+        ctx.m_out << "m_service->" << func.m_name << "(";
+        if (!func.m_params.isEmpty()) {
+            ctx.m_out << endl;
+        }
+
+        for(const auto & param: qAsConst(func.m_params))
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                continue;
+            }
+
+            ctx.m_out << "                " << param.m_name << "," << endl;
+        }
+
+        ctx.m_out << "                ctx);" << endl;
+
+        if (!isVoidResult) {
+            ctx.m_out << "            return res;" << endl;
+        }
+
+        ctx.m_out << "        }" << endl;
+
+        // TODO: should also increase request timeout if setting is set
+        ctx.m_out << "        catch(...)" << endl
+            << "        {" << endl
+            << "            --state.m_retryCount;" << endl
+            << "            if (!state.m_retryCount) {" << endl
+            << "                throw;" << endl
+            << "            }" << endl
+            << "        }" << endl
+            << "    }" << endl << endl
+            << "    throw EverCloudException(\"no retry attempts left\");" << endl
+            << "}" << endl << endl;
+
+        // TODO: implement version with AsyncResult
     }
 }
 

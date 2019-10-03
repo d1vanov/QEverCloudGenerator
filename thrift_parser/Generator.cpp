@@ -2403,7 +2403,7 @@ void Generator::generateServiceClassDefinition(
 
         ctx.m_out << "}" << endl << endl;
 
-        ctx.m_out << "AsyncResult* " << service.m_name << "::" << f.m_name
+        ctx.m_out << "AsyncResult * " << service.m_name << "::" << f.m_name
             << "Async(" << endl;
         for(const auto & param : f.m_params)
         {
@@ -2578,7 +2578,56 @@ void Generator::generateDurableServiceClassDefinition(
             << "    throw EverCloudException(\"no retry attempts left\");" << endl
             << "}" << endl << endl;
 
-        // TODO: implement version with AsyncResult
+        ctx.m_out << "AsyncResult * Durable" << service.m_name << "::"
+            << func.m_name << "Async(" << endl;
+        for(const auto & param : func.m_params)
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                continue;
+            }
+
+            ctx.m_out << "    " << typeToStr(
+                param.m_type,
+                func.m_name + QStringLiteral(", ") + param.m_name,
+                MethodType::FuncParamType);
+            ctx.m_out << " " << param.m_name;
+
+            ctx.m_out << "," << endl;
+        }
+
+        ctx.m_out << "    IRequestContextPtr ctx";
+        ctx.m_out << ")" << endl
+            << "{" << endl;
+
+        ctx.m_out << "    if (!ctx) {" << endl
+            << "        ctx = m_ctx;" << endl
+            << "    }" << endl << endl;
+
+        // TODO: insert actual code instead
+        ctx.m_out << "    AsyncResult * result = new AsyncResult;" << endl << endl;
+
+        ctx.m_out << "    auto res = m_service->" << func.m_name << "(" << endl;
+        for(const auto & param : func.m_params)
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                continue;
+            }
+
+            ctx.m_out << "        " << param.m_name << "," << endl;
+        }
+        ctx.m_out << "        ctx);" << endl;
+        ctx.m_out << "    QObject::connect(res, &AsyncResult::finished," << endl
+            << "        [=] (QVariant result, "
+            << "QSharedPointer<EverCloudExceptionData> error) {" << endl
+            << "            Q_UNUSED(result)" << endl
+            << "            Q_UNUSED(error)" << endl
+            << "            // TODO: implement" << endl
+            << "        });" << endl << endl;
+
+        ctx.m_out << "    return result;" << endl;
+
+        ctx.m_out << "}" << endl << endl;
+
     }
 }
 

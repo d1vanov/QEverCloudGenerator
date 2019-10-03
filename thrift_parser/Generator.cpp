@@ -1903,7 +1903,8 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>");
+        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>")
+        << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
     sortIncludes(additionalIncludes);
 
     writeHeaderBody(ctx.m_out, QStringLiteral("Services.h"), additionalIncludes);
@@ -1977,7 +1978,7 @@ void Generator::generateServiceClassDeclaration(
     ctx.m_out << "class Q_DECL_HIDDEN " << className
         << ": public I" << service.m_name << endl << "{" << endl;
     ctx.m_out << "    Q_OBJECT" << endl;
-    ctx.m_out << "    Q_DISABLE_COPY(" << service.m_name << ")" << endl;
+    ctx.m_out << "    Q_DISABLE_COPY(" << className << ")" << endl;
     ctx.m_out << "public:" << endl;
 
     if (service.m_name == QStringLiteral("UserStore"))
@@ -2468,7 +2469,16 @@ void Generator::generateDurableServiceCommonCode(OutputFileContext & ctx)
         << "        m_request(std::move(request))," << endl
         << "        m_response(response)" << endl
         << "    {}" << endl
-        << "}" << endl;
+        << "};" << endl << endl;
+
+    ctx.m_out << "quint64 exponentiallyIncreasedTimeoutMsec("
+        << "quint64 timeout, const quint64 maxTimeout)" << endl
+        << "{" << endl
+        << "    timeout = static_cast<quint64>(std::floor(timeout * 1.6 + 0.5));"
+        << endl
+        << "    timeout = std::min(timeout, maxTimeout);" << endl
+        << "    return timeout;" << endl
+        << "}" << endl << endl;
 }
 
 void Generator::generateDurableServiceClassDefinition(
@@ -2541,12 +2551,27 @@ void Generator::generateDurableServiceClassDefinition(
 
         ctx.m_out << "        }" << endl;
 
-        // TODO: should also increase request timeout if setting is set
         ctx.m_out << "        catch(...)" << endl
             << "        {" << endl
             << "            --state.m_retryCount;" << endl
             << "            if (!state.m_retryCount) {" << endl
             << "                throw;" << endl
+            << "            }" << endl << endl
+            << "            if (ctx->increaseRequestTimeoutExponentially()) {"
+            << endl
+            << "                quint64 maxRequestTimeout = ctx->maxRequestTimeout();"
+            << endl
+            << "                quint64 timeout = exponentiallyIncreasedTimeoutMsec("
+            << endl
+            << "                    ctx->requestTimeout()," << endl
+            << "                    maxRequestTimeout);" << endl
+            << "                ctx = newRequestContext(" << endl
+            << "                    ctx->authenticationToken()," << endl
+            << "                    timeout," << endl
+            << "                    /* increase request timeout exponentially = */ true,"
+            << endl
+            << "                    maxRequestTimeout," << endl
+            << "                    ctx->maxRequestRetryCount());" << endl
             << "            }" << endl
             << "        }" << endl
             << "    }" << endl << endl

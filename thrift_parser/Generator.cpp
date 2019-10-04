@@ -264,9 +264,6 @@ void Generator::writeHeaderBody(
     out << "namespace qevercloud {";
     out << endl;
     out << endl;
-    out << blockSeparator;
-    out << endl;
-    out << endl;
 }
 
 void Generator::writeHeaderFooter(
@@ -853,6 +850,8 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
     writeHeaderBody(
         ctx.m_out, QStringLiteral("Constants.h"), additionalIncludes);
 
+    ctx.m_out << blockSeparator << endl << endl;
+
     const auto & constants = parser->constants();
     for(const auto & c: constants)
     {
@@ -1289,6 +1288,8 @@ void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
 
     writeHeaderBody(ctx.m_out, QStringLiteral("EDAMErrorCode.h"));
 
+    ctx.m_out << blockSeparator << endl << endl;
+
     const auto & enumerations = parser->enumerations();
     int enumerationsCount = enumerations.size();
     int i = 0;
@@ -1581,6 +1582,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
 
     writeHeaderBody(ctx.m_out, QStringLiteral("Types.h"), additionalIncludes);
 
+    ctx.m_out << blockSeparator << endl << endl;
     ctx.m_out << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
 
     const auto & enumerations = parser->enumerations();
@@ -2603,10 +2605,10 @@ void Generator::generateDurableServiceClassDefinition(
             << "        ctx = m_ctx;" << endl
             << "    }" << endl << endl;
 
-        // TODO: insert actual code instead
-        ctx.m_out << "    AsyncResult * result = new AsyncResult;" << endl << endl;
+        ctx.m_out << "    AsyncResult * result = "
+            << "new AsyncResult(QString(), QByteArray());" << endl;
 
-        ctx.m_out << "    auto res = m_service->" << func.m_name << "(" << endl;
+        ctx.m_out << "    auto res = m_service->" << func.m_name << "Async(" << endl;
         for(const auto & param : func.m_params)
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {

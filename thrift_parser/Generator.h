@@ -85,8 +85,6 @@ private:
     void generateServiceClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);
 
-    void generateDurableServiceCommonCode(OutputFileContext & ctx);
-
     void generateDurableServiceClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);
 

@@ -1905,8 +1905,9 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>")
-        << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
+        << QStringLiteral("../DurableService.h") << QStringLiteral("Types_io.h")
+        << QStringLiteral("<Helpers.h>") << QStringLiteral("<algorithm>")
+        << QStringLiteral("<cmath>");
     sortIncludes(additionalIncludes);
 
     writeHeaderBody(ctx.m_out, QStringLiteral("Services.h"), additionalIncludes);
@@ -1923,9 +1924,6 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
         ctx.m_out << blockSeparator << endl << endl;
         generateServiceClassDeclaration(s, ServiceClassType::Durable, ctx);
     }
-
-    ctx.m_out << blockSeparator << endl << endl;
-    generateDurableServiceCommonCode(ctx);
 
     for(const auto & s: services) {
         ctx.m_out << blockSeparator << endl << endl;
@@ -2000,7 +1998,8 @@ void Generator::generateServiceClassDeclaration(
             << "        IUserStore(parent)," << endl;
 
         if (serviceClassType == ServiceClassType::Durable) {
-            ctx.m_out << "        m_service(std::move(service))," << endl;
+            ctx.m_out << "        m_service(std::move(service))," << endl
+                << "        m_durableService(newRetryPolicy(), ctx)," << endl;
         }
 
         ctx.m_out << "        m_ctx(std::move(ctx))" << endl
@@ -2040,7 +2039,8 @@ void Generator::generateServiceClassDeclaration(
             ctx.m_out << "        m_url(std::move(noteStoreUrl))," << endl;
         }
         else {
-            ctx.m_out << "        m_service(std::move(service))," << endl;
+            ctx.m_out << "        m_service(std::move(service))," << endl
+                << "        m_durableService(newRetryPolicy(), ctx)," << endl;
         }
 
         ctx.m_out << "        m_ctx(std::move(ctx))" << endl
@@ -2146,6 +2146,7 @@ void Generator::generateServiceClassDeclaration(
     }
     else {
         ctx.m_out << "    I" << service.m_name << "Ptr m_service;" << endl;
+        ctx.m_out << "    DurableService m_durableService;" << endl;
     }
 
     ctx.m_out << "    IRequestContextPtr m_ctx;" << endl;
@@ -2453,36 +2454,6 @@ void Generator::generateServiceClassDefinition(
     }
 }
 
-void Generator::generateDurableServiceCommonCode(OutputFileContext & ctx)
-{
-    ctx.m_out << "struct RetryState" << endl
-        << "{" << endl
-        << "    const quint64 m_started = QDateTime::currentMSecsSinceEpoch();"
-        << endl
-        << "    quint32 m_retryCount = 0;" << endl
-        << "};" << endl << endl;
-
-    ctx.m_out << "template <class T>" << endl
-        << "struct RequestState" << endl
-        << "{" << endl
-        << "    T m_request;" << endl
-        << "    AsyncResult * m_response;" << endl << endl
-        << "    RequestState(T && request, AsyncResult * response) :" << endl
-        << "        m_request(std::move(request))," << endl
-        << "        m_response(response)" << endl
-        << "    {}" << endl
-        << "};" << endl << endl;
-
-    ctx.m_out << "quint64 exponentiallyIncreasedTimeoutMsec("
-        << "quint64 timeout, const quint64 maxTimeout)" << endl
-        << "{" << endl
-        << "    timeout = static_cast<quint64>(std::floor(timeout * 1.6 + 0.5));"
-        << endl
-        << "    timeout = std::min(timeout, maxTimeout);" << endl
-        << "    return timeout;" << endl
-        << "}" << endl << endl;
-}
-
 void Generator::generateDurableServiceClassDefinition(
     const Parser::Service & service, OutputFileContext & ctx)
 {
@@ -2491,6 +2462,8 @@ void Generator::generateDurableServiceClassDefinition(
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
         }
+
+        // Synchronous version
 
         ctx.m_out << typeToStr(func.m_type, func.m_name) << " "
             << "Durable" << service.m_name << "::" << func.m_name << "(" << endl;
@@ -2515,17 +2488,14 @@ void Generator::generateDurableServiceClassDefinition(
             << "        ctx = m_ctx;" << endl
             << "    }" << endl << endl;
 
-        ctx.m_out << "    RetryState state;" << endl;
-        ctx.m_out << "    state.m_retryCount = ctx->maxRequestRetryCount();"
-            << endl;
-        ctx.m_out << "    while(state.m_retryCount)" << endl
-            << "    {" << endl
-            << "        try" << endl
+        bool isVoidResult =
+            !func.m_type.dynamicCast<Parser::VoidType>().isNull();
+
+        ctx.m_out << "    auto result = DurableService::SyncServiceCall(" << endl
+            << "        [&] (IRequestContextPtr ctx)" << endl
             << "        {" << endl;
 
         ctx.m_out << "            ";
-        bool isVoidResult =
-            !func.m_type.dynamicCast<Parser::VoidType>().isNull();
         if (!isVoidResult) {
             ctx.m_out << "auto res = ";
         }
@@ -2547,38 +2517,21 @@ void Generator::generateDurableServiceClassDefinition(
 
         ctx.m_out << "                ctx);" << endl;
 
+        ctx.m_out << "            return DurableService::SyncResult(QVariant(";
         if (!isVoidResult) {
-            ctx.m_out << "            return res;" << endl;
+            ctx.m_out << "res";
         }
+        ctx.m_out << "), {});" << endl << endl;
 
-        ctx.m_out << "        }" << endl;
-
-        ctx.m_out << "        catch(...)" << endl
-            << "        {" << endl
-            << "            --state.m_retryCount;" << endl
-            << "            if (!state.m_retryCount) {" << endl
-            << "                throw;" << endl
-            << "            }" << endl << endl
-            << "            if (ctx->increaseRequestTimeoutExponentially()) {"
-            << endl
-            << "                quint64 maxRequestTimeout = ctx->maxRequestTimeout();"
-            << endl
-            << "                quint64 timeout = exponentiallyIncreasedTimeoutMsec("
-            << endl
-            << "                    ctx->requestTimeout()," << endl
-            << "                    maxRequestTimeout);" << endl
-            << "                ctx = newRequestContext(" << endl
-            << "                    ctx->authenticationToken()," << endl
-            << "                    timeout," << endl
-            << "                    /* increase request timeout exponentially = */ true,"
-            << endl
-            << "                    maxRequestTimeout," << endl
-            << "                    ctx->maxRequestRetryCount());" << endl
-            << "            }" << endl
-            << "        }" << endl
-            << "    }" << endl << endl
-            << "    throw EverCloudException(\"no retry attempts left\");" << endl
+        ctx.m_out << "    return";
+        if (!isVoidResult) {
+            ctx.m_out << " result.value<" << typeToStr(func.m_type, func.m_name)
+                << ">()";
+        }
+        ctx.m_out << ";" << endl
             << "}" << endl << endl;
+
+        // Asynchronous version
 
         ctx.m_out << "AsyncResult * Durable" << service.m_name << "::"
             << func.m_name << "Async(" << endl;
@@ -2606,7 +2559,7 @@ void Generator::generateDurableServiceClassDefinition(
             << "    }" << endl << endl;
 
         ctx.m_out << "    AsyncResult * result = "
-            << "new AsyncResult(QString(), QByteArray());" << endl;
+            << "new AsyncResult;" << endl;
 
         ctx.m_out << "    auto res = m_service->" << func.m_name << "Async(" << endl;
         for(const auto & param : func.m_params)

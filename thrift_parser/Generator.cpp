@@ -1253,7 +1253,8 @@ void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("<QTextStream>") << QStringLiteral("<QDebug>");
+        << QStringLiteral("<QDebug>") << QStringLiteral("<QMetaType>")
+        << QStringLiteral("<QTextStream>");
 
     sortIncludes(additionalIncludes);
 
@@ -1278,7 +1279,19 @@ void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
         ++i;
     }
 
-    writeHeaderFooter(ctx.m_out, fileName);
+    QStringList extraLinesOutsideNamespace;
+    for(const auto & e: enumerations)
+    {
+        QString line;
+        QTextStream lineOut(&line);
+
+        lineOut << "Q_DECLARE_METATYPE(qevercloud::" << e.m_name << ")";
+        lineOut.flush();
+
+        extraLinesOutsideNamespace << line;
+    }
+
+    writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
 }
 
 void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
@@ -1554,7 +1567,6 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
         ctx.m_out << "};" << endl << endl;
     }
-    ctx.m_out << endl << endl;
 
     QStringList extraLinesOutsideNamespace;
     for(const auto & s: qAsConst(ordered)) {
@@ -2465,7 +2477,9 @@ void Generator::generateDurableServiceClassDefinition(
 
         // Synchronous version
 
-        ctx.m_out << typeToStr(func.m_type, func.m_name) << " "
+        auto funcReturnTypeName = typeToStr(func.m_type, func.m_name);
+
+        ctx.m_out << funcReturnTypeName << " "
             << "Durable" << service.m_name << "::" << func.m_name << "(" << endl;
         for(const auto & param: func.m_params)
         {
@@ -2491,7 +2505,8 @@ void Generator::generateDurableServiceClassDefinition(
         bool isVoidResult =
             !func.m_type.dynamicCast<Parser::VoidType>().isNull();
 
-        ctx.m_out << "    auto result = DurableService::SyncServiceCall(" << endl
+        ctx.m_out << "    auto call = "
+            << "DurableService::SyncServiceCall(" << endl
             << "        [&] (IRequestContextPtr ctx)" << endl
             << "        {" << endl;
 
@@ -2517,16 +2532,38 @@ void Generator::generateDurableServiceClassDefinition(
 
         ctx.m_out << "                ctx);" << endl;
 
-        ctx.m_out << "            return DurableService::SyncResult(QVariant(";
+        ctx.m_out << "            return DurableService::SyncResult(QVariant";
         if (!isVoidResult) {
-            ctx.m_out << "res";
+            ctx.m_out << "::fromValue(res)";
         }
-        ctx.m_out << "), {});" << endl << endl;
+        else {
+            ctx.m_out << "()";
+        }
+        ctx.m_out << ", {});" << endl
+            << "        });" << endl << endl;
+
+        ctx.m_out << "    auto result = m_durableService.executeSyncRequest("
+            << endl
+            << "        std::move(call), ctx);" << endl << endl;
 
         ctx.m_out << "    return";
-        if (!isVoidResult) {
-            ctx.m_out << " result.value<" << typeToStr(func.m_type, func.m_name)
-                << ">()";
+        if (!isVoidResult)
+        {
+            if (funcReturnTypeName == QStringLiteral("QString")) {
+                ctx.m_out << " result.first.toString()";
+            }
+            else if (funcReturnTypeName == QStringLiteral("QStringList")) {
+                ctx.m_out << " result.first.toStringList()";
+            }
+            else if (funcReturnTypeName == QStringLiteral("QByteArray")) {
+                ctx.m_out << " result.first.toByteArray()";
+            }
+            else if (funcReturnTypeName == QStringLiteral("bool")) {
+                ctx.m_out << " result.first.toBool()";
+            }
+            else {
+                ctx.m_out << " result.first.value<" << funcReturnTypeName << ">()";
+            }
         }
         ctx.m_out << ";" << endl
             << "}" << endl << endl;
@@ -2559,7 +2596,7 @@ void Generator::generateDurableServiceClassDefinition(
             << "    }" << endl << endl;
 
         ctx.m_out << "    AsyncResult * result = "
-            << "new AsyncResult;" << endl;
+            << "m_durableService.newAsyncResult();" << endl;
 
         ctx.m_out << "    auto res = m_service->" << func.m_name << "Async(" << endl;
         for(const auto & param : func.m_params)

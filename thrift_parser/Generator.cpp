@@ -2595,31 +2595,29 @@ void Generator::generateDurableServiceClassDefinition(
             << "        ctx = m_ctx;" << endl
             << "    }" << endl << endl;
 
-        ctx.m_out << "    AsyncResult * result = "
-            << "m_durableService.newAsyncResult();" << endl;
+        ctx.m_out << "    auto call = "
+            << "DurableService::AsyncServiceCall(" << endl
+            << "        [=, service=m_service] (IRequestContextPtr ctx)" << endl
+            << "        {" << endl
+            << "            return service->" << func.m_name << "Async("
+            << endl;
 
-        ctx.m_out << "    auto res = m_service->" << func.m_name << "Async(" << endl;
         for(const auto & param : func.m_params)
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
                 continue;
             }
 
-            ctx.m_out << "        " << param.m_name << "," << endl;
+            ctx.m_out << "                " << param.m_name << "," << endl;
         }
-        ctx.m_out << "        ctx);" << endl;
-        ctx.m_out << "    QObject::connect(res, &AsyncResult::finished," << endl
-            << "        [=] (QVariant result, "
-            << "QSharedPointer<EverCloudExceptionData> error) {" << endl
-            << "            Q_UNUSED(result)" << endl
-            << "            Q_UNUSED(error)" << endl
-            << "            // TODO: implement" << endl
+        ctx.m_out << "                ctx);" << endl
             << "        });" << endl << endl;
 
-        ctx.m_out << "    return result;" << endl;
+        ctx.m_out << "    return m_durableService.executeAsyncRequest("
+            << endl
+            << "        std::move(call), ctx);" << endl << endl;
 
         ctx.m_out << "}" << endl << endl;
-
     }
 }
 

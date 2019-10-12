@@ -1917,7 +1917,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
-        << QStringLiteral("../DurableService.h") << QStringLiteral("Types_io.h")
+        << QStringLiteral("Types_io.h") << QStringLiteral("<DurableService.h>")
         << QStringLiteral("<Helpers.h>") << QStringLiteral("<algorithm>")
         << QStringLiteral("<cmath>");
     sortIncludes(additionalIncludes);
@@ -2011,7 +2011,8 @@ void Generator::generateServiceClassDeclaration(
 
         if (serviceClassType == ServiceClassType::Durable) {
             ctx.m_out << "        m_service(std::move(service))," << endl
-                << "        m_durableService(newRetryPolicy(), ctx)," << endl;
+                << "        m_durableService(newDurableService("
+                << "newRetryPolicy(), ctx))," << endl;
         }
 
         ctx.m_out << "        m_ctx(std::move(ctx))" << endl
@@ -2052,7 +2053,8 @@ void Generator::generateServiceClassDeclaration(
         }
         else {
             ctx.m_out << "        m_service(std::move(service))," << endl
-                << "        m_durableService(newRetryPolicy(), ctx)," << endl;
+                << "        m_durableService(newDurableService("
+                << "newRetryPolicy(), ctx))," << endl;
         }
 
         ctx.m_out << "        m_ctx(std::move(ctx))" << endl
@@ -2158,7 +2160,7 @@ void Generator::generateServiceClassDeclaration(
     }
     else {
         ctx.m_out << "    I" << service.m_name << "Ptr m_service;" << endl;
-        ctx.m_out << "    DurableService m_durableService;" << endl;
+        ctx.m_out << "    IDurableServicePtr m_durableService;" << endl;
     }
 
     ctx.m_out << "    IRequestContextPtr m_ctx;" << endl;
@@ -2506,7 +2508,7 @@ void Generator::generateDurableServiceClassDefinition(
             !func.m_type.dynamicCast<Parser::VoidType>().isNull();
 
         ctx.m_out << "    auto call = "
-            << "DurableService::SyncServiceCall(" << endl
+            << "IDurableService::SyncServiceCall(" << endl
             << "        [&] (IRequestContextPtr ctx)" << endl
             << "        {" << endl;
 
@@ -2532,7 +2534,7 @@ void Generator::generateDurableServiceClassDefinition(
 
         ctx.m_out << "                ctx);" << endl;
 
-        ctx.m_out << "            return DurableService::SyncResult(QVariant";
+        ctx.m_out << "            return IDurableService::SyncResult(QVariant";
         if (!isVoidResult) {
             ctx.m_out << "::fromValue(res)";
         }
@@ -2542,7 +2544,7 @@ void Generator::generateDurableServiceClassDefinition(
         ctx.m_out << ", {});" << endl
             << "        });" << endl << endl;
 
-        ctx.m_out << "    auto result = m_durableService.executeSyncRequest("
+        ctx.m_out << "    auto result = m_durableService->executeSyncRequest("
             << endl
             << "        std::move(call), ctx);" << endl << endl;
 
@@ -2596,7 +2598,7 @@ void Generator::generateDurableServiceClassDefinition(
             << "    }" << endl << endl;
 
         ctx.m_out << "    auto call = "
-            << "DurableService::AsyncServiceCall(" << endl
+            << "IDurableService::AsyncServiceCall(" << endl
             << "        [=, service=m_service] (IRequestContextPtr ctx)" << endl
             << "        {" << endl
             << "            return service->" << func.m_name << "Async("
@@ -2613,7 +2615,7 @@ void Generator::generateDurableServiceClassDefinition(
         ctx.m_out << "                ctx);" << endl
             << "        });" << endl << endl;
 
-        ctx.m_out << "    return m_durableService.executeAsyncRequest("
+        ctx.m_out << "    return m_durableService->executeAsyncRequest("
             << endl
             << "        std::move(call), ctx);" << endl << endl;
 

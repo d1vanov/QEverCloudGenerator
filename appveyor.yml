@@ -79,7 +79,7 @@ after_build:
   - 7z a %DEPLOYMENT_TARGET% *
   - cp %DEPLOYMENT_TARGET% %APPVEYOR_BUILD_FOLDER%
   - cd %APPVEYOR_BUILD_FOLDER%
-  - c:\dev\ciuploadtool\ciuploadtool.exe -suffix="%APPVEYOR_REPO_BRANCH%" %DEPLOYMENT_TARGET%
+  - c:\dev\ciuploadtool\ciuploadtool.exe -verbose -suffix="%APPVEYOR_REPO_BRANCH%" %DEPLOYMENT_TARGET%
 
 artifacts:
   - path: '*.zip'

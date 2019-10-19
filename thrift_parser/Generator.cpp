@@ -2544,9 +2544,15 @@ void Generator::generateDurableServiceClassDefinition(
         ctx.m_out << ", {});" << endl
             << "        });" << endl << endl;
 
+        ctx.m_out << "    // TODO: compose proper description" << endl;
+        ctx.m_out << "    IDurableService::SyncRequest request(" << endl
+            << "        \"" << func.m_name << "\"," << endl
+            << "        {}," << endl
+            << "        std::move(call));" << endl << endl;
+
         ctx.m_out << "    auto result = m_durableService->executeSyncRequest("
             << endl
-            << "        std::move(call), ctx);" << endl << endl;
+            << "        std::move(request), ctx);" << endl << endl;
 
         ctx.m_out << "    return";
         if (!isVoidResult)
@@ -2615,9 +2621,15 @@ void Generator::generateDurableServiceClassDefinition(
         ctx.m_out << "                ctx);" << endl
             << "        });" << endl << endl;
 
+        ctx.m_out << "    // TODO: compose proper description" << endl;
+        ctx.m_out << "    IDurableService::AsyncRequest request(" << endl
+            << "        \"" << func.m_name << "\"," << endl
+            << "        {}," << endl
+            << "        std::move(call));" << endl << endl;
+
         ctx.m_out << "    return m_durableService->executeAsyncRequest("
             << endl
-            << "        std::move(call), ctx);" << endl << endl;
+            << "        std::move(request), ctx);" << endl << endl;
 
         ctx.m_out << "}" << endl << endl;
     }

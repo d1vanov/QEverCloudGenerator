@@ -131,7 +131,7 @@ private:
         const QString & identifier,
         const QString & offset = QString());
 
-    QString fieldToStr(const Parser::Field & field);
+    QString fieldDeclarationToStr(const Parser::Field & field);
 
     enum class MethodType
     {
@@ -145,7 +145,7 @@ private:
 
     QString typeToStr(
         QSharedPointer<Parser::Type> type, const QString & identifier,
-        const MethodType methodType = MethodType::TypeName);
+        const MethodType methodType = MethodType::TypeName) const;
 
     // Other auxiliary methods
 
@@ -165,6 +165,10 @@ private:
 
     void writeEnumerationPrintDefinition(
         QTextStream & out, const Parser::Enumeration & e,
+        const char * printer) const;
+
+    void writeStructPrintDefinition(
+        QTextStream & out, const Parser::Structure & s,
         const char * printer) const;
 
 private:

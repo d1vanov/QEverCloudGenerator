@@ -204,6 +204,85 @@ void Generator::writeEnumerationPrintDefinition(
         << "}" << endl << endl;
 }
 
+void Generator::writeStructPrintDefinition(
+    QTextStream & out, const Parser::Structure & s,
+    const char * printer) const
+{
+    out << printer << " & operator<<(" << endl
+        << "    " << printer << " & out, const "
+        << s.m_name << " & value)" << endl << "{" << endl
+        << "    out << \"" << s.m_name << ": {\\n\";" << endl;
+
+    bool previousOptional = false;
+    for(const auto & f: s.m_fields)
+    {
+        if (f.m_required == Parser::Field::RequiredFlag::Optional)
+        {
+            if (!previousOptional) {
+                out << endl;
+            }
+
+            out << "    if (value." << f.m_name << ".isSet()) {" << endl
+                << "        out << \"    " << f.m_name << " = \"" << endl;
+
+            if (auto mapType = f.m_type.dynamicCast<Parser::MapType>())
+            {
+                out << "            << \"QMap<"
+                    << typeToStr(mapType->m_keyType, {}) << ", "
+                    << typeToStr(mapType->m_valueType, {})
+                    << "> {\";" << endl;
+                out << "        for(const auto & it: toRange(value." << f.m_name
+                    << ".ref())) {" << endl;
+                out << "            out << \"[\" << it.key() << \"] = \" "
+                    << "<< it.value() << \"\\n\";" << endl;
+                out << "        }" << endl;
+            }
+            else if (auto setType = f.m_type.dynamicCast<Parser::SetType>())
+            {
+                out << "            << \"QSet<"
+                    << typeToStr(setType->m_valueType, {}) << "> {\";" << endl;
+                out << "        for(const auto & v: value." << f.m_name
+                    << ".ref()) {" << endl;
+                out << "            out << v;" << endl;
+                out << "        }" << endl;
+            }
+            else if (auto listType = f.m_type.dynamicCast<Parser::ListType>())
+            {
+                out << "            << \"QList<"
+                    << typeToStr(listType->m_valueType, {}) << "> {\";" << endl;
+                out << "        for(const auto & v: value." << f.m_name
+                    << ".ref()) {" << endl;
+                out << "            out << v;" << endl;
+                out << "        }" << endl;
+            }
+            else
+            {
+                out << "            << value."
+                    << f.m_name << ".ref() << \"\\n\";" << endl;
+            }
+
+            out << "    }" << endl
+                << "    else {" << endl
+                << "        out << \"    " << f.m_name << " is not set\\n\";"
+                << endl
+                << "    }" << endl << endl;
+            previousOptional = true;
+        }
+        else
+        {
+            out << "    out << \"    " << f.m_name << " = \"" << endl
+                << "        << \"" << typeToStr(f.m_type, f.m_name) << "\""
+                << " << \"\\n\";" << endl;
+
+            previousOptional = false;
+        }
+    }
+
+    out << "    out << \"}\\n\";" << endl
+        << "    return out;" << endl
+        << "}" << endl << endl;
+}
+
 void Generator::writeHeaderHeader(
     QTextStream & out, const QString & fileName,
     const QStringList & additionalIncludes,
@@ -304,7 +383,7 @@ void Generator::writeBodyFooter(QTextStream & out)
 
 QString Generator::typeToStr(
     QSharedPointer<Parser::Type> type, const QString & identifier,
-    const MethodType methodType)
+    const MethodType methodType) const
 {
     QSharedPointer<Parser::BaseType> baseType =
         type.dynamicCast<Parser::BaseType>();
@@ -780,7 +859,7 @@ QString Generator::valueToStr(
     {
         if (!setType && !listType) {
             throw std::runtime_error(QString::fromUtf8(
-                "List initializer for a unsupported type for (%1)")
+                "List initializer for an unsupported type for (%1)")
                 .arg(identifier).toStdString());
         }
 
@@ -875,7 +954,7 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
     writeBodyFooter(ctx.m_out);
 }
 
-QString Generator::fieldToStr(const Parser::Field & field)
+QString Generator::fieldDeclarationToStr(const Parser::Field & field)
 {
     QString s = typeToStr(field.m_type, field.m_name);
     if (field.m_required == Parser::Field::RequiredFlag::Optional) {
@@ -1486,7 +1565,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 << "public:" << endl;
 
             for(const auto & f : s.m_fields) {
-                ctx.m_out << "    " << fieldToStr(f) << ";" << endl;
+                ctx.m_out << "    " << fieldDeclarationToStr(f) << ";" << endl;
             }
 
             ctx.m_out << endl;
@@ -1527,7 +1606,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                     ctx.m_out << "    /** NOT DOCUMENTED */" << endl;
                 }
 
-                ctx.m_out << "    " << fieldToStr(f) << ";" << endl;
+                ctx.m_out << "    " << fieldDeclarationToStr(f) << ";" << endl;
             }
         }
 
@@ -1566,6 +1645,14 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         ctx.m_out << "    }" << endl << endl;
 
         ctx.m_out << "};" << endl << endl;
+
+        ctx.m_out << "QEVERCLOUD_EXPORT QTextStream & operator <<(" << endl
+            << "    QTextStream & strm, const " << s.m_name << " & value);"
+            << endl << endl;
+
+        ctx.m_out << "QEVERCLOUD_EXPORT QDebug & operator <<(" << endl
+            << "    QDebug & dbg, const " << s.m_name << " & value);"
+            << endl << endl;
     }
 
     QStringList extraLinesOutsideNamespace;
@@ -1738,6 +1825,12 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
             }
         }
         ctx.m_out << "}" << endl << endl;
+
+        ctx.m_out << blockSeparator << endl << endl;
+        writeStructPrintDefinition(ctx.m_out, s, "QTextStream");
+        ctx.m_out << blockSeparator << endl << endl;
+        writeStructPrintDefinition(ctx.m_out, s, "QDebug");
+        ctx.m_out << blockSeparator << endl << endl;
     }
     ctx.m_out << endl;
 
@@ -2544,11 +2637,42 @@ void Generator::generateDurableServiceClassDefinition(
         ctx.m_out << ", {});" << endl
             << "        });" << endl << endl;
 
-        ctx.m_out << "    // TODO: compose proper description" << endl;
+        bool requestDescriptionIsEmpty = false;
+        if (func.m_params.isEmpty() ||
+            ((func.m_params.size() == 1) &&
+             (func.m_params[0].m_name == QStringLiteral("authenticationToken"))))
+        {
+            requestDescriptionIsEmpty = true;
+        }
+        else
+        {
+            ctx.m_out << "    QString requestDescription;" << endl
+                      << "    QTextStream strm(&requestDescription);" << endl;
+
+            for(const auto & param: qAsConst(func.m_params))
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    continue;
+                }
+
+                ctx.m_out << "    strm << \"" << param.m_name << " = \" << "
+                          << param.m_name << " << \"\\n\";" << endl;
+            }
+            ctx.m_out << endl;
+        }
+
         ctx.m_out << "    IDurableService::SyncRequest request(" << endl
-            << "        \"" << func.m_name << "\"," << endl
-            << "        {}," << endl
-            << "        std::move(call));" << endl << endl;
+            << "        \"" << func.m_name << "\"," << endl;
+
+        if (!requestDescriptionIsEmpty) {
+            ctx.m_out << "        requestDescription," << endl;
+        }
+        else {
+            ctx.m_out << "        {}," << endl;
+        }
+
+        ctx.m_out << "        std::move(call));" << endl << endl;
 
         ctx.m_out << "    auto result = m_durableService->executeSyncRequest("
             << endl
@@ -2621,11 +2745,35 @@ void Generator::generateDurableServiceClassDefinition(
         ctx.m_out << "                ctx);" << endl
             << "        });" << endl << endl;
 
-        ctx.m_out << "    // TODO: compose proper description" << endl;
+        if (!requestDescriptionIsEmpty)
+        {
+            ctx.m_out << "    QString requestDescription;" << endl
+                      << "    QTextStream strm(&requestDescription);" << endl;
+
+            for(const auto & param: qAsConst(func.m_params))
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    continue;
+                }
+
+                ctx.m_out << "    strm << \"" << param.m_name << " = \" << "
+                          << param.m_name << " << \"\\n\";" << endl;
+            }
+            ctx.m_out << endl;
+        }
+
         ctx.m_out << "    IDurableService::AsyncRequest request(" << endl
-            << "        \"" << func.m_name << "\"," << endl
-            << "        {}," << endl
-            << "        std::move(call));" << endl << endl;
+            << "        \"" << func.m_name << "\"," << endl;
+
+        if (!requestDescriptionIsEmpty) {
+            ctx.m_out  << "        requestDescription," << endl;
+        }
+        else {
+            ctx.m_out << "        {}," << endl;
+        }
+
+        ctx.m_out  << "        std::move(call));" << endl << endl;
 
         ctx.m_out << "    return m_durableService->executeAsyncRequest("
             << endl

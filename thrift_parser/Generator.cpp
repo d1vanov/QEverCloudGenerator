@@ -135,6 +135,29 @@ QString Generator::clearTypedef(const QString & s) const
     return s;
 }
 
+QList<Parser::Field> Generator::loggableFields(
+    const QList<Parser::Field> & fields) const
+{
+    QList<Parser::Field> result;
+    result.reserve(fields.size());
+
+    for(const auto & field: fields)
+    {
+        if ( (field.m_name == QStringLiteral("authenticationToken")) ||
+             (field.m_name == QStringLiteral("consumerKey")) ||
+             (field.m_name == QStringLiteral("consumerSecret")) ||
+             (field.m_name == QStringLiteral("password")) ||
+             (field.m_name == QStringLiteral("oneTimeCode")) )
+        {
+            continue;
+        }
+
+        result.push_back(field);
+    }
+
+    return result;
+}
+
 void Generator::writeEnumeration(
     QTextStream & out, const Parser::Enumeration & e) const
 {
@@ -2010,9 +2033,9 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<DurableService.h>")
-        << QStringLiteral("<Helpers.h>") << QStringLiteral("<algorithm>")
-        << QStringLiteral("<cmath>");
+        << QStringLiteral("Types_io.h") << QStringLiteral("<Log.h>")
+        << QStringLiteral("<DurableService.h>") << QStringLiteral("<Helpers.h>")
+        << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
     sortIncludes(additionalIncludes);
 
     writeHeaderBody(ctx.m_out, QStringLiteral("Services.h"), additionalIncludes);
@@ -2638,9 +2661,9 @@ void Generator::generateDurableServiceClassDefinition(
             << "        });" << endl << endl;
 
         bool requestDescriptionIsEmpty = false;
-        if (func.m_params.isEmpty() ||
-            ((func.m_params.size() == 1) &&
-             (func.m_params[0].m_name == QStringLiteral("authenticationToken"))))
+        auto loggableParams = loggableFields(func.m_params);
+
+        if (loggableParams.isEmpty())
         {
             requestDescriptionIsEmpty = true;
         }
@@ -2649,17 +2672,16 @@ void Generator::generateDurableServiceClassDefinition(
             ctx.m_out << "    QString requestDescription;" << endl
                       << "    QTextStream strm(&requestDescription);" << endl;
 
-            for(const auto & param: qAsConst(func.m_params))
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
+            ctx.m_out << "    if (auto log = logger(); "
+                << "log->shouldLog(LogLevel::Trace, \"durable_service\")) {"
+                << endl;
 
-                ctx.m_out << "    strm << \"" << param.m_name << " = \" << "
+            for(const auto & param: qAsConst(loggableParams))
+            {
+                ctx.m_out << "        strm << \"" << param.m_name << " = \" << "
                           << param.m_name << " << \"\\n\";" << endl;
             }
-            ctx.m_out << endl;
+            ctx.m_out << "    }" << endl << endl;
         }
 
         ctx.m_out << "    IDurableService::SyncRequest request(" << endl
@@ -2750,17 +2772,16 @@ void Generator::generateDurableServiceClassDefinition(
             ctx.m_out << "    QString requestDescription;" << endl
                       << "    QTextStream strm(&requestDescription);" << endl;
 
-            for(const auto & param: qAsConst(func.m_params))
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
+            ctx.m_out << "    if (auto log = logger(); "
+                << "log->shouldLog(LogLevel::Trace, \"durable_service\")) {"
+                << endl;
 
-                ctx.m_out << "    strm << \"" << param.m_name << " = \" << "
+            for(const auto & param: qAsConst(loggableParams))
+            {
+                ctx.m_out << "        strm << \"" << param.m_name << " = \" << "
                           << param.m_name << " << \"\\n\";" << endl;
             }
-            ctx.m_out << endl;
+            ctx.m_out << "    }" << endl << endl;
         }
 
         ctx.m_out << "    IDurableService::AsyncRequest request(" << endl

@@ -154,6 +154,14 @@ private:
     QString clearInclude(const QString & s) const;
     QString clearTypedef(const QString & s) const;
 
+    /**
+     * @brief loggableFields - filters out fields like authentication token,
+     * consumer key, consumer secret etc which should not be present in the log
+     * @param fields - fields to be filtered for logging
+     * @return the list of non-secret fields which can be put into a log entry
+     */
+    QList<Parser::Field> loggableFields(const QList<Parser::Field> & fields) const;
+
     // Write methods for particular parsed fields
 
     void writeEnumeration(

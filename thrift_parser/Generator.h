@@ -176,8 +176,7 @@ private:
         const char * printer) const;
 
     void writeStructPrintDefinition(
-        QTextStream & out, const Parser::Structure & s,
-        const char * printer) const;
+        QTextStream & out, const Parser::Structure & s) const;
 
 private:
     QStringList m_includeList;

@@ -162,6 +162,8 @@ private:
      */
     QList<Parser::Field> loggableFields(const QList<Parser::Field> & fields) const;
 
+    QString camelCaseToSnakeCase(const QString & input) const;
+
     // Write methods for particular parsed fields
 
     void writeEnumeration(

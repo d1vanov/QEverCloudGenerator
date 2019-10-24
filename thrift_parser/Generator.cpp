@@ -158,6 +158,21 @@ QList<Parser::Field> Generator::loggableFields(
     return result;
 }
 
+QString Generator::camelCaseToSnakeCase(const QString & input) const
+{
+    QString result;
+
+    for(auto it = input.begin(), end = input.end(); it != end; ++it) {
+        if (it->isUpper() && it != input.begin()) {
+            result += QStringLiteral("_");
+        }
+
+        result += it->toLower();
+    }
+
+    return result;
+}
+
 void Generator::writeEnumeration(
     QTextStream & out, const Parser::Enumeration & e) const
 {
@@ -2361,6 +2376,31 @@ void Generator::generateServiceClassDefinition(
 
         ctx.m_out << ")" << endl;
         ctx.m_out << "{" << endl;
+
+        auto logComponentName = camelCaseToSnakeCase(service.m_name);
+
+        ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
+            << prepareParamsName << "\");" << endl;
+        auto loggableParams = loggableFields(f.m_params);
+        if (!loggableParams.isEmpty())
+        {
+            ctx.m_out << "    QEC_TRACE(\"" << logComponentName
+                << "\", \"Parameters:\\n\"" << endl;
+            auto lastLoggableParamId = loggableParams.last().m_id;
+            for(const auto & param: loggableParams)
+            {
+                ctx.m_out << "        << \"    " << param.m_name << " = \" << "
+                    << param.m_name;
+                if (param.m_id == lastLoggableParamId) {
+                    ctx.m_out << ");" << endl;
+                }
+                else {
+                    ctx.m_out << " << \"\\n\"" << endl;
+                }
+            }
+        }
+
+        ctx.m_out << endl;
         ctx.m_out << "    ThriftBinaryBufferWriter w;" << endl;
         ctx.m_out << "    qint32 cseqid = 0;" << endl;
         ctx.m_out << "    w.writeMessageBegin(" << endl;
@@ -2384,6 +2424,11 @@ void Generator::generateServiceClassDefinition(
                       : typeToStr(f.m_type, f.m_name))
             << " " << readReplyName << "(QByteArray reply)" << endl;
         ctx.m_out << "{" << endl;
+
+        ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
+            << readReplyName << "\");" << endl;
+
+        ctx.m_out << endl;
 
         if (!isVoidResult) {
             ctx.m_out << "    bool resultIsSet = false;" << endl
@@ -2546,6 +2591,27 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << ")" << endl
             << "{" << endl;
 
+        ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
+            << service.m_name << "::" << f.m_name << "\");" << endl;
+        if (!loggableParams.isEmpty())
+        {
+            ctx.m_out << "    QEC_TRACE(\"" << logComponentName
+                << "\", \"Parameters:\\n\"" << endl;
+            auto lastLoggableParamId = loggableParams.last().m_id;
+            for(const auto & param: loggableParams)
+            {
+                ctx.m_out << "        << \"    " << param.m_name << " = \" << "
+                    << param.m_name;
+                if (param.m_id == lastLoggableParamId) {
+                    ctx.m_out << ");" << endl;
+                }
+                else {
+                    ctx.m_out << " << \"\\n\"" << endl;
+                }
+            }
+        }
+
+        ctx.m_out << endl;
         ctx.m_out << "    if (!ctx) {" << endl
             << "        ctx = m_ctx;" << endl
             << "    }" << endl;
@@ -2600,6 +2666,27 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << ")" << endl
             << "{" << endl;
 
+        ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
+            << service.m_name << "::" << f.m_name << "Async\");" << endl;
+        if (!loggableParams.isEmpty())
+        {
+            ctx.m_out << "    QEC_TRACE(\"" << logComponentName
+                << "\", \"Parameters:\\n\"" << endl;
+            auto lastLoggableParamId = loggableParams.last().m_id;
+            for(const auto & param: loggableParams)
+            {
+                ctx.m_out << "        << \"    " << param.m_name << " = \" << "
+                    << param.m_name;
+                if (param.m_id == lastLoggableParamId) {
+                    ctx.m_out << ");" << endl;
+                }
+                else {
+                    ctx.m_out << " << \"\\n\"" << endl;
+                }
+            }
+        }
+
+        ctx.m_out << endl;
         ctx.m_out << "    if (!ctx) {" << endl
             << "        ctx = m_ctx;" << endl
             << "    }" << endl;

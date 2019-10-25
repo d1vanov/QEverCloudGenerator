@@ -2613,10 +2613,12 @@ void Generator::generateServiceClassDefinition(
                 ctx.m_out << "," << endl;
             }
         }
-        ctx.m_out << ");" << endl;
+        ctx.m_out << ");" << endl << endl;
 
-        ctx.m_out << "    QByteArray reply = askEvernote(m_url, params);"
-            << endl;
+        ctx.m_out << "    QByteArray reply = askEvernote(" << endl
+            << "        m_url," << endl
+            << "        params," << endl
+            << "        ctx->requestTimeout());" << endl << endl;
         if (isVoidResult) {
             ctx.m_out << "    " << readReplyName << "(reply);" << endl;
         }
@@ -2671,7 +2673,7 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << endl;
         ctx.m_out << "    if (!ctx) {" << endl
             << "        ctx = m_ctx;" << endl
-            << "    }" << endl;
+            << "    }" << endl << endl;
 
         ctx.m_out << "    QByteArray params = " << prepareParamsName << "("
             << endl;
@@ -2688,9 +2690,12 @@ void Generator::generateServiceClassDefinition(
                 ctx.m_out << "," << endl;
             }
         }
-        ctx.m_out << ");" << endl
-            << "    return new AsyncResult(m_url, params, "
-            << asyncReadFunctionName << ");" << endl;
+        ctx.m_out << ");" << endl << endl
+            << "    return new AsyncResult(" << endl
+            << "        m_url," << endl
+            << "        params," << endl
+            << "        ctx->requestTimeout()," << endl
+            << "        " << asyncReadFunctionName << ");" << endl;
 
         ctx.m_out << "}" << endl << endl;
     }

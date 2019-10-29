@@ -1535,11 +1535,11 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("EDAMErrorCode.h") << QStringLiteral("Printable.h")
-        << QStringLiteral("../Optional.h") << QStringLiteral("<QSharedPointer>")
-        << QStringLiteral("<QMetaType>") << QStringLiteral("<QList>")
-        << QStringLiteral("<QMap>") << QStringLiteral("<QSet>")
-        << QStringLiteral("<QStringList>") << QStringLiteral("<QByteArray>")
-        << QStringLiteral("<QDateTime>") << QStringLiteral("<QMetaType>");
+        << QStringLiteral("../Optional.h") << QStringLiteral("<QMetaType>")
+        << QStringLiteral("<QList>") << QStringLiteral("<QMap>")
+        << QStringLiteral("<QSet>") << QStringLiteral("<QStringList>")
+        << QStringLiteral("<QByteArray>") << QStringLiteral("<QDateTime>")
+        << QStringLiteral("<QMetaType>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
@@ -1666,8 +1666,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
             ctx.m_out << "    const char * what() const throw() override;"
                 << endl;
-            ctx.m_out << "    virtual QSharedPointer<"
-                << "EverCloudExceptionData> exceptionData() "
+            ctx.m_out << "    virtual EverCloudExceptionDataPtr exceptionData() "
                 << "const override;" << endl << endl;
             ctx.m_out << "    virtual void print(QTextStream & strm) const override;"
                 << endl;

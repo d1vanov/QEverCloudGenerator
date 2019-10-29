@@ -1236,7 +1236,7 @@ void Generator::writeThriftReadField(
             MethodType::ThriftFieldType);
 
         out << indent << "qint32 size;" << endl;
-        out << indent << "ThriftFieldType::type elemType;" << endl;
+        out << indent << "ThriftFieldType elemType;" << endl;
         out << indent << "r.readListBegin(elemType, size);" << endl;
         out << indent << "v.reserve(size);" << endl;
         out << indent << "if (elemType != " << valueThriftType
@@ -1269,7 +1269,7 @@ void Generator::writeThriftReadField(
             valueType, identPrefix + field.m_name, MethodType::ThriftFieldType);
 
         out << indent << "qint32 size;" << endl;
-        out << indent << "ThriftFieldType::type elemType;" << endl;
+        out << indent << "ThriftFieldType elemType;" << endl;
         out << indent << "r.readSetBegin(elemType, size);" << endl;
         out << indent << "v.reserve(size);" << endl;
         out << indent << "if (elemType != " << valueThriftType
@@ -1310,8 +1310,8 @@ void Generator::writeThriftReadField(
             valueType, identPrefix + field.m_name, MethodType::ThriftFieldType);
 
         out << indent << "qint32 size;" << endl;
-        out << indent << "ThriftFieldType::type keyType;" << endl;
-        out << indent << "ThriftFieldType::type elemType;" << endl;
+        out << indent << "ThriftFieldType keyType;" << endl;
+        out << indent << "ThriftFieldType elemType;" << endl;
         out << indent << "r.readMapBegin(keyType, elemType, size);" << endl;
         out << indent << "if (keyType != " << keyThriftType
             << ") throw ThriftException(ThriftException::Type::"
@@ -1841,7 +1841,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
             << "(" << endl << "    ThriftBinaryBufferReader & r," << endl
             << "    " << s.m_name << " & s)" << endl << "{" << endl;
         ctx.m_out << "    QString fname;" << endl;
-        ctx.m_out << "    ThriftFieldType::type fieldType;" << endl;
+        ctx.m_out << "    ThriftFieldType fieldType;" << endl;
         ctx.m_out << "    qint16 fieldId;" << endl;
 
         for(const auto & field : s.m_fields)
@@ -2419,7 +2419,7 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << "    ThriftBinaryBufferReader r(reply);" << endl
             << "    qint32 rseqid = 0;" << endl
             << "    QString fname;" << endl
-            << "    ThriftMessageType::type mtype;" << endl
+            << "    ThriftMessageType mtype;" << endl
             << "    r.readMessageBegin(fname, mtype, rseqid);" << endl
             << "    if (mtype == ThriftMessageType::T_EXCEPTION) {" << endl
             << "        ThriftException e = readThriftException(r);" << endl
@@ -2440,7 +2440,7 @@ void Generator::generateServiceClassDefinition(
             << "WRONG_METHOD_NAME);" << endl
             << "    }" << endl << endl;
 
-        ctx.m_out << "    ThriftFieldType::type fieldType;" << endl
+        ctx.m_out << "    ThriftFieldType fieldType;" << endl
             << "    qint16 fieldId;" << endl
             << "    r.readStructBegin(fname);" << endl
             << "    while(true) {" << endl

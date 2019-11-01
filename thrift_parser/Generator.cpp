@@ -2443,11 +2443,12 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << "    ThriftFieldType fieldType;" << endl
             << "    qint16 fieldId;" << endl
             << "    r.readStructBegin(fname);" << endl
-            << "    while(true) {" << endl
-            << "        r.readFieldBegin(fname, fieldType, fieldId);"
-            << endl
-            << "        if (fieldType == ThriftFieldType::T_STOP) break;"
-            << endl;
+            << "    while(true)" << endl
+            << "    {" << endl
+            << "        r.readFieldBegin(fname, fieldType, fieldId);" << endl
+            << "        if (fieldType == ThriftFieldType::T_STOP) {" << endl
+            << "            break;" << endl
+            << "        }" << endl << endl;
 
         if (!isVoidResult)
         {
@@ -2457,7 +2458,8 @@ void Generator::generateServiceClassDefinition(
             result.m_required = Parser::Field::RequiredFlag::Required;
             result.m_type = f.m_type;
 
-            ctx.m_out << "        if (fieldId == 0) {" << endl
+            ctx.m_out << "        if (fieldId == 0)" << endl
+                << "        {" << endl
                 << "            if (fieldType == "
                 << typeToStr(
                     f.m_type, f.m_name, MethodType::ThriftFieldType)
@@ -2468,7 +2470,8 @@ void Generator::generateServiceClassDefinition(
                 ctx.m_out, result, f.m_name + QStringLiteral("."),
                 QLatin1Literal(""));
 
-            ctx.m_out << "            } else {" << endl
+            ctx.m_out << "            }" << endl
+                << "            else {" << endl
                 << "                r.skip(fieldType);" << endl
                 << "            }" << endl
                 << "        }" << endl;
@@ -2482,11 +2485,11 @@ void Generator::generateServiceClassDefinition(
                 ctx.m_out << "        ";
             }
             else {
-                ctx.m_out << "       else ";
+                ctx.m_out << "        else ";
             }
 
-            ctx.m_out << "if (fieldId == "  << th.m_id
-                << ") {" << endl;
+            ctx.m_out << "if (fieldId == "  << th.m_id << ")" << endl
+                << "        {" << endl;
 
             QString exceptionType = typeToStr(
                 th.m_type, f.m_name + QStringLiteral(", ") + th.m_name);
@@ -2512,14 +2515,15 @@ void Generator::generateServiceClassDefinition(
                 << "        }" << endl;
         }
 
-        ctx.m_out << "        else {" << endl
+        ctx.m_out << "        else" << endl
+            << "        {" << endl
             << "            r.skip(fieldType);" << endl
-            << "        }" << endl
+            << "        }" << endl << endl
             << "        r.readFieldEnd();" << endl
-            << "    }" << endl
+            << "    }" << endl << endl
             << "    r.readStructEnd();" << endl;
 
-        ctx.m_out << "    r.readMessageEnd();" << endl;
+        ctx.m_out << "    r.readMessageEnd();" << endl << endl;
 
         if (!isVoidResult) {
             ctx.m_out << "    if (!resultIsSet) {" << endl
@@ -2528,7 +2532,7 @@ void Generator::generateServiceClassDefinition(
                 << "MISSING_RESULT," << endl
                 << "            QStringLiteral(\""
                 << f.m_name << ": missing result\"));" << endl
-                << "    }" << endl
+                << "    }" << endl << endl
                 << "    return result;" << endl;
         }
 

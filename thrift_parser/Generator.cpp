@@ -2149,6 +2149,47 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     ctx.m_out << "#include <Services.moc>" << endl;
 }
 
+void Generator::generateServerHeader(Parser * parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Server.h");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
+
+    QStringList additionalIncludes = QStringList()
+        << QStringLiteral("../RequestContext.h")
+        << QStringLiteral("../Optional.h")
+        << QStringLiteral("Constants.h")
+        << QStringLiteral("Types.h")
+        << QStringLiteral("<QObject>");
+    sortIncludes(additionalIncludes);
+
+    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
+
+    const auto & services = parser->services();
+    for(const auto & s: services)
+    {
+        if (!s.m_extends.isEmpty()) {
+            throw std::runtime_error("extending services is not supported");
+        }
+
+        ctx.m_out << blockSeparator << endl << endl;
+
+        ctx.m_out << "/**" << endl
+            << " * @brief The " << s.m_name << "Server class represents " << endl
+            << " * customizable server for " << s.m_name << " requests. " << endl
+            << " * It is primarily used for testing of QEverCloud" << endl
+            << " */" << endl;
+
+        ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
+            << "Server: public QObject" << endl << "{" << endl;
+        ctx.m_out << "    Q_OBJECT" << endl;
+        ctx.m_out << "    Q_DISABLE_COPY(" << s.m_name << "Server)" << endl;
+
+        // TODO: generate actual class declaration
+
+        ctx.m_out << "};" << endl << endl;
+    }
+}
+
 void Generator::generateServiceClassDeclaration(
     const Parser::Service & service,
     const ServiceClassType serviceClassType,

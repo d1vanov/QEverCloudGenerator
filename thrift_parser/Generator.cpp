@@ -1666,8 +1666,8 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
             ctx.m_out << "    const char * what() const throw() override;"
                 << endl;
-            ctx.m_out << "    virtual EverCloudExceptionDataPtr exceptionData() "
-                << "const override;" << endl << endl;
+            ctx.m_out << "    virtual QSharedPointer<EverCloudExceptionData> "
+                << "exceptionData() const override;" << endl << endl;
             ctx.m_out << "    virtual void print(QTextStream & strm) const override;"
                 << endl;
         }
@@ -2035,7 +2035,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
         }
 
         ctx.m_out << "};" << endl << endl;
-        ctx.m_out << "using I" << s.m_name << "Ptr = std::shared_ptr<I"
+        ctx.m_out << "using I" << s.m_name << "Ptr = QSharedPointer<I"
             << s.m_name << ">;" << endl << endl;
     }
 

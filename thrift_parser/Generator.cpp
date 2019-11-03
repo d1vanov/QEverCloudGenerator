@@ -2301,6 +2301,12 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
                 throw std::runtime_error("oneway functions are not supported");
             }
 
+            ctx.m_out << blockSeparator << endl << endl;
+
+            ctx.m_out << "void parse" << capitalize(s.m_name)
+                << capitalize(func.m_name) << "Params(" << endl
+                << "    ThriftBinaryBufferReader & r," << endl;
+
             bool hasParams = false;
             if (!func.m_params.isEmpty())
             {
@@ -2313,31 +2319,6 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
                 {
                     hasParams = true;
                 }
-            }
-
-            if (!hasParams) {
-                continue;
-            }
-
-            ctx.m_out << blockSeparator << endl << endl;
-
-            ctx.m_out << "void parse" << capitalize(s.m_name)
-                << capitalize(func.m_name) << "Params(" << endl
-                << "    ThriftBinaryBufferReader & r";
-
-            ctx.m_out << "," << endl;
-
-            int lastId = -1;
-            for(int i = func.m_params.size() - 1; i >= 0; --i)
-            {
-                const auto & param = func.m_params.at(i);
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                lastId = param.m_id;
-                break;
             }
 
             for(const auto & param: func.m_params)
@@ -2358,14 +2339,11 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
                     paramType += QStringLiteral(" &");
                 }
 
-                ctx.m_out << "    " << paramType << " " << param.m_name;
-
-                if (param.m_id != lastId) {
-                    ctx.m_out << "," << endl;
-                }
+                ctx.m_out << "    " << paramType << " " << param.m_name
+                    << "," << endl;
             }
 
-            ctx.m_out << ")" << endl
+            ctx.m_out << "    IRequestContextPtr ctx)" << endl
                 << "{" << endl
                 << "    // TODO: implement" << endl
                 << "    Q_UNUSED(r)" << endl;
@@ -2379,6 +2357,8 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
 
                 ctx.m_out << "    Q_UNUSED(" << param.m_name << ")" << endl;
             }
+
+            ctx.m_out << "    Q_UNUSED(ctx)" << endl;
 
             ctx.m_out  << "}" << endl << endl;
         }
@@ -2439,33 +2419,12 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
                 ++paramCount;
             }
 
-            if (!paramCount) {
-                ctx.m_out << "        // TODO: parse ctx" << endl;
-                ctx.m_out << "        IRequestContextPtr ctx;" << endl;
-                ctx.m_out << "        Q_EMIT " << func.m_name << "Request(ctx);";
-                ctx.m_out << endl;
-                ctx.m_out << "    }" << endl;
-                firstFunc = false;
-                continue;
-            }
+            ctx.m_out << "        IRequestContextPtr ctx;" << endl;
 
             ctx.m_out << "        parse" << capitalize(s.m_name)
                 << capitalize(func.m_name) << "Params(" << endl;
 
             ctx.m_out << "            r," << endl;
-
-            int lastId = -1;
-            for(int i = func.m_params.size() - 1; i >= 0; --i)
-            {
-                const auto & param = func.m_params.at(i);
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                lastId = param.m_id;
-                break;
-            }
 
             for(const auto & param: func.m_params)
             {
@@ -2474,16 +2433,11 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
                     continue;
                 }
 
-                ctx.m_out << "            " << param.m_name;
-                if (param.m_id != lastId) {
-                    ctx.m_out << "," << endl;
-                }
+                ctx.m_out << "            " << param.m_name << "," << endl;
             }
 
-            ctx.m_out << ");" << endl << endl;
+            ctx.m_out << "            ctx);" << endl << endl;
 
-            ctx.m_out << "        // TODO: parse ctx" << endl;
-            ctx.m_out << "        IRequestContextPtr ctx;" << endl;
             ctx.m_out << "        Q_EMIT " << func.m_name << "Request(" << endl;
 
             for(const auto & param: func.m_params)

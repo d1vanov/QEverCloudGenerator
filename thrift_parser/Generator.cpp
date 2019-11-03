@@ -173,6 +173,23 @@ QString Generator::camelCaseToSnakeCase(const QString & input) const
     return result;
 }
 
+QString Generator::capitalize(const QString & input) const
+{
+    if (input.isEmpty()) {
+        return input;
+    }
+
+    QString result;
+    result.reserve(input.size());
+
+    result.push_back(input.at(0).toUpper());
+    for(int i = 1, size = input.size(); i < size; ++i) {
+        result.push_back(input.at(i));
+    }
+
+    return result;
+}
+
 void Generator::writeEnumeration(
     QTextStream & out, const Parser::Enumeration & e) const
 {
@@ -2002,7 +2019,10 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
                 ctx.m_out << "," << endl;
             }
 
-            ctx.m_out << "        IRequestContextPtr ctx = {}";
+            if (!func.m_params.isEmpty()) {
+                ctx.m_out << "        ";
+            }
+            ctx.m_out << "IRequestContextPtr ctx = {}";
             ctx.m_out << ") = 0;" << endl << endl;
 
             ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
@@ -2151,7 +2171,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
 
 void Generator::generateServerHeader(Parser * parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("Server.h");
+    const QString fileName = QStringLiteral("Servers.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     QStringList additionalIncludes = QStringList()
@@ -2159,7 +2179,8 @@ void Generator::generateServerHeader(Parser * parser, const QString & outPath)
         << QStringLiteral("../Optional.h")
         << QStringLiteral("Constants.h")
         << QStringLiteral("Types.h")
-        << QStringLiteral("<QObject>");
+        << QStringLiteral("<QObject>")
+        << QStringLiteral("<functional>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
@@ -2184,10 +2205,129 @@ void Generator::generateServerHeader(Parser * parser, const QString & outPath)
         ctx.m_out << "    Q_OBJECT" << endl;
         ctx.m_out << "    Q_DISABLE_COPY(" << s.m_name << "Server)" << endl;
 
-        // TODO: generate actual class declaration
+        ctx.m_out << "public:" << endl
+            << "    explicit " << s.m_name << "Server(QObject * parent = nullptr);"
+            << endl << endl;
+
+        ctx.m_out << "Q_SIGNALS:" << endl;
+        ctx.m_out << "    // Signals notifying listeners about incoming requests"
+            << endl;
+        for(const auto & func: qAsConst(s.m_functions))
+        {
+            if (func.m_isOneway) {
+                throw std::runtime_error("oneway functions are not supported");
+            }
+
+            ctx.m_out << "    void " << func.m_name << "Request(";
+            if (!func.m_params.isEmpty()) {
+                ctx.m_out << endl;
+            }
+
+            for(const auto & param: qAsConst(func.m_params))
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    continue;
+                }
+
+                ctx.m_out << "        ";
+
+                auto paramType = typeToStr(
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                if (paramType.startsWith(QStringLiteral("const "))) {
+                    paramType = paramType.mid(6);
+                }
+                if (paramType.endsWith(QStringLiteral(" &"))) {
+                    paramType = paramType.mid(0, paramType.size() - 2);
+                }
+                ctx.m_out << paramType << " " << param.m_name << "," << endl;
+            }
+
+            if (!func.m_params.isEmpty()) {
+                ctx.m_out << "        ";
+            }
+            ctx.m_out << "IRequestContextPtr ctx);" << endl << endl;
+        }
+
+        ctx.m_out << "public Q_SLOTS:" << endl;
+        ctx.m_out << "    // Slot used to deliver requests to the server" << endl
+            << "    void onRequest(QByteArray data);" << endl << endl;
+
+        for(const auto & func: qAsConst(s.m_functions))
+        {
+            if (func.m_isOneway) {
+                throw std::runtime_error("oneway functions are not supported");
+            }
+
+            ctx.m_out << "    void on" << capitalize(func.m_name) << "RequestReady(";
+            auto responseType = typeToStr(func.m_type, func.m_name);
+            if (responseType != QStringLiteral("void")) {
+                ctx.m_out << responseType << " value";
+            }
+            ctx.m_out << ");" << endl;
+        }
 
         ctx.m_out << "};" << endl << endl;
     }
+
+    writeHeaderFooter(ctx.m_out, fileName);
+}
+
+void Generator::generateServerCpp(Parser * parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Servers.cpp");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
+
+    writeHeaderBody(ctx.m_out, QStringLiteral("Servers.h"));
+
+    const auto & services = parser->services();
+
+    for(const auto & s: services)
+    {
+        if (!s.m_extends.isEmpty()) {
+            throw std::runtime_error("extending services is not supported");
+        }
+
+        ctx.m_out << blockSeparator << endl << endl;
+
+        ctx.m_out << s.m_name << "Server::" << s.m_name
+            << "Server(QObject * parent) :" << endl
+            << "    QObject(parent)" << endl
+            << "{}" << endl << endl;
+
+        ctx.m_out << "void " << s.m_name << "Server::onRequest(QByteArray data)" << endl
+            << "{" << endl
+            << "    // TODO: implement" << endl
+            << "    Q_UNUSED(data)" << endl
+            << "}" << endl
+            << endl;
+
+        for(const auto & func: qAsConst(s.m_functions))
+        {
+            if (func.m_isOneway) {
+                throw std::runtime_error("oneway functions are not supported");
+            }
+
+            ctx.m_out << "void " << s.m_name << "Server::on"
+                << capitalize(func.m_name) << "RequestReady(";
+
+            auto responseType = typeToStr(func.m_type, func.m_name);
+            if (responseType != QStringLiteral("void")) {
+                ctx.m_out << responseType << " value";
+            }
+            ctx.m_out << ")" << endl << "{" << endl
+                << "    // TODO: implement" << endl;
+
+            if (responseType != QStringLiteral("void")) {
+                ctx.m_out << "    Q_UNUSED(value)" << endl;
+            }
+            ctx.m_out << "}" << endl << endl;
+        }
+    }
+
+    writeBodyFooter(ctx.m_out);
 }
 
 void Generator::generateServiceClassDeclaration(
@@ -3020,5 +3160,8 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
 
     generateServicesHeader(parser, outPath);
     generateServicesCpp(parser, outPath);
+
+    generateServerHeader(parser, outPath);
+    generateServerCpp(parser, outPath);
 }
 

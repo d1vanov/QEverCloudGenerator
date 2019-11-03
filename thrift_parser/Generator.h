@@ -72,6 +72,7 @@ private:
     void generateServicesCpp(Parser * parser, const QString & outPath);
 
     void generateServerHeader(Parser * parser, const QString & outPath);
+    void generateServerCpp(Parser * parser, const QString & outPath);
 
     enum class ServiceClassType
     {
@@ -165,6 +166,8 @@ private:
     QList<Parser::Field> loggableFields(const QList<Parser::Field> & fields) const;
 
     QString camelCaseToSnakeCase(const QString & input) const;
+
+    QString capitalize(const QString & input) const;
 
     // Write methods for particular parsed fields
 

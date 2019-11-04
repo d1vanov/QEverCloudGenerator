@@ -515,10 +515,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("bool");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeBool(");
+                result = QStringLiteral("writer.writeBool(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readBool(");
+                result = QStringLiteral("reader.readBool(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_BOOL");
@@ -538,10 +538,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("QString");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeString(");
+                result = QStringLiteral("writer.writeString(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readString(");
+                result = QStringLiteral("reader.readString(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_STRING");
@@ -562,10 +562,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("double");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeDouble(");
+                result = QStringLiteral("writer.writeDouble(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readDouble(");
+                result = QStringLiteral("reader.readDouble(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_DOUBLE");
@@ -586,10 +586,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("QByteArray");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeBinary(");
+                result = QStringLiteral("writer.writeBinary(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readBinary(");
+                result = QStringLiteral("reader.readBinary(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_STRING");
@@ -610,10 +610,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("quint8");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeByte(");
+                result = QStringLiteral("writer.writeByte(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readByte(");
+                result = QStringLiteral("reader.readByte(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_BYTE");
@@ -634,10 +634,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("qint16");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeI16(");
+                result = QStringLiteral("writer.writeI16(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readI16(");
+                result = QStringLiteral("reader.readI16(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_I16");
@@ -658,10 +658,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("qint32");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeI32(");
+                result = QStringLiteral("writer.writeI32(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readI32(");
+                result = QStringLiteral("reader.readI32(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_I32");
@@ -682,10 +682,10 @@ QString Generator::typeToStr(
                 result = QStringLiteral("qint64");
                 break;
             case MethodType::WriteMethod:
-                result = QStringLiteral("w.writeI64(");
+                result = QStringLiteral("writer.writeI64(");
                 break;
             case MethodType::ReadMethod:
-                result = QStringLiteral("r.readI64(");
+                result = QStringLiteral("reader.readI64(");
                 break;
             case MethodType::ThriftFieldType:
                 result = QStringLiteral("ThriftFieldType::T_I64");
@@ -764,13 +764,13 @@ QString Generator::typeToStr(
                     case MethodType::WriteMethod:
                         {
                             QTextStream strm(&result);
-                            strm << "write" << nameOfType << "(w, ";
+                            strm << "write" << nameOfType << "(writer, ";
                         }
                         break;
                     case MethodType::ReadMethod:
                         {
                             QTextStream strm(&result);
-                            strm << "read" << nameOfType << "(r, ";
+                            strm << "read" << nameOfType << "(reader, ";
                         }
                         break;
                     case MethodType::ThriftFieldType:
@@ -785,12 +785,12 @@ QString Generator::typeToStr(
                     switch(methodType)
                     {
                     case MethodType::WriteMethod:
-                        result = QStringLiteral("w.writeI32(static_cast<qint32>(");
+                        result = QStringLiteral("writer.writeI32(static_cast<qint32>(");
                         break;
                     case MethodType::ReadMethod:
                         {
                             QTextStream strm(&result);
-                            strm << "readEnum" << nameOfType << "(r, ";
+                            strm << "readEnum" << nameOfType << "(reader, ";
                         }
                         break;
                     case MethodType::ThriftFieldType:
@@ -817,10 +817,10 @@ QString Generator::typeToStr(
             }
             break;
         case MethodType::WriteMethod:
-            result = QStringLiteral("w.writeMapBegin(");
+            result = QStringLiteral("writer.writeMapBegin(");
             break;
         case MethodType::ReadMethod:
-            result = QStringLiteral("r.readMapBegin(");
+            result = QStringLiteral("reader.readMapBegin(");
             break;
         case MethodType::ThriftFieldType:
             result = QStringLiteral("ThriftFieldType::T_MAP");
@@ -845,10 +845,10 @@ QString Generator::typeToStr(
             }
             break;
         case MethodType::WriteMethod:
-            result = QStringLiteral("w.writeSetBegin(");
+            result = QStringLiteral("writer.writeSetBegin(");
             break;
         case MethodType::ReadMethod:
-            result = QStringLiteral("r.readSetBegin(");
+            result = QStringLiteral("reader.readSetBegin(");
             break;
         case MethodType::ThriftFieldType:
             result = QStringLiteral("ThriftFieldType::T_SET");
@@ -880,10 +880,10 @@ QString Generator::typeToStr(
                 break;
             }
         case MethodType::WriteMethod:
-            result = QStringLiteral("w.writeListBegin(");
+            result = QStringLiteral("writer.writeListBegin(");
             break;
         case MethodType::ReadMethod:
-            result = QStringLiteral("r.readListBegin(");
+            result = QStringLiteral("reader.readListBegin(");
             break;
         case MethodType::ThriftFieldType:
             result = QStringLiteral("ThriftFieldType::T_LIST");
@@ -1088,14 +1088,14 @@ void Generator::writeThriftWriteFields(
                 << field.m_name << ".isSet()) {" << endl;
         }
 
-        out << ident << "    w.writeFieldBegin(" << endl
+        out << ident << "    writer.writeFieldBegin(" << endl
             << ident << "        QStringLiteral(\""
             << field.m_name << "\")," << endl
             << ident << "        " << typeToStr(
                 field.m_type, identPrefix + QStringLiteral(". ") + field.m_name,
                 MethodType::ThriftFieldType)
             << "," << endl
-            << ident << "        " << field.m_id << ");" << endl;
+            << ident << "        " << field.m_id << ");" << endl << endl;
 
         QString fieldMoniker;
         {
@@ -1113,7 +1113,7 @@ void Generator::writeThriftWriteFields(
             QSharedPointer<Parser::Type> valueType =
                 field.m_type.dynamicCast<Parser::ListType>()->m_valueType;
 
-            out << ident << "    w.writeListBegin("
+            out << ident << "    writer.writeListBegin("
                 << typeToStr(
                     valueType, identPrefix + QStringLiteral(",") + field.m_name,
                     MethodType::ThriftFieldType)
@@ -1134,14 +1134,14 @@ void Generator::writeThriftWriteFields(
                 << ");" << endl;
 
             out << ident << "    }" << endl;
-            out << ident << "    w.writeListEnd();" << endl;
+            out << ident << "    writer.writeListEnd();" << endl << endl;
         }
         else if (writeMethod.contains(QStringLiteral("writeSetBegin")))
         {
             QSharedPointer<Parser::Type> valueType =
                 field.m_type.dynamicCast<Parser::SetType>()->m_valueType;
 
-            out << ident << "    w.writeSetBegin("
+            out << ident << "    writer.writeSetBegin("
                 << typeToStr(
                     valueType, identPrefix + QStringLiteral(",") + field.m_name,
                     MethodType::ThriftFieldType)
@@ -1163,7 +1163,7 @@ void Generator::writeThriftWriteFields(
                 << ");" << endl;
 
             out << ident << "    }" << endl;
-            out << ident << "    w.writeSetEnd();" << endl;
+            out << ident << "    writer.writeSetEnd();" << endl << endl;
         }
         else if (writeMethod.contains(QStringLiteral("writeMapBegin")))
         {
@@ -1173,7 +1173,7 @@ void Generator::writeThriftWriteFields(
             QSharedPointer<Parser::Type> valueType =
                 field.m_type.dynamicCast<Parser::MapType>()->m_valueType;
 
-            out << ident << "    w.writeMapBegin("
+            out << ident << "    writer.writeMapBegin("
                 << typeToStr(
                     keyType, identPrefix + QStringLiteral(",") + field.m_name,
                     MethodType::ThriftFieldType)
@@ -1209,7 +1209,7 @@ void Generator::writeThriftWriteFields(
                 << ");" << endl;
 
             out << ident << "    }" << endl;
-            out << ident << "    w.writeMapEnd();" << endl;
+            out << ident << "    writer.writeMapEnd();" << endl << endl;
         }
         else
         {
@@ -1220,10 +1220,11 @@ void Generator::writeThriftWriteFields(
                 << ");" << endl;
         }
 
-        out << ident << "    w.writeFieldEnd();" << endl;
+        out << ident << "    writer.writeFieldEnd();" << endl;
         if (isOptional) {
             out << "    }" << endl;
         }
+        out << endl;
     }
 }
 
@@ -1254,7 +1255,7 @@ void Generator::writeThriftReadField(
 
         out << indent << "qint32 size;" << endl;
         out << indent << "ThriftFieldType elemType;" << endl;
-        out << indent << "r.readListBegin(elemType, size);" << endl;
+        out << indent << "reader.readListBegin(elemType, size);" << endl;
         out << indent << "v.reserve(size);" << endl;
         out << indent << "if (elemType != " << valueThriftType
             << ") {" << endl << indent << "    throw ThriftException("
@@ -1272,7 +1273,7 @@ void Generator::writeThriftReadField(
         out << indent << "    " << valueReadMethod << "elem);" << endl;
         out << indent << "    v.append(elem);" << endl;
         out << indent << "}" << endl;
-        out << indent << "r.readListEnd();" << endl;
+        out << indent << "reader.readListEnd();" << endl;
     }
     else if (readMethod.contains(QStringLiteral("readSetBegin")))
     {
@@ -1287,7 +1288,7 @@ void Generator::writeThriftReadField(
 
         out << indent << "qint32 size;" << endl;
         out << indent << "ThriftFieldType elemType;" << endl;
-        out << indent << "r.readSetBegin(elemType, size);" << endl;
+        out << indent << "reader.readSetBegin(elemType, size);" << endl;
         out << indent << "v.reserve(size);" << endl;
         out << indent << "if (elemType != " << valueThriftType
             << ") {" << endl
@@ -1304,7 +1305,7 @@ void Generator::writeThriftReadField(
         out << indent << "    " << valueReadMethod << "elem);" << endl;
         out << indent << "    v.insert(elem);" << endl;
         out << indent << "}" << endl;
-        out << indent << "r.readSetEnd();" << endl;
+        out << indent << "reader.readSetEnd();" << endl;
     }
     else if (readMethod.contains(QStringLiteral("readMapBegin")))
     {
@@ -1329,7 +1330,7 @@ void Generator::writeThriftReadField(
         out << indent << "qint32 size;" << endl;
         out << indent << "ThriftFieldType keyType;" << endl;
         out << indent << "ThriftFieldType elemType;" << endl;
-        out << indent << "r.readMapBegin(keyType, elemType, size);" << endl;
+        out << indent << "reader.readMapBegin(keyType, elemType, size);" << endl;
         out << indent << "if (keyType != " << keyThriftType
             << ") throw ThriftException(ThriftException::Type::"
             << "INVALID_DATA, QStringLiteral(\"Incorrect map key type ("
@@ -1351,7 +1352,7 @@ void Generator::writeThriftReadField(
         out << indent << "    " << valueReadMethod << "value);" << endl;
         out << indent << "    v[key] = value;" << endl;
         out << indent << "}" << endl;
-        out << indent << "r.readMapEnd();" << endl;
+        out << indent << "reader.readMapEnd();" << endl;
     }
     else
     {
@@ -1525,10 +1526,10 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
     {
         for(const auto & s: *pList) {
             ctx.m_out << "void write" << s.m_name
-                << "(ThriftBinaryBufferWriter & w, const "
+                << "(ThriftBinaryBufferWriter & writer, const "
                 << s.m_name << " & s);" << endl;
             ctx.m_out << "void read" << s.m_name
-                << "(ThriftBinaryBufferReader & r, "
+                << "(ThriftBinaryBufferReader & reader, "
                 << s.m_name << " & s);" << endl;
         }
     }
@@ -1537,7 +1538,7 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
     const auto & enumerations = parser->enumerations();
     for(const auto & e: enumerations) {
         ctx.m_out << "void readEnum" << e.m_name
-            << "(ThriftBinaryBufferReader & r, "
+            << "(ThriftBinaryBufferReader & reader, "
             << e.m_name << " & e);" << endl;
     }
     ctx.m_out << endl << "/** @endcond */" << endl;
@@ -1786,11 +1787,11 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     for(const auto & e: enumerations)
     {
         ctx.m_out <<  "void readEnum" << e.m_name
-            << "(" << endl << "    ThriftBinaryBufferReader & r," << endl
+            << "(" << endl << "    ThriftBinaryBufferReader & reader," << endl
             << "    " << e.m_name << " & e)" << endl << "{" << endl;
 
         ctx.m_out << "    qint32 i;" << endl;
-        ctx.m_out << "    r.readI32(i);" << endl;
+        ctx.m_out << "    reader.readI32(i);" << endl;
         ctx.m_out << "    switch(i) {" << endl;
 
         for(const auto & v : e.m_values) {
@@ -1801,8 +1802,8 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
         }
 
         ctx.m_out << "    default: throw ThriftException(ThriftException::Type::"
-            "INVALID_DATA, QStringLiteral(\"Incorrect value for enum "
-             << e.m_name << "\"));" << endl;
+            << "INVALID_DATA, QStringLiteral(\"Incorrect value for enum "
+            << e.m_name << "\"));" << endl;
         ctx.m_out << "    }" << endl;
         ctx.m_out << "}" << endl << endl;
     }
@@ -1840,22 +1841,22 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
         }
 
         ctx.m_out << "void write" << s.m_name
-            << "(" << endl << "    ThriftBinaryBufferWriter & w," << endl
+            << "(" << endl << "    ThriftBinaryBufferWriter & writer," << endl
             << "    const "
             << s.m_name << " & s)" << endl << "{" << endl;
 
-        ctx.m_out << "    w.writeStructBegin(QStringLiteral(\""
+        ctx.m_out << "    writer.writeStructBegin(QStringLiteral(\""
             << s.m_name  << "\"));" << endl;
 
         writeThriftWriteFields(
             ctx.m_out, s.m_fields, s.m_name, QStringLiteral("s."));
 
-        ctx.m_out << "    w.writeFieldStop();" << endl;
-        ctx.m_out << "    w.writeStructEnd();" << endl;
+        ctx.m_out << "    writer.writeFieldStop();" << endl;
+        ctx.m_out << "    writer.writeStructEnd();" << endl;
         ctx.m_out << "}" << endl << endl;
 
         ctx.m_out << "void read" << s.m_name
-            << "(" << endl << "    ThriftBinaryBufferReader & r," << endl
+            << "(" << endl << "    ThriftBinaryBufferReader & reader," << endl
             << "    " << s.m_name << " & s)" << endl << "{" << endl;
         ctx.m_out << "    QString fname;" << endl;
         ctx.m_out << "    ThriftFieldType fieldType;" << endl;
@@ -1869,11 +1870,11 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
             }
         }
 
-        ctx.m_out << "    r.readStructBegin(fname);" << endl;
+        ctx.m_out << "    reader.readStructBegin(fname);" << endl;
         ctx.m_out << "    while(true)" << endl
             << "    {" << endl;
-        ctx.m_out << "        r.readFieldBegin(fname, fieldType, "
-            << "fieldId);" << endl;
+        ctx.m_out << "        reader.readFieldBegin(fname, fieldType, fieldId);"
+            << endl;
         ctx.m_out << "        if (fieldType == "
             << "ThriftFieldType::T_STOP) break;" << endl;
 
@@ -1899,17 +1900,17 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
                 QStringLiteral("s."));
 
             ctx.m_out << "            } else {" << endl;
-            ctx.m_out << "                r.skip(fieldType);" << endl;
+            ctx.m_out << "                reader.skip(fieldType);" << endl;
             ctx.m_out << "            }" << endl;
             ctx.m_out << "        } else" << endl;
         }
 
         ctx.m_out << "        {" << endl;
-        ctx.m_out << "            r.skip(fieldType);" << endl;
+        ctx.m_out << "            reader.skip(fieldType);" << endl;
         ctx.m_out << "        }" << endl;
-        ctx.m_out << "        r.readFieldEnd();" << endl;
+        ctx.m_out << "        reader.readFieldEnd();" << endl;
         ctx.m_out << "    }" << endl;
-        ctx.m_out << "    r.readStructEnd();" << endl;
+        ctx.m_out << "    reader.readStructEnd();" << endl;
 
         for(const auto & field : s.m_fields)
         {
@@ -2280,7 +2281,9 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
     const QString fileName = QStringLiteral("Servers.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h");
+    auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
+        << QStringLiteral("Types_io.h");
+    sortIncludes(additionalIncludes);
     writeHeaderBody(ctx.m_out, QStringLiteral("Servers.h"), additionalIncludes);
 
     // First generate some helper functions
@@ -2305,26 +2308,14 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
 
             ctx.m_out << "void parse" << capitalize(s.m_name)
                 << capitalize(func.m_name) << "Params(" << endl
-                << "    ThriftBinaryBufferReader & r," << endl;
+                << "    ThriftBinaryBufferReader & reader," << endl;
 
-            bool hasParams = false;
-            if (!func.m_params.isEmpty())
-            {
-                if (func.m_params.size() > 1)
-                {
-                    hasParams = true;
-                }
-                else if (func.m_params.at(0).m_name !=
-                         QStringLiteral("authenticationToken"))
-                {
-                    hasParams = true;
-                }
-            }
-
+            bool hasAuthenticationToken = false;
             for(const auto & param: func.m_params)
             {
                 if (param.m_name == QStringLiteral("authenticationToken")) {
                     // Auth token is a part of IRequestContext interface
+                    hasAuthenticationToken = true;
                     continue;
                 }
 
@@ -2343,24 +2334,78 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
                     << "," << endl;
             }
 
-            ctx.m_out << "    IRequestContextPtr ctx)" << endl
-                << "{" << endl
-                << "    // TODO: implement" << endl
-                << "    Q_UNUSED(r)" << endl;
+            ctx.m_out << "    IRequestContextPtr & ctx)" << endl
+                << "{" << endl;
 
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
+            ctx.m_out << "    ThriftFieldType fieldType;" << endl
+                << "    qint16 fieldId;" << endl;
 
-                ctx.m_out << "    Q_UNUSED(" << param.m_name << ")" << endl;
+            if (hasAuthenticationToken) {
+                ctx.m_out << "    QString authenticationToken;" << endl;
             }
 
-            ctx.m_out << "    Q_UNUSED(ctx)" << endl;
+            ctx.m_out << endl;
+            ctx.m_out << "    QString fname = " << endl
+                << "        QStringLiteral(\""
+                << s.m_name << "_" << func.m_name << "_pargs\");" << endl;
 
-            ctx.m_out  << "}" << endl << endl;
+
+            ctx.m_out << endl;
+            ctx.m_out << "    reader.readStructBegin(fname);" << endl
+                << "    while(true)" << endl
+                << "    {" << endl
+                << "        reader.readFieldBegin(fname, fieldType, fieldId);"
+                << endl
+                << "        if (fieldType == ThriftFieldType::T_STOP) {" << endl
+                << "            break;" << endl
+                << "        }" << endl << endl;
+
+            bool firstParam = true;
+            for(const auto & param: func.m_params)
+            {
+                ctx.m_out << "        ";
+
+                if (!firstParam) {
+                    ctx.m_out << "else ";
+                }
+                else {
+                    firstParam = false;
+                }
+
+                ctx.m_out << "if (fieldId == " << param.m_id << ")"
+                    << endl
+                    << "        {" << endl
+                    << "            if (fieldType == "
+                    << typeToStr(
+                        param.m_type, param.m_name, MethodType::ThriftFieldType)
+                    << ") {" << endl;
+
+                writeThriftReadField(
+                    ctx.m_out, param, param.m_name + QStringLiteral("."),
+                    QLatin1String(""));
+
+                ctx.m_out << "            }" << endl
+                    << "            else {" << endl
+                    << "                reader.skip(fieldType);" << endl
+                    << "            }" << endl
+                    << "        }" << endl;
+            }
+
+            ctx.m_out << "        else" << endl
+                << "        {" << endl
+                << "            reader.skip(fieldType);" << endl
+                << "        }" << endl << endl
+                << "        reader.readFieldEnd();" << endl;
+
+            ctx.m_out << "    }" << endl << endl
+                << "    reader.readStructEnd();" << endl
+                << "    reader.readMessageEnd();" << endl << endl;
+
+            ctx.m_out << "    ctx = newRequestContext(";
+            if (hasAuthenticationToken) {
+                ctx.m_out << "authenticationToken";
+            }
+            ctx.m_out << ");" << endl << "}" << endl << endl;
         }
     }
 
@@ -2383,11 +2428,18 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
 
         ctx.m_out << "void " << s.m_name << "Server::onRequest(QByteArray data)" << endl
             << "{" << endl
-            << "    ThriftBinaryBufferReader r(data);" << endl
+            << "    ThriftBinaryBufferReader reader(data);" << endl
             << "    qint32 rseqid = 0;" << endl
             << "    QString fname;" << endl
             << "    ThriftMessageType mtype;" << endl
-            << "    r.readMessageBegin(fname, mtype, rseqid);" << endl << endl;
+            << "    reader.readMessageBegin(fname, mtype, rseqid);" << endl << endl;
+
+        ctx.m_out << "    if (mtype != ThriftMessageType::T_CALL) {" << endl
+            << "        reader.skip(ThriftFieldType::T_STRUCT);" << endl
+            << "        reader.readMessageEnd();" << endl
+            << "        throw ThriftException("
+            << "ThriftException::Type::INVALID_MESSAGE_TYPE);" << endl
+            << "    }" << endl << endl;
 
         bool firstFunc = true;
         for (const auto & func: qAsConst(s.m_functions))
@@ -2419,12 +2471,12 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
                 ++paramCount;
             }
 
-            ctx.m_out << "        IRequestContextPtr ctx;" << endl;
+            ctx.m_out << "        IRequestContextPtr ctx;" << endl << endl;
 
             ctx.m_out << "        parse" << capitalize(s.m_name)
                 << capitalize(func.m_name) << "Params(" << endl;
 
-            ctx.m_out << "            r," << endl;
+            ctx.m_out << "            reader," << endl;
 
             for(const auto & param: func.m_params)
             {
@@ -2683,11 +2735,11 @@ void Generator::generateServiceClassDefinition(
     {
         ctx.m_out << blockSeparator << endl << endl;
 
-        QString prepareParamsName = service.m_name + QStringLiteral("_") +
-            f.m_name + QStringLiteral("_prepareParams");
+        QString prepareParamsName = service.m_name + capitalize(f.m_name) +
+            QStringLiteral("PrepareParams");
 
-        QString readReplyName = service.m_name + QStringLiteral("_") + f.m_name +
-            QStringLiteral("_readReply");
+        QString readReplyName = service.m_name + capitalize(f.m_name) +
+            QStringLiteral("ReadReply");
 
         int lastId = f.m_params.last().m_id;
 
@@ -2716,22 +2768,23 @@ void Generator::generateServiceClassDefinition(
 
         ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
             << prepareParamsName << "\");" << endl << endl;
-        ctx.m_out << "    ThriftBinaryBufferWriter w;" << endl;
-        ctx.m_out << "    qint32 cseqid = 0;" << endl;
-        ctx.m_out << "    w.writeMessageBegin(" << endl;
-        ctx.m_out << "        QStringLiteral(\"" << f.m_name
-            << "\"), ThriftMessageType::T_CALL, cseqid);" << endl;
-        ctx.m_out << "    w.writeStructBegin(" << endl;
+        ctx.m_out << "    ThriftBinaryBufferWriter writer;" << endl;
+        ctx.m_out << "    qint32 cseqid = 0;" << endl << endl;
+        ctx.m_out << "    writer.writeMessageBegin(" << endl;
+        ctx.m_out << "        QStringLiteral(\"" << f.m_name << "\")," << endl
+            << "        ThriftMessageType::T_CALL," << endl
+            << "        cseqid);" << endl << endl;
+        ctx.m_out << "    writer.writeStructBegin(" << endl;
         ctx.m_out << "        QStringLiteral(\"" << service.m_name
             << "_" << f.m_name << "_pargs\"));" << endl;
 
         writeThriftWriteFields(
             ctx.m_out, f.m_params, f.m_name, QLatin1Literal(""));
 
-        ctx.m_out << "    w.writeFieldStop();" << endl;
-        ctx.m_out << "    w.writeStructEnd();" << endl;
-        ctx.m_out << "    w.writeMessageEnd();" << endl;
-        ctx.m_out << "    return w.buffer();" << endl;
+        ctx.m_out << "    writer.writeFieldStop();" << endl;
+        ctx.m_out << "    writer.writeStructEnd();" << endl;
+        ctx.m_out << "    writer.writeMessageEnd();" << endl;
+        ctx.m_out << "    return writer.buffer();" << endl;
         ctx.m_out << "}" << endl << endl;
 
         ctx.m_out << (isVoidResult
@@ -2752,36 +2805,36 @@ void Generator::generateServiceClassDefinition(
                 << "();" << endl;
         }
 
-        ctx.m_out << "    ThriftBinaryBufferReader r(reply);" << endl
+        ctx.m_out << "    ThriftBinaryBufferReader reader(reply);" << endl
             << "    qint32 rseqid = 0;" << endl
             << "    QString fname;" << endl
             << "    ThriftMessageType mtype;" << endl
-            << "    r.readMessageBegin(fname, mtype, rseqid);" << endl
+            << "    reader.readMessageBegin(fname, mtype, rseqid);" << endl
             << "    if (mtype == ThriftMessageType::T_EXCEPTION) {" << endl
-            << "        ThriftException e = readThriftException(r);" << endl
-            << "        r.readMessageEnd();" << endl
+            << "        ThriftException e = readThriftException(reader);" << endl
+            << "        reader.readMessageEnd();" << endl
             << "        throw e;" << endl
             << "    }" << endl
             << "    if (mtype != ThriftMessageType::T_REPLY) {" << endl
-            << "        r.skip(ThriftFieldType::T_STRUCT);" << endl
-            << "        r.readMessageEnd();" << endl
+            << "        reader.skip(ThriftFieldType::T_STRUCT);" << endl
+            << "        reader.readMessageEnd();" << endl
             << "        throw ThriftException(ThriftException::Type::"
             << "INVALID_MESSAGE_TYPE);" << endl
             << "    }" << endl
             << "    if (fname.compare(QStringLiteral(\"" << f.m_name
             << "\")) != 0) {" << endl
-            << "        r.skip(ThriftFieldType::T_STRUCT);" << endl
-            << "        r.readMessageEnd();" << endl
+            << "        reader.skip(ThriftFieldType::T_STRUCT);" << endl
+            << "        reader.readMessageEnd();" << endl
             << "        throw ThriftException(ThriftException::Type::"
             << "WRONG_METHOD_NAME);" << endl
             << "    }" << endl << endl;
 
         ctx.m_out << "    ThriftFieldType fieldType;" << endl
             << "    qint16 fieldId;" << endl
-            << "    r.readStructBegin(fname);" << endl
+            << "    reader.readStructBegin(fname);" << endl
             << "    while(true)" << endl
             << "    {" << endl
-            << "        r.readFieldBegin(fname, fieldType, fieldId);" << endl
+            << "        reader.readFieldBegin(fname, fieldType, fieldId);" << endl
             << "        if (fieldType == ThriftFieldType::T_STOP) {" << endl
             << "            break;" << endl
             << "        }" << endl << endl;
@@ -2808,7 +2861,7 @@ void Generator::generateServiceClassDefinition(
 
             ctx.m_out << "            }" << endl
                 << "            else {" << endl
-                << "                r.skip(fieldType);" << endl
+                << "                reader.skip(fieldType);" << endl
                 << "            }" << endl
                 << "        }" << endl;
         }
@@ -2833,7 +2886,7 @@ void Generator::generateServiceClassDefinition(
             ctx.m_out << "            if (fieldType == ThriftFieldType::"
                 << "T_STRUCT) {" << endl
                 << "                " << exceptionType << " e;" << endl
-                << "                read" << exceptionType << "(r, e);"
+                << "                read" << exceptionType << "(reader, e);"
                 << endl;
 
             if (exceptionType == QStringLiteral("EDAMSystemException")) {
@@ -2846,20 +2899,20 @@ void Generator::generateServiceClassDefinition(
 
             ctx.m_out << "            }" << endl
                 << "            else {" << endl
-                << "                r.skip(fieldType);" << endl
+                << "                reader.skip(fieldType);" << endl
                 << "            }" << endl
                 << "        }" << endl;
         }
 
         ctx.m_out << "        else" << endl
             << "        {" << endl
-            << "            r.skip(fieldType);" << endl
+            << "            reader.skip(fieldType);" << endl
             << "        }" << endl << endl
-            << "        r.readFieldEnd();" << endl
+            << "        reader.readFieldEnd();" << endl
             << "    }" << endl << endl
-            << "    r.readStructEnd();" << endl;
+            << "    reader.readStructEnd();" << endl;
 
-        ctx.m_out << "    r.readMessageEnd();" << endl << endl;
+        ctx.m_out << "    reader.readMessageEnd();" << endl << endl;
 
         if (!isVoidResult) {
             ctx.m_out << "    if (!resultIsSet) {" << endl

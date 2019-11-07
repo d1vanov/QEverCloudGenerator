@@ -2187,90 +2187,8 @@ void Generator::generateServerHeader(Parser * parser, const QString & outPath)
     writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
 
     const auto & services = parser->services();
-    for(const auto & s: services)
-    {
-        if (!s.m_extends.isEmpty()) {
-            throw std::runtime_error("extending services is not supported");
-        }
-
-        ctx.m_out << blockSeparator << endl << endl;
-
-        ctx.m_out << "/**" << endl
-            << " * @brief The " << s.m_name << "Server class represents " << endl
-            << " * customizable server for " << s.m_name << " requests. " << endl
-            << " * It is primarily used for testing of QEverCloud" << endl
-            << " */" << endl;
-
-        ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
-            << "Server: public QObject" << endl << "{" << endl;
-        ctx.m_out << "    Q_OBJECT" << endl;
-        ctx.m_out << "    Q_DISABLE_COPY(" << s.m_name << "Server)" << endl;
-
-        ctx.m_out << "public:" << endl
-            << "    explicit " << s.m_name << "Server(QObject * parent = nullptr);"
-            << endl << endl;
-
-        ctx.m_out << "Q_SIGNALS:" << endl;
-        ctx.m_out << "    // Signals notifying listeners about incoming requests"
-            << endl;
-        for(const auto & func: qAsConst(s.m_functions))
-        {
-            if (func.m_isOneway) {
-                throw std::runtime_error("oneway functions are not supported");
-            }
-
-            ctx.m_out << "    void " << func.m_name << "Request(";
-            if (!func.m_params.isEmpty()) {
-                ctx.m_out << endl;
-            }
-
-            for(const auto & param: qAsConst(func.m_params))
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                ctx.m_out << "        ";
-
-                auto paramType = typeToStr(
-                    param.m_type,
-                    func.m_name + QStringLiteral(", ") + param.m_name,
-                    MethodType::FuncParamType);
-                if (paramType.startsWith(QStringLiteral("const "))) {
-                    paramType = paramType.mid(6);
-                }
-                if (paramType.endsWith(QStringLiteral(" &"))) {
-                    paramType = paramType.mid(0, paramType.size() - 2);
-                }
-                ctx.m_out << paramType << " " << param.m_name << "," << endl;
-            }
-
-            if (!func.m_params.isEmpty()) {
-                ctx.m_out << "        ";
-            }
-            ctx.m_out << "IRequestContextPtr ctx);" << endl << endl;
-        }
-
-        ctx.m_out << "public Q_SLOTS:" << endl;
-        ctx.m_out << "    // Slot used to deliver requests to the server" << endl
-            << "    void onRequest(QByteArray data);" << endl << endl;
-
-        for(const auto & func: qAsConst(s.m_functions))
-        {
-            if (func.m_isOneway) {
-                throw std::runtime_error("oneway functions are not supported");
-            }
-
-            ctx.m_out << "    void on" << capitalize(func.m_name) << "RequestReady(";
-            auto responseType = typeToStr(func.m_type, func.m_name);
-            if (responseType != QStringLiteral("void")) {
-                ctx.m_out << responseType << " value";
-            }
-            ctx.m_out << ");" << endl;
-        }
-
-        ctx.m_out << "};" << endl << endl;
+    for(const auto & s: services) {
+        generateServerClassDeclaration(s, ctx);
     }
 
     writeHeaderFooter(ctx.m_out, fileName);
@@ -2291,247 +2209,16 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
     ctx.m_out << "namespace {" << endl << endl;
 
     const auto & services = parser->services();
-
-    for(const auto & s: services)
-    {
-        if (!s.m_extends.isEmpty()) {
-            throw std::runtime_error("extending services is not supported");
-        }
-
-        for(const auto & func: s.m_functions)
-        {
-            if (func.m_isOneway) {
-                throw std::runtime_error("oneway functions are not supported");
-            }
-
-            ctx.m_out << blockSeparator << endl << endl;
-
-            ctx.m_out << "void parse" << capitalize(s.m_name)
-                << capitalize(func.m_name) << "Params(" << endl
-                << "    ThriftBinaryBufferReader & reader," << endl;
-
-            bool hasAuthenticationToken = false;
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    hasAuthenticationToken = true;
-                    continue;
-                }
-
-                auto paramType = typeToStr(
-                    param.m_type,
-                    func.m_name + QStringLiteral(", ") + param.m_name,
-                    MethodType::FuncParamType);
-                if (paramType.startsWith(QStringLiteral("const "))) {
-                    paramType = paramType.mid(6);
-                }
-                if (!paramType.endsWith(QStringLiteral(" &"))) {
-                    paramType += QStringLiteral(" &");
-                }
-
-                ctx.m_out << "    " << paramType << " " << param.m_name
-                    << "," << endl;
-            }
-
-            ctx.m_out << "    IRequestContextPtr & ctx)" << endl
-                << "{" << endl;
-
-            ctx.m_out << "    ThriftFieldType fieldType;" << endl
-                << "    qint16 fieldId;" << endl;
-
-            if (hasAuthenticationToken) {
-                ctx.m_out << "    QString authenticationToken;" << endl;
-            }
-
-            ctx.m_out << endl;
-            ctx.m_out << "    QString fname = " << endl
-                << "        QStringLiteral(\""
-                << s.m_name << "_" << func.m_name << "_pargs\");" << endl;
-
-
-            ctx.m_out << endl;
-            ctx.m_out << "    reader.readStructBegin(fname);" << endl
-                << "    while(true)" << endl
-                << "    {" << endl
-                << "        reader.readFieldBegin(fname, fieldType, fieldId);"
-                << endl
-                << "        if (fieldType == ThriftFieldType::T_STOP) {" << endl
-                << "            break;" << endl
-                << "        }" << endl << endl;
-
-            bool firstParam = true;
-            for(const auto & param: func.m_params)
-            {
-                ctx.m_out << "        ";
-
-                if (!firstParam) {
-                    ctx.m_out << "else ";
-                }
-                else {
-                    firstParam = false;
-                }
-
-                ctx.m_out << "if (fieldId == " << param.m_id << ")"
-                    << endl
-                    << "        {" << endl
-                    << "            if (fieldType == "
-                    << typeToStr(
-                        param.m_type, param.m_name, MethodType::ThriftFieldType)
-                    << ") {" << endl;
-
-                writeThriftReadField(
-                    ctx.m_out, param, param.m_name + QStringLiteral("."),
-                    QLatin1String(""));
-
-                ctx.m_out << "            }" << endl
-                    << "            else {" << endl
-                    << "                reader.skip(fieldType);" << endl
-                    << "            }" << endl
-                    << "        }" << endl;
-            }
-
-            ctx.m_out << "        else" << endl
-                << "        {" << endl
-                << "            reader.skip(fieldType);" << endl
-                << "        }" << endl << endl
-                << "        reader.readFieldEnd();" << endl;
-
-            ctx.m_out << "    }" << endl << endl
-                << "    reader.readStructEnd();" << endl
-                << "    reader.readMessageEnd();" << endl << endl;
-
-            ctx.m_out << "    ctx = newRequestContext(";
-            if (hasAuthenticationToken) {
-                ctx.m_out << "authenticationToken";
-            }
-            ctx.m_out << ");" << endl << "}" << endl << endl;
-        }
+    for(const auto & s: services) {
+        generateServerHelperFunctions(s, ctx);
     }
 
     ctx.m_out << "} // namespace" << endl << endl;
 
     // Now generate actual server classes
 
-    for(const auto & s: services)
-    {
-        if (!s.m_extends.isEmpty()) {
-            throw std::runtime_error("extending services is not supported");
-        }
-
-        ctx.m_out << blockSeparator << endl << endl;
-
-        ctx.m_out << s.m_name << "Server::" << s.m_name
-            << "Server(QObject * parent) :" << endl
-            << "    QObject(parent)" << endl
-            << "{}" << endl << endl;
-
-        ctx.m_out << "void " << s.m_name << "Server::onRequest(QByteArray data)" << endl
-            << "{" << endl
-            << "    ThriftBinaryBufferReader reader(data);" << endl
-            << "    qint32 rseqid = 0;" << endl
-            << "    QString fname;" << endl
-            << "    ThriftMessageType mtype;" << endl
-            << "    reader.readMessageBegin(fname, mtype, rseqid);" << endl << endl;
-
-        ctx.m_out << "    if (mtype != ThriftMessageType::T_CALL) {" << endl
-            << "        reader.skip(ThriftFieldType::T_STRUCT);" << endl
-            << "        reader.readMessageEnd();" << endl
-            << "        throw ThriftException("
-            << "ThriftException::Type::INVALID_MESSAGE_TYPE);" << endl
-            << "    }" << endl << endl;
-
-        bool firstFunc = true;
-        for (const auto & func: qAsConst(s.m_functions))
-        {
-            ctx.m_out << "    ";
-
-            if (!firstFunc) {
-                ctx.m_out << "else ";
-            }
-
-            ctx.m_out << "if (fname == QStringLiteral(\"" << func.m_name
-                << "\"))" << endl
-                << "    {" << endl;
-
-            quint32 paramCount = 0;
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                ctx.m_out << "        " << typeToStr(
-                    param.m_type,
-                    func.m_name + QStringLiteral(", ") + param.m_name,
-                    MethodType::TypeName);
-                ctx.m_out << " " << param.m_name << ";" << endl;
-
-                ++paramCount;
-            }
-
-            ctx.m_out << "        IRequestContextPtr ctx;" << endl << endl;
-
-            ctx.m_out << "        parse" << capitalize(s.m_name)
-                << capitalize(func.m_name) << "Params(" << endl;
-
-            ctx.m_out << "            reader," << endl;
-
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                ctx.m_out << "            " << param.m_name << "," << endl;
-            }
-
-            ctx.m_out << "            ctx);" << endl << endl;
-
-            ctx.m_out << "        Q_EMIT " << func.m_name << "Request(" << endl;
-
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                ctx.m_out << "            " << param.m_name;
-                ctx.m_out << "," << endl;
-            }
-
-            ctx.m_out << "            ctx);" << endl;
-            ctx.m_out << "    }" << endl;
-
-            firstFunc = false;
-        }
-
-        ctx.m_out << "}" << endl << endl;
-
-        for(const auto & func: qAsConst(s.m_functions))
-        {
-            if (func.m_isOneway) {
-                throw std::runtime_error("oneway functions are not supported");
-            }
-
-            ctx.m_out << "void " << s.m_name << "Server::on"
-                << capitalize(func.m_name) << "RequestReady(";
-
-            auto responseType = typeToStr(func.m_type, func.m_name);
-            if (responseType != QStringLiteral("void")) {
-                ctx.m_out << responseType << " value";
-            }
-            ctx.m_out << ")" << endl << "{" << endl
-                << "    // TODO: implement" << endl;
-
-            if (responseType != QStringLiteral("void")) {
-                ctx.m_out << "    Q_UNUSED(value)" << endl;
-            }
-            ctx.m_out << "}" << endl << endl;
-        }
+    for(const auto & s: services) {
+        generateServerClassDefinition(s, ctx);
     }
 
     writeBodyFooter(ctx.m_out);
@@ -3310,6 +2997,393 @@ void Generator::generateDurableServiceClassDefinition(
             << "        std::move(request), ctx);" << endl << endl;
 
         ctx.m_out << "}" << endl << endl;
+    }
+}
+
+void Generator::generateServerClassDeclaration(
+    const Parser::Service & service, OutputFileContext & ctx)
+{
+    if (!service.m_extends.isEmpty()) {
+        throw std::runtime_error("extending services is not supported");
+    }
+
+    ctx.m_out << blockSeparator << endl << endl;
+
+    ctx.m_out << "/**" << endl
+        << " * @brief The " << service.m_name << "Server class represents "
+        << endl
+        << " * customizable server for " << service.m_name << " requests. "
+        << endl
+        << " * It is primarily used for testing of QEverCloud" << endl
+        << " */" << endl;
+
+    ctx.m_out << "class QEVERCLOUD_EXPORT " << service.m_name
+        << "Server: public QObject" << endl << "{" << endl;
+    ctx.m_out << "    Q_OBJECT" << endl;
+    ctx.m_out << "    Q_DISABLE_COPY(" << service.m_name << "Server)" << endl;
+
+    ctx.m_out << "public:" << endl
+        << "    explicit " << service.m_name
+        << "Server(QObject * parent = nullptr);" << endl << endl;
+
+    ctx.m_out << "Q_SIGNALS:" << endl;
+    ctx.m_out << "    // Signals notifying listeners about incoming requests"
+        << endl;
+    for(const auto & func: qAsConst(service.m_functions))
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        ctx.m_out << "    void " << func.m_name << "Request(";
+        if (!func.m_params.isEmpty()) {
+            ctx.m_out << endl;
+        }
+
+        for(const auto & param: qAsConst(func.m_params))
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                continue;
+            }
+
+            ctx.m_out << "        ";
+
+            auto paramType = typeToStr(
+                param.m_type,
+                func.m_name + QStringLiteral(", ") + param.m_name,
+                MethodType::FuncParamType);
+            if (paramType.startsWith(QStringLiteral("const "))) {
+                paramType = paramType.mid(6);
+            }
+            if (paramType.endsWith(QStringLiteral(" &"))) {
+                paramType = paramType.mid(0, paramType.size() - 2);
+            }
+            ctx.m_out << paramType << " " << param.m_name << "," << endl;
+        }
+
+        if (!func.m_params.isEmpty()) {
+            ctx.m_out << "        ";
+        }
+        ctx.m_out << "IRequestContextPtr ctx);" << endl << endl;
+    }
+
+    ctx.m_out << "public Q_SLOTS:" << endl;
+    ctx.m_out << "    // Slot used to deliver requests to the server" << endl
+        << "    void onRequest(QByteArray data);" << endl << endl;
+
+    ctx.m_out << "    // Slots for replies to requests" << endl;
+    for(const auto & func: qAsConst(service.m_functions))
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        ctx.m_out << "    void on" << capitalize(func.m_name) << "RequestReady("
+            << endl;
+        auto responseType = typeToStr(func.m_type, func.m_name);
+        if (responseType != QStringLiteral("void")) {
+            ctx.m_out << "        " << responseType << " value," << endl;
+        }
+        ctx.m_out << "        QSharedPointer<EverCloudExceptionData> "
+            << "exceptionData);" << endl << endl;
+    }
+
+    ctx.m_out << "};" << endl << endl;
+}
+
+void Generator::generateServerClassDefinition(
+    const Parser::Service & service, OutputFileContext & ctx)
+{
+    if (!service.m_extends.isEmpty()) {
+        throw std::runtime_error("extending services is not supported");
+    }
+
+    ctx.m_out << blockSeparator << endl << endl;
+
+    ctx.m_out << service.m_name << "Server::" << service.m_name
+        << "Server(QObject * parent) :" << endl
+        << "    QObject(parent)" << endl
+        << "{}" << endl << endl;
+
+    ctx.m_out << "void " << service.m_name << "Server::onRequest(QByteArray data)"
+        << endl
+        << "{" << endl
+        << "    ThriftBinaryBufferReader reader(data);" << endl
+        << "    qint32 rseqid = 0;" << endl
+        << "    QString fname;" << endl
+        << "    ThriftMessageType mtype;" << endl
+        << "    reader.readMessageBegin(fname, mtype, rseqid);" << endl << endl;
+
+    ctx.m_out << "    if (mtype != ThriftMessageType::T_CALL) {" << endl
+        << "        reader.skip(ThriftFieldType::T_STRUCT);" << endl
+        << "        reader.readMessageEnd();" << endl
+        << "        throw ThriftException("
+        << "ThriftException::Type::INVALID_MESSAGE_TYPE);" << endl
+        << "    }" << endl << endl;
+
+    bool firstFunc = true;
+    for (const auto & func: qAsConst(service.m_functions))
+    {
+        ctx.m_out << "    ";
+
+        if (!firstFunc) {
+            ctx.m_out << "else ";
+        }
+
+        ctx.m_out << "if (fname == QStringLiteral(\"" << func.m_name
+            << "\"))" << endl
+            << "    {" << endl;
+
+        quint32 paramCount = 0;
+        for(const auto & param: func.m_params)
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                continue;
+            }
+
+            ctx.m_out << "        " << typeToStr(
+                param.m_type,
+                func.m_name + QStringLiteral(", ") + param.m_name,
+                MethodType::TypeName);
+            ctx.m_out << " " << param.m_name << ";" << endl;
+
+            ++paramCount;
+        }
+
+        ctx.m_out << "        IRequestContextPtr ctx;" << endl << endl;
+
+        ctx.m_out << "        parse" << capitalize(service.m_name)
+            << capitalize(func.m_name) << "Params(" << endl;
+
+        ctx.m_out << "            reader," << endl;
+
+        for(const auto & param: func.m_params)
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                continue;
+            }
+
+            ctx.m_out << "            " << param.m_name << "," << endl;
+        }
+
+        ctx.m_out << "            ctx);" << endl << endl;
+
+        ctx.m_out << "        Q_EMIT " << func.m_name << "Request(" << endl;
+
+        for(const auto & param: func.m_params)
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                continue;
+            }
+
+            ctx.m_out << "            " << param.m_name;
+            ctx.m_out << "," << endl;
+        }
+
+        ctx.m_out << "            ctx);" << endl;
+        ctx.m_out << "    }" << endl;
+
+        firstFunc = false;
+    }
+
+    ctx.m_out << "}" << endl << endl;
+
+    for(const auto & func: qAsConst(service.m_functions))
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        ctx.m_out << "void " << service.m_name << "Server::on"
+            << capitalize(func.m_name) << "RequestReady(" << endl;
+
+        auto responseType = typeToStr(func.m_type, func.m_name);
+        if (responseType != QStringLiteral("void")) {
+            ctx.m_out << "    " << responseType << " value," << endl;
+        }
+        ctx.m_out << "    QSharedPointer<EverCloudExceptionData> exceptionData)"
+            << endl;
+
+        ctx.m_out << "{" << endl;
+
+        ctx.m_out << "    ThriftBinaryBufferWriter writer;" << endl
+            << "    qint32 cseqid = 0;" << endl << endl;
+
+        ctx.m_out << "    if (!exceptionData.isNull())" << endl
+            << "    {" << endl
+            << "        try" << endl
+            << "        {" << endl
+            << "            exceptionData->throwException();" << endl
+            << "        }" << endl
+            << "        catch(const ThriftException & exception)" << endl
+            << "        {" << endl
+            << "            writer.writeMessageBegin(" << endl
+            << "                QStringLiteral(\"" << func.m_name << "\"),"
+            << endl
+            << "                ThriftMessageType::T_EXCEPTION," << endl
+            << "                cseqid);" << endl
+            << "            writeThriftException(writer, exception);" << endl
+            << "            writer.writeMessageEnd();" << endl
+            << "            return;" << endl
+            << "        }" << endl
+            << "        catch(...)" << endl
+            << "        {" << endl
+            << "            // Will be handled below" << endl
+            << "        }" << endl
+            << "    }" << endl << endl;
+
+        ctx.m_out << "    writer.writeMessageBegin(" << endl
+            << "        QStringLiteral(\"" << func.m_name << "\")," << endl
+            << "        ThriftMessageType::T_REPLY," << endl
+            << "        cseqid);" << endl << endl;
+
+        ctx.m_out << "    writer.writeStructBegin(" << endl
+            << "        QStringLiteral(\"" << func.m_name << "\"));" << endl << endl;
+
+        ctx.m_out << "    // TODO: implement further" << endl << endl;
+
+        if (responseType == QStringLiteral("void"))
+        {
+            ctx.m_out << "    writer.writeFieldBegin(" << endl
+                << "        QLatin1String("")," << endl
+                << "        ThriftFieldType::T_VOID," << endl
+                << "        0);" << endl;
+            ctx.m_out << "    writer.writeFieldEnd();" << endl;
+        }
+        else
+        {
+            // TODO: implement
+        }
+
+        ctx.m_out << "    writer.writeStructEnd();" << endl
+            << "    writer.writeMessageEnd();" << endl << endl;
+
+        if (responseType != QStringLiteral("void")) {
+            ctx.m_out << "    Q_UNUSED(value)" << endl;
+        }
+        ctx.m_out << "}" << endl << endl;
+    }
+}
+
+void Generator::generateServerHelperFunctions(
+    const Parser::Service & service, OutputFileContext & ctx)
+{
+    if (!service.m_extends.isEmpty()) {
+        throw std::runtime_error("extending services is not supported");
+    }
+
+    for(const auto & func: service.m_functions)
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        ctx.m_out << blockSeparator << endl << endl;
+
+        ctx.m_out << "void parse" << capitalize(service.m_name)
+            << capitalize(func.m_name) << "Params(" << endl
+            << "    ThriftBinaryBufferReader & reader," << endl;
+
+        bool hasAuthenticationToken = false;
+        for(const auto & param: func.m_params)
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                hasAuthenticationToken = true;
+                continue;
+            }
+
+            auto paramType = typeToStr(
+                param.m_type,
+                func.m_name + QStringLiteral(", ") + param.m_name,
+                MethodType::FuncParamType);
+            if (paramType.startsWith(QStringLiteral("const "))) {
+                paramType = paramType.mid(6);
+            }
+            if (!paramType.endsWith(QStringLiteral(" &"))) {
+                paramType += QStringLiteral(" &");
+            }
+
+            ctx.m_out << "    " << paramType << " " << param.m_name
+                << "," << endl;
+        }
+
+        ctx.m_out << "    IRequestContextPtr & ctx)" << endl
+            << "{" << endl;
+
+        ctx.m_out << "    ThriftFieldType fieldType;" << endl
+            << "    qint16 fieldId;" << endl;
+
+        if (hasAuthenticationToken) {
+            ctx.m_out << "    QString authenticationToken;" << endl;
+        }
+
+        ctx.m_out << endl;
+        ctx.m_out << "    QString fname = " << endl
+            << "        QStringLiteral(\""
+            << service.m_name << "_" << func.m_name << "_pargs\");" << endl;
+
+
+        ctx.m_out << endl;
+        ctx.m_out << "    reader.readStructBegin(fname);" << endl
+            << "    while(true)" << endl
+            << "    {" << endl
+            << "        reader.readFieldBegin(fname, fieldType, fieldId);"
+            << endl
+            << "        if (fieldType == ThriftFieldType::T_STOP) {" << endl
+            << "            break;" << endl
+            << "        }" << endl << endl;
+
+        bool firstParam = true;
+        for(const auto & param: func.m_params)
+        {
+            ctx.m_out << "        ";
+
+            if (!firstParam) {
+                ctx.m_out << "else ";
+            }
+            else {
+                firstParam = false;
+            }
+
+            ctx.m_out << "if (fieldId == " << param.m_id << ")"
+                << endl
+                << "        {" << endl
+                << "            if (fieldType == "
+                << typeToStr(
+                    param.m_type, param.m_name, MethodType::ThriftFieldType)
+                << ") {" << endl;
+
+            writeThriftReadField(
+                ctx.m_out, param, param.m_name + QStringLiteral("."),
+                QLatin1String(""));
+
+            ctx.m_out << "            }" << endl
+                << "            else {" << endl
+                << "                reader.skip(fieldType);" << endl
+                << "            }" << endl
+                << "        }" << endl;
+        }
+
+        ctx.m_out << "        else" << endl
+            << "        {" << endl
+            << "            reader.skip(fieldType);" << endl
+            << "        }" << endl << endl
+            << "        reader.readFieldEnd();" << endl;
+
+        ctx.m_out << "    }" << endl << endl
+            << "    reader.readStructEnd();" << endl
+            << "    reader.readMessageEnd();" << endl << endl;
+
+        ctx.m_out << "    ctx = newRequestContext(";
+        if (hasAuthenticationToken) {
+            ctx.m_out << "authenticationToken";
+        }
+        ctx.m_out << ");" << endl << "}" << endl << endl;
     }
 }
 

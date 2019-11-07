@@ -91,6 +91,15 @@ private:
     void generateDurableServiceClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);
 
+    void generateServerClassDeclaration(
+        const Parser::Service & service, OutputFileContext & ctx);
+
+    void generateServerClassDefinition(
+        const Parser::Service & service, OutputFileContext & ctx);
+
+    void generateServerHelperFunctions(
+        const Parser::Service & service, OutputFileContext & ctx);
+
     // Methods for writing header and source files
 
     enum class HeaderKind

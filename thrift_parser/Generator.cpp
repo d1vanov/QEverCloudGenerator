@@ -2200,7 +2200,7 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
-        << QStringLiteral("Types_io.h");
+        << QStringLiteral("Types_io.h") << QStringLiteral("<Log.h>");
     sortIncludes(additionalIncludes);
     writeHeaderBody(ctx.m_out, QStringLiteral("Servers.h"), additionalIncludes);
 
@@ -3243,6 +3243,57 @@ void Generator::generateServerClassDefinition(
 
         ctx.m_out << "    writer.writeStructBegin(" << endl
             << "        QStringLiteral(\"" << func.m_name << "\"));" << endl << endl;
+
+        if (!func.m_throws.isEmpty())
+        {
+            ctx.m_out << "    if (!exceptionData.isNull())" << endl
+                << "    {" << endl;
+
+            ctx.m_out << "        try" << endl
+                << "        {" << endl
+                << "            exceptionData->throwException();" << endl
+                << "        }" << endl;
+
+            for(const auto & th: func.m_throws)
+            {
+                QString exceptionType = typeToStr(th.m_type, {});
+
+                ctx.m_out << "        catch(const " << exceptionType << " & e)"
+                    << endl
+                    << "        {" << endl
+                    << "            writer.writeFieldBegin(" << endl
+                    << "                QStringLiteral(\"" << exceptionType
+                    << "\")," << endl
+                    << "                ThriftFieldType::T_STRUCT," << endl
+                    << "                " << th.m_id << ");" << endl << endl;
+
+                ctx.m_out << "            write" << exceptionType
+                    << "(writer, e);" << endl
+                    << "            writer.writeFieldEnd();" << endl << endl
+                    << "            // Finalize message and return immediately"
+                    << endl
+                    << "            writer.writeStructEnd();" << endl
+                    << "            writer.writeMessageEnd();" << endl
+                    << "            return;" << endl
+                    << "        }" << endl;
+            }
+
+            ctx.m_out << "        catch(const std::exception & e)" << endl
+                << "        {" << endl
+                << "            // TODO: more proper error handling" << endl
+                << "            QEC_ERROR(\"server\", \"Unknown exception: \""
+                << " << e.what());" << endl
+                << "        }" << endl;
+
+            ctx.m_out << "        catch(...)" << endl
+                << "        {" << endl
+                << "            // TODO: more proper error handling" << endl
+                << "            QEC_ERROR(\"server\", \"Unknown exception\");"
+                << endl
+                << "        }" << endl << endl;
+
+            ctx.m_out << "    }" << endl << endl;
+        }
 
         ctx.m_out << "    // TODO: implement further" << endl << endl;
 

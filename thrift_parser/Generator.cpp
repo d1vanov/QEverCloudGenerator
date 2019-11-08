@@ -3290,7 +3290,7 @@ void Generator::generateServerClassDefinition(
                 << "            // TODO: more proper error handling" << endl
                 << "            QEC_ERROR(\"server\", \"Unknown exception\");"
                 << endl
-                << "        }" << endl << endl;
+                << "        }" << endl;
 
             ctx.m_out << "    }" << endl << endl;
         }

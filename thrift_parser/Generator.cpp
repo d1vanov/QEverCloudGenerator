@@ -1460,6 +1460,7 @@ void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
     }
 
     QStringList extraLinesOutsideNamespace;
+    extraLinesOutsideNamespace.reserve(enumerations.size());
     for(const auto & e: enumerations)
     {
         QString line;
@@ -1755,6 +1756,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
     }
 
     QStringList extraLinesOutsideNamespace;
+    extraLinesOutsideNamespace.reserve(ordered.size() + 1);
     for(const auto & s: qAsConst(ordered)) {
         QString line;
         QTextStream lineOut(&line);

@@ -2868,9 +2868,8 @@ void Generator::generateDurableServiceClassDefinition(
             ctx.m_out << "    QString requestDescription;" << endl
                       << "    QTextStream strm(&requestDescription);" << endl;
 
-            ctx.m_out << "    if (auto log = logger(); "
-                << "log->shouldLog(LogLevel::Trace, \"durable_service\")) {"
-                << endl;
+            ctx.m_out << "    if (logger()->shouldLog(LogLevel::Trace, "
+                << "\"durable_service\")) {" << endl;
 
             for(const auto & param: qAsConst(loggableParams))
             {
@@ -2968,9 +2967,8 @@ void Generator::generateDurableServiceClassDefinition(
             ctx.m_out << "    QString requestDescription;" << endl
                       << "    QTextStream strm(&requestDescription);" << endl;
 
-            ctx.m_out << "    if (auto log = logger(); "
-                << "log->shouldLog(LogLevel::Trace, \"durable_service\")) {"
-                << endl;
+            ctx.m_out << "    if (logger()->shouldLog(LogLevel::Trace, "
+                << "\"durable_service\")) {" << endl;
 
             for(const auto & param: qAsConst(loggableParams))
             {

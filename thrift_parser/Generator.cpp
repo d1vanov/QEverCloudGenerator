@@ -3201,9 +3201,9 @@ void Generator::generateServerClassDefinition(
         ctx.m_out << "void " << service.m_name << "Server::on"
             << capitalize(func.m_name) << "RequestReady(" << endl;
 
-        auto responseType = typeToStr(func.m_type, func.m_name);
-        if (responseType != QStringLiteral("void")) {
-            ctx.m_out << "    " << responseType << " value," << endl;
+        auto responseTypeName = typeToStr(func.m_type, func.m_name);
+        if (responseTypeName != QStringLiteral("void")) {
+            ctx.m_out << "    " << responseTypeName << " value," << endl;
         }
         ctx.m_out << "    QSharedPointer<EverCloudExceptionData> exceptionData)"
             << endl;
@@ -3295,27 +3295,116 @@ void Generator::generateServerClassDefinition(
             ctx.m_out << "    }" << endl << endl;
         }
 
-        ctx.m_out << "    // TODO: implement further" << endl << endl;
+        ctx.m_out << "    writer.writeFieldBegin(" << endl
+            << "        QStringLiteral(\"" << func.m_name << "\")," << endl
+            << "        ";
 
-        if (responseType == QStringLiteral("void"))
-        {
-            ctx.m_out << "    writer.writeFieldBegin(" << endl
-                << "        QLatin1String("")," << endl
-                << "        ThriftFieldType::T_VOID," << endl
-                << "        0);" << endl;
-            ctx.m_out << "    writer.writeFieldEnd();" << endl;
+        if (responseTypeName != QStringLiteral("void")) {
+            ctx.m_out << typeToStr(
+                func.m_type,
+                func.m_name,
+                MethodType::ThriftFieldType);
         }
-        else
-        {
-            // TODO: implement
+        else {
+            ctx.m_out << "ThriftFieldType::T_VOID";
         }
+
+        ctx.m_out << "," << endl << "        0);" << endl;
+
+        if (responseTypeName != QStringLiteral("void"))
+        {
+            ctx.m_out << "    "
+                << typeToStr(func.m_type, func.m_name, MethodType::WriteMethod);
+
+            QSharedPointer<Parser::ListType> listType =
+                func.m_type.dynamicCast<Parser::ListType>();
+
+            QSharedPointer<Parser::MapType> mapType =
+                func.m_type.dynamicCast<Parser::MapType>();
+
+            QSharedPointer<Parser::SetType> setType =
+                func.m_type.dynamicCast<Parser::SetType>();
+
+            if (!listType.isNull())
+            {
+                ctx.m_out << typeToStr(
+                    listType->m_valueType,
+                    func.m_name,
+                    MethodType::ThriftFieldType);
+                ctx.m_out << ", value.size());" << endl;
+
+                ctx.m_out << "    for(const auto & v: qAsConst(value)) {"
+                    << endl << "        ";
+
+                ctx.m_out << typeToStr(
+                    listType->m_valueType,
+                    func.m_name,
+                    MethodType::WriteMethod);
+                ctx.m_out << "v);" << endl
+                    << "    }" << endl
+                    << "    writer.writeListEnd();" << endl;
+            }
+            else if (!setType.isNull())
+            {
+                ctx.m_out << typeToStr(
+                    listType->m_valueType,
+                    func.m_name,
+                    MethodType::ThriftFieldType);
+                ctx.m_out << ", value.size());" << endl;
+
+                ctx.m_out << "    for(const auto & v: qAsConst(value)) {"
+                    << endl << "        ";
+
+                ctx.m_out << typeToStr(
+                    setType->m_valueType,
+                    func.m_name,
+                    MethodType::WriteMethod);
+                ctx.m_out << "v);" << endl
+                    << "    }" << endl
+                    << "    writer.writeSetEnd();" << endl;
+            }
+            else if (!mapType.isNull())
+            {
+                ctx.m_out << typeToStr(
+                    mapType->m_keyType,
+                    func.m_name,
+                    MethodType::ThriftFieldType);
+                ctx.m_out << ", ";
+                ctx.m_out << typeToStr(
+                    mapType->m_valueType,
+                    func.m_name,
+                    MethodType::ThriftFieldType);
+                ctx.m_out << ", value);" << endl;
+
+                ctx.m_out << "    for(const auto & it: toRange(qAsConst(value))) {"
+                    << endl << "        ";
+
+                ctx.m_out << typeToStr(
+                    mapType->m_keyType,
+                    func.m_name,
+                    MethodType::WriteMethod);
+                ctx.m_out << "it.key());" << endl;
+
+                ctx.m_out << typeToStr(
+                    mapType->m_valueType,
+                    func.m_name,
+                    MethodType::WriteMethod);
+                ctx.m_out << "it.value());" << endl;
+
+                ctx.m_out << "    }" << endl
+                    << "    writer.writeMapEnd();" << endl;
+            }
+            else
+            {
+                ctx.m_out << "value);" << endl;
+            }
+        }
+
+        ctx.m_out << "    writer.writeFieldEnd();" << endl << endl;
 
         ctx.m_out << "    writer.writeStructEnd();" << endl
-            << "    writer.writeMessageEnd();" << endl << endl;
+            << "    writer.writeMessageEnd();" << endl;
 
-        if (responseType != QStringLiteral("void")) {
-            ctx.m_out << "    Q_UNUSED(value)" << endl;
-        }
         ctx.m_out << "}" << endl << endl;
     }
 }

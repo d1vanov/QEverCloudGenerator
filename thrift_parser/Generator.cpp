@@ -1750,7 +1750,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             << endl;
         ctx.m_out << "    {" << endl;
         ctx.m_out << "        return !(*this == other);" << endl;
-        ctx.m_out << "    }" << endl << endl;
+        ctx.m_out << "    }" << endl;
 
         ctx.m_out << "};" << endl << endl;
     }

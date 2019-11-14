@@ -35,7 +35,8 @@
 enum class OutputFileType
 {
     Interface,
-    Implementation
+    Implementation,
+    Test
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -73,6 +74,8 @@ private:
 
     void generateServerHeader(Parser * parser, const QString & outPath);
     void generateServerCpp(Parser * parser, const QString & outPath);
+
+    void generateTestServerHeaders(Parser * parser, const QString & outPath);
 
     enum class ServiceClassType
     {

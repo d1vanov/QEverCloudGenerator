@@ -67,6 +67,9 @@ QString generatedFileOutputPath(
     else if (type == OutputFileType::Implementation) {
         path += QStringLiteral("/src/generated");
     }
+    else if (type == OutputFileType::Test) {
+        path += QStringLiteral("/src/tests/generated");
+    }
     else {
         throw std::logic_error(
             QString::fromUtf8("Wrong value of output file type flag: %1")
@@ -2226,6 +2229,57 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
     writeBodyFooter(ctx.m_out);
 }
 
+void Generator::generateTestServerHeaders(
+    Parser * parser, const QString & outPath)
+{
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("../Common.h") << QStringLiteral("<QObject>");
+    sortIncludes(additionalIncludes);
+
+    const auto & services = parser->services();
+    for(const auto & s: services)
+    {
+        const QString fileName = QStringLiteral("Test") + s.m_name +
+            QStringLiteral(".h");
+
+        OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+        writeHeaderHeader(
+            ctx.m_out,
+            fileName,
+            additionalIncludes,
+            HeaderKind::Private);
+
+        if (!s.m_extends.isEmpty()) {
+            throw std::runtime_error("extending services is not supported");
+        }
+
+        ctx.m_out << blockSeparator << endl << endl;
+
+        ctx.m_out << "class Test" << s.m_name << ": public QObject" << endl
+            << "{" << endl
+            << "    Q_OBJECT" << endl
+            << "public:" << endl
+            << "    explicit Test" << s.m_name << "(QObject * parent = nullptr);"
+            << endl << endl
+            << "private:" << endl;
+
+        for(const auto & func: s.m_functions)
+        {
+            if (func.m_isOneway) {
+                throw std::runtime_error("oneway functions are not supported");
+            }
+
+            ctx.m_out << "    void shouldExecute" << capitalize(func.m_name)
+                << "();" << endl;
+        }
+
+        ctx.m_out << "};" << endl << endl;
+
+        writeHeaderFooter(ctx.m_out, fileName);
+    }
+}
+
 void Generator::generateServiceClassDeclaration(
     const Parser::Service & service,
     const ServiceClassType serviceClassType,
@@ -3585,5 +3639,7 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
 
     generateServerHeader(parser, outPath);
     generateServerCpp(parser, outPath);
+
+    generateTestServerHeaders(parser, outPath);
 }
 

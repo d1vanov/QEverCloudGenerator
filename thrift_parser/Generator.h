@@ -76,6 +76,7 @@ private:
     void generateServerCpp(Parser * parser, const QString & outPath);
 
     void generateTestServerHeaders(Parser * parser, const QString & outPath);
+    void generateTestServerCpps(Parser * parser, const QString & outPath);
 
     enum class ServiceClassType
     {
@@ -118,7 +119,8 @@ private:
 
     void writeHeaderBody(
         QTextStream & out, const QString & headerFileName,
-        const QStringList & additionalIncludes = QStringList());
+        const QStringList & additionalIncludes = QStringList(),
+        const HeaderKind headerKind = HeaderKind::Public);
 
     void writeHeaderFooter(
         QTextStream & out, const QString & fileName,

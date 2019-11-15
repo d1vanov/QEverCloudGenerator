@@ -420,10 +420,17 @@ void Generator::writeHeaderHeader(
 
 void Generator::writeHeaderBody(
     QTextStream & out, const QString & headerFileName,
-    const QStringList & additionalIncludes)
+    const QStringList & additionalIncludes,
+    const HeaderKind headerKind)
 {
     out << disclaimer << endl;
-    out << "#include <generated/" << headerFileName << ">" << endl;
+
+    if (headerKind == HeaderKind::Public) {
+        out << "#include <generated/" << headerFileName << ">" << endl;
+    }
+    else {
+        out << "#include \"" << headerFileName << "\"" << endl;
+    }
     out << "#include \"../Impl.h\"" << endl;
 
     for(const auto & include: additionalIncludes)
@@ -2239,6 +2246,10 @@ void Generator::generateTestServerHeaders(
     const auto & services = parser->services();
     for(const auto & s: services)
     {
+        if (!s.m_extends.isEmpty()) {
+            throw std::runtime_error("extending services is not supported");
+        }
+
         const QString fileName = QStringLiteral("Test") + s.m_name +
             QStringLiteral(".h");
 
@@ -2249,10 +2260,6 @@ void Generator::generateTestServerHeaders(
             fileName,
             additionalIncludes,
             HeaderKind::Private);
-
-        if (!s.m_extends.isEmpty()) {
-            throw std::runtime_error("extending services is not supported");
-        }
 
         ctx.m_out << blockSeparator << endl << endl;
 
@@ -2277,6 +2284,167 @@ void Generator::generateTestServerHeaders(
         ctx.m_out << "};" << endl << endl;
 
         writeHeaderFooter(ctx.m_out, fileName);
+    }
+}
+
+void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
+{
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("<generated/Servers.h>");
+    sortIncludes(additionalIncludes);
+
+    const auto & services = parser->services();
+    for(const auto & s: services)
+    {
+        if (!s.m_extends.isEmpty()) {
+            throw std::runtime_error("extending services is not supported");
+        }
+
+        const QString fileName = QStringLiteral("Test") + s.m_name +
+            QStringLiteral(".cpp");
+
+        OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+        writeHeaderBody(
+            ctx.m_out,
+            QStringLiteral("Test") + s.m_name + QStringLiteral(".h"),
+            additionalIncludes,
+            HeaderKind::Private);
+
+        ctx.m_out << blockSeparator << endl << endl;
+
+        ctx.m_out << "Test" << s.m_name << "::Test" << s.m_name
+            << "(QObject * parent) :" << endl
+            << "    QObject(parent)" << endl
+            << "{}" << endl << endl;
+
+        for(const auto & func: s.m_functions)
+        {
+            if (func.m_isOneway) {
+                throw std::runtime_error("oneway functions are not supported");
+            }
+
+            ctx.m_out << blockSeparator << endl << endl;
+
+            QString funcName = capitalize(func.m_name);
+
+            ctx.m_out << "class Test" << s.m_name << funcName
+                << "Helper: public QObject" << endl
+                << "{" << endl
+                << "    Q_OBJECT" << endl;
+
+            auto responseType = typeToStr(func.m_type, func.m_name);
+            ctx.m_out << "public:" << endl
+                << "    using Executor = std::function<" << endl
+                << "        " << responseType << "(" << endl;
+
+            for(const auto & param: func.m_params)
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    continue;
+                }
+
+                auto paramType = typeToStr(
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                ctx.m_out << "            " << paramType << "," << endl;
+            }
+
+            ctx.m_out << "            IRequestContextPtr ctx)>;"
+                << endl << endl;
+
+            ctx.m_out << "public:" << endl
+                << "    explicit Test" << s.m_name << funcName
+                << "(Executor executor, QObject * parent = nullptr) :" << endl
+                << "        QObject(parent)," << endl
+                << "        m_executor(std::move(executor))" << endl
+                << "    {}" << endl << endl;
+
+            ctx.m_out << "Q_SIGNALS:" << endl
+                << "    void " << funcName << "RequestReady(" << endl;
+            if (responseType != QStringLiteral("void")) {
+                ctx.m_out << "        " << responseType << " value," << endl;
+            }
+            ctx.m_out << "        QSharedPointer<EverCloudExceptionData> "
+                << "exceptionData);" << endl << endl;
+
+            ctx.m_out << "public Q_SLOTS:" << endl
+                << "    void on" << funcName << "RequestReceived(" << endl;
+
+            for(const auto & param: func.m_params)
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    continue;
+                }
+
+                auto paramType = typeToStr(
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name,
+                    MethodType::FuncParamType);
+                if (paramType.startsWith(QStringLiteral("const "))) {
+                    paramType = paramType.mid(6);
+                }
+                if (paramType.endsWith(QStringLiteral(" &"))) {
+                    paramType = paramType.mid(0, paramType.size() - 2);
+                }
+
+                ctx.m_out << "        " << paramType << " " << param.m_name
+                    << "," << endl;
+            }
+
+            ctx.m_out << "        IRequestContextPtr ctx)" << endl
+                << "    {" << endl;
+
+            ctx.m_out << "        try" << endl
+                << "        {" << endl;
+
+            ctx.m_out << "            ";
+
+            if (responseType != QStringLiteral("void")) {
+                ctx.m_out << "auto value = ";
+            }
+
+            ctx.m_out << "m_executor(" << endl;
+
+            for(const auto & param: func.m_params)
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    continue;
+                }
+
+                ctx.m_out << "                " << param.m_name << "," << endl;
+            }
+
+            ctx.m_out << "                ctx);" << endl;
+
+            ctx.m_out << "            // TODO: emit value" << endl
+                << "            Q_UNUSED(value)" << endl
+                << "        }" << endl;
+
+            ctx.m_out << "        catch(const EverCloudException & e)" << endl
+                << "        {" << endl
+                << "            // TODO: emit error" << endl
+                << "            Q_UNUSED(e)" << endl
+                << "        }" << endl;
+
+            ctx.m_out << "    }" << endl << endl;
+
+            ctx.m_out << "private:" << endl
+                << "    Executor m_executor;" << endl;
+
+            ctx.m_out << "};" << endl << endl;
+        }
+
+        // TODO: test method implementation
+
+        writeBodyFooter(ctx.m_out);
+
+        ctx.m_out << endl
+            << "#include <Test" << s.m_name << ".moc>" << endl;
     }
 }
 
@@ -3641,5 +3809,6 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
     generateServerCpp(parser, outPath);
 
     generateTestServerHeaders(parser, outPath);
+    generateTestServerCpps(parser, outPath);
 }
 

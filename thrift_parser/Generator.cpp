@@ -2372,7 +2372,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 << "    {}" << endl << endl;
 
             ctx.m_out << "Q_SIGNALS:" << endl
-                << "    void " << funcName << "RequestReady(" << endl;
+                << "    void " << func.m_name << "RequestReady(" << endl;
             if (responseType != QStringLiteral("void")) {
                 ctx.m_out << "        " << responseType << " value," << endl;
             }
@@ -2428,19 +2428,31 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 ctx.m_out << "                " << param.m_name << "," << endl;
             }
 
-            ctx.m_out << "                ctx);" << endl;
-            ctx.m_out << "            // TODO: emit finished" << endl;
+            ctx.m_out << "                ctx);" << endl << endl;
+
+            ctx.m_out << "            Q_EMIT " << func.m_name << "RequestReady("
+                << endl;
 
             if (responseType != QStringLiteral("void")) {
-                ctx.m_out << "            Q_UNUSED(v)" << endl;
+                ctx.m_out << "                v," << endl;
             }
 
-            ctx.m_out << "        }" << endl;
+            ctx.m_out << "                "
+                << "QSharedPointer<EverCloudExceptionData>());" << endl
+                << "        }" << endl;
 
             ctx.m_out << "        catch(const EverCloudException & e)" << endl
-                << "        {" << endl
-                << "            // TODO: emit error" << endl
-                << "            Q_UNUSED(e)" << endl
+                << "        {" << endl;
+
+            ctx.m_out << "            Q_EMIT " << func.m_name << "RequestReady("
+                << endl;
+
+            if (responseType != QStringLiteral("void")) {
+                ctx.m_out << "                {}," << endl;
+            }
+
+            ctx.m_out << "                "
+                << "e.exceptionData());" << endl
                 << "        }" << endl;
 
             ctx.m_out << "    }" << endl << endl;

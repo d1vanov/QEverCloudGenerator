@@ -109,7 +109,8 @@ private:
     enum class HeaderKind
     {
         Public,
-        Private
+        Private,
+        Test
     };
 
     void writeHeaderHeader(

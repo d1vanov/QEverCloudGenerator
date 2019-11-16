@@ -431,7 +431,13 @@ void Generator::writeHeaderBody(
     else {
         out << "#include \"" << headerFileName << "\"" << endl;
     }
-    out << "#include \"../Impl.h\"" << endl;
+
+    if (headerKind == HeaderKind::Test) {
+        out << "#include \"../../Impl.h\"" << endl;
+    }
+    else {
+        out << "#include \"../Impl.h\"" << endl;
+    }
 
     for(const auto & include: additionalIncludes)
     {
@@ -2263,13 +2269,13 @@ void Generator::generateTestServerHeaders(
 
         ctx.m_out << blockSeparator << endl << endl;
 
-        ctx.m_out << "class Test" << s.m_name << ": public QObject" << endl
+        ctx.m_out << "class " << s.m_name << "Tester: public QObject" << endl
             << "{" << endl
             << "    Q_OBJECT" << endl
             << "public:" << endl
-            << "    explicit Test" << s.m_name << "(QObject * parent = nullptr);"
+            << "    explicit " << s.m_name << "Tester(QObject * parent = nullptr);"
             << endl << endl
-            << "private:" << endl;
+            << "private Q_SLOTS:" << endl;
 
         for(const auto & func: s.m_functions)
         {
@@ -2309,11 +2315,11 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             ctx.m_out,
             QStringLiteral("Test") + s.m_name + QStringLiteral(".h"),
             additionalIncludes,
-            HeaderKind::Private);
+            HeaderKind::Test);
 
         ctx.m_out << blockSeparator << endl << endl;
 
-        ctx.m_out << "Test" << s.m_name << "::Test" << s.m_name
+        ctx.m_out << s.m_name << "Tester::" << s.m_name << "Tester"
             << "(QObject * parent) :" << endl
             << "    QObject(parent)" << endl
             << "{}" << endl << endl;
@@ -2328,8 +2334,8 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             QString funcName = capitalize(func.m_name);
 
-            ctx.m_out << "class Test" << s.m_name << funcName
-                << "Helper: public QObject" << endl
+            ctx.m_out << "class " << s.m_name << funcName
+                << "TesterHelper: public QObject" << endl
                 << "{" << endl
                 << "    Q_OBJECT" << endl;
 
@@ -2356,8 +2362,11 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 << endl << endl;
 
             ctx.m_out << "public:" << endl
-                << "    explicit Test" << s.m_name << funcName
-                << "(Executor executor, QObject * parent = nullptr) :" << endl
+                << "    explicit " << s.m_name << funcName << "TesterHelper("
+                << endl
+                << "            Executor executor," << endl
+                << "            QObject * parent = nullptr) :"
+                << endl
                 << "        QObject(parent)," << endl
                 << "        m_executor(std::move(executor))" << endl
                 << "    {}" << endl << endl;
@@ -2404,7 +2413,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             ctx.m_out << "            ";
 
             if (responseType != QStringLiteral("void")) {
-                ctx.m_out << "auto value = ";
+                ctx.m_out << "auto v = ";
             }
 
             ctx.m_out << "m_executor(" << endl;
@@ -2420,10 +2429,13 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             }
 
             ctx.m_out << "                ctx);" << endl;
+            ctx.m_out << "            // TODO: emit finished" << endl;
 
-            ctx.m_out << "            // TODO: emit value" << endl
-                << "            Q_UNUSED(value)" << endl
-                << "        }" << endl;
+            if (responseType != QStringLiteral("void")) {
+                ctx.m_out << "            Q_UNUSED(v)" << endl;
+            }
+
+            ctx.m_out << "        }" << endl;
 
             ctx.m_out << "        catch(const EverCloudException & e)" << endl
                 << "        {" << endl
@@ -2439,7 +2451,17 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             ctx.m_out << "};" << endl << endl;
         }
 
-        // TODO: test method implementation
+        for(const auto & func: s.m_functions)
+        {
+            ctx.m_out << blockSeparator << endl << endl;
+
+            ctx.m_out << "void " << s.m_name << "Tester::shouldExecute"
+                << capitalize(func.m_name) << "()" << endl;
+
+            ctx.m_out << "{" << endl
+                << "    // TODO: implement" << endl
+                << "}" << endl << endl;
+        }
 
         writeBodyFooter(ctx.m_out);
 

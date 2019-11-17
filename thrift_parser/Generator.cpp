@@ -3324,6 +3324,17 @@ void Generator::generateServerClassDeclaration(
         ctx.m_out << "IRequestContextPtr ctx);" << endl << endl;
     }
 
+    ctx.m_out << "    // Signals used to send encoded response data" << endl;
+    for(const auto & func: qAsConst(service.m_functions))
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        ctx.m_out << "    void " << func.m_name << "RequestReady(" << endl
+            << "        QByteArray data);" << endl << endl;
+    }
+
     ctx.m_out << "public Q_SLOTS:" << endl;
     ctx.m_out << "    // Slot used to deliver requests to the server" << endl
         << "    void onRequest(QByteArray data);" << endl << endl;
@@ -3659,7 +3670,10 @@ void Generator::generateServerClassDefinition(
         ctx.m_out << "    writer.writeFieldEnd();" << endl << endl;
 
         ctx.m_out << "    writer.writeStructEnd();" << endl
-            << "    writer.writeMessageEnd();" << endl;
+            << "    writer.writeMessageEnd();" << endl << endl;
+
+        ctx.m_out << "    Q_EMIT " << func.m_name << "RequestReady(" << endl
+            << "        writer.buffer());" << endl;
 
         ctx.m_out << "}" << endl << endl;
     }

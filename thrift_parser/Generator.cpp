@@ -2738,11 +2738,6 @@ void Generator::generateServiceClassDefinition(
             << " " << readReplyName << "(QByteArray reply)" << endl;
         ctx.m_out << "{" << endl;
 
-        ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
-            << readReplyName << "\");" << endl;
-
-        ctx.m_out << endl;
-
         if (!isVoidResult) {
             ctx.m_out << "    bool resultIsSet = false;" << endl
                 << "    " << typeToStr(f.m_type, f.m_name)
@@ -2908,8 +2903,13 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << ")" << endl
             << "{" << endl;
 
+        ctx.m_out << "    if (!ctx) {" << endl
+            << "        ctx = m_ctx;" << endl
+            << "    }" << endl << endl;
+
         ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
-            << service.m_name << "::" << f.m_name << "\");" << endl;
+            << service.m_name << "::" << f.m_name << ": request id = \""
+            << endl << "        << ctx->requestId());" << endl;
 
         auto loggableParams = loggableFields(f.m_params);
         if (!loggableParams.isEmpty())
@@ -2931,9 +2931,6 @@ void Generator::generateServiceClassDefinition(
         }
 
         ctx.m_out << endl;
-        ctx.m_out << "    if (!ctx) {" << endl
-            << "        ctx = m_ctx;" << endl
-            << "    }" << endl;
 
         ctx.m_out << "    QByteArray params = " << prepareParamsName << "("
             << endl;
@@ -2956,6 +2953,11 @@ void Generator::generateServiceClassDefinition(
             << "        m_url," << endl
             << "        params," << endl
             << "        ctx->requestTimeout());" << endl << endl;
+
+        ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
+            << "received reply for request with id = \"" << endl
+            << "        << ctx->requestId());" << endl;
+
         if (isVoidResult) {
             ctx.m_out << "    " << readReplyName << "(reply);" << endl;
         }
@@ -3032,6 +3034,7 @@ void Generator::generateServiceClassDefinition(
             << "        m_url," << endl
             << "        params," << endl
             << "        ctx->requestTimeout()," << endl
+            << "        ctx->requestId()," << endl
             << "        " << asyncReadFunctionName << ");" << endl;
 
         ctx.m_out << "}" << endl << endl;

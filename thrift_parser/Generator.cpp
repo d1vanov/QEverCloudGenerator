@@ -2088,6 +2088,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
 
             if (s.m_name == QStringLiteral("UserStore")) {
                 ctx.m_out << "    QString host," << endl
+                    << "    quint16 port," << endl
                     << "    IRequestContextPtr ctx = {}," << endl
                     << "    QObject * parent = nullptr);" << endl
                     << endl;
@@ -2162,11 +2163,12 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
 
         if (s.m_name == QStringLiteral("UserStore")) {
             ctx.m_out << "    QString host," << endl
+                << "    quint16 port," << endl
                 << "    IRequestContextPtr ctx," << endl
                 << "    QObject * parent)" << endl
                 << "{" << endl
                 << "    return new " << s.m_name
-                << "(host, ctx, parent);" << endl
+                << "(host, port, ctx, parent);" << endl
                 << "}" << endl
                 << endl;
         }
@@ -2504,7 +2506,8 @@ void Generator::generateServiceClassDeclaration(
         ctx.m_out << "    explicit " << className << "(" << endl;
 
         if (serviceClassType == ServiceClassType::NonDurable) {
-            ctx.m_out << "            QString host," << endl;
+            ctx.m_out << "            QString host," << endl
+                << "            quint16 port," << endl;
         }
         else {
             ctx.m_out << "            I" << service.m_name << "Ptr service,"
@@ -2531,6 +2534,7 @@ void Generator::generateServiceClassDeclaration(
             ctx.m_out << "        QUrl url;" << endl
                 << "        url.setScheme(QStringLiteral(\"https\"));" << endl
                 << "        url.setHost(host);" << endl
+                << "        url.setPort(static_cast<int>(port));" << endl
                 << "        url.setPath(QStringLiteral(\"/edam/user\"));" << endl
                 << "        m_url = url.toString(QUrl::StripTrailingSlash);"
                 << endl;

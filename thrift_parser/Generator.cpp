@@ -3679,6 +3679,10 @@ void Generator::generateServerClassDefinition(
 
         ctx.m_out << "    writer.writeFieldEnd();" << endl << endl;
 
+        ctx.m_out << "    writer.writeFieldBegin(QString(), "
+            << "ThriftFieldType::T_STOP, 0);" << endl
+            << "    writer.writeFieldEnd();" << endl << endl;
+
         ctx.m_out << "    writer.writeStructEnd();" << endl
             << "    writer.writeMessageEnd();" << endl << endl;
 
@@ -3743,7 +3747,7 @@ void Generator::generateServerHelperFunctions(
         }
 
         ctx.m_out << endl;
-        ctx.m_out << "    QString fname = " << endl
+        ctx.m_out << "    QString fname =" << endl
             << "        QStringLiteral(\""
             << service.m_name << "_" << func.m_name << "_pargs\");" << endl;
 

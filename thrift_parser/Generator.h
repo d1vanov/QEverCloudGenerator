@@ -184,6 +184,8 @@ private:
 
     QString capitalize(const QString & input) const;
 
+    QString getGenerateRandomValueFunction(const QString & typeName) const;
+
     // Write methods for particular parsed fields
 
     void writeEnumeration(

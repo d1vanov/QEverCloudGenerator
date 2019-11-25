@@ -193,6 +193,37 @@ QString Generator::capitalize(const QString & input) const
     return result;
 }
 
+QString Generator::getGenerateRandomValueFunction(const QString & typeName) const
+{
+    if (typeName == QStringLiteral("bool")) {
+        return QStringLiteral("tests::generateRandomBool()");
+    }
+    else if (typeName == QStringLiteral("string")) {
+        return QStringLiteral("tests::generateRandomString()");
+    }
+    else if (typeName == QStringLiteral("double")) {
+        return QStringLiteral("tests::generateRandomDouble()");
+    }
+    else if (typeName == QStringLiteral("binary")) {
+        return QStringLiteral("tests::generateRandomString().toUtf8()");
+    }
+    else if (typeName == QStringLiteral("byte")) {
+        return QStringLiteral("tests::generateRandomUint8()");
+    }
+    else if (typeName == QStringLiteral("i16")) {
+        return QStringLiteral("tests::generateRandomInt16()");
+    }
+    else if (typeName == QStringLiteral("i32")) {
+        return QStringLiteral("tests::generateRandomInt32()");
+    }
+    else if (typeName == QStringLiteral("i64")) {
+        return QStringLiteral("tests::generateRandomInt64()");
+    }
+    else {
+        return QStringLiteral("tests::generate") + typeName + QStringLiteral("()");
+    }
+}
+
 void Generator::writeEnumeration(
     QTextStream & out, const Parser::Enumeration & e) const
 {
@@ -2300,7 +2331,11 @@ void Generator::generateTestServerHeaders(
 void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("<generated/Servers.h>");
+        << QStringLiteral("../Common.h")
+        << QStringLiteral("<generated/Servers.h>")
+        << QStringLiteral("<generated/Services.h>")
+        << QStringLiteral("<QTcpServer>")
+        << QStringLiteral("<QtTest/QtTest>");
     sortIncludes(additionalIncludes);
 
     const auto & services = parser->services();
@@ -2474,9 +2509,136 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             ctx.m_out << "void " << s.m_name << "Tester::shouldExecute"
                 << capitalize(func.m_name) << "()" << endl;
 
-            ctx.m_out << "{" << endl
-                << "    // TODO: implement" << endl
-                << "}" << endl << endl;
+            ctx.m_out << "{" << endl;
+
+            quint32 paramCounter = 0;
+            bool hasAuthenticationToken = false;
+            for(const auto & param: func.m_params)
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    hasAuthenticationToken = true;
+                    continue;
+                }
+
+                auto paramTypeName = typeToStr(
+                    param.m_type,
+                    {},
+                    MethodType::TypeName);
+
+                QSharedPointer<Parser::BaseType> baseType =
+                    param.m_type.dynamicCast<Parser::BaseType>();
+
+                QSharedPointer<Parser::IdentifierType> identifierType =
+                    param.m_type.dynamicCast<Parser::IdentifierType>();
+
+                QString actualParamTypeName;
+
+                if (!baseType.isNull()) {
+                    actualParamTypeName = baseType->m_baseType;
+                }
+                else if (!identifierType.isNull()) {
+                    actualParamTypeName = clearInclude(identifierType->m_identifier);
+                    actualParamTypeName = clearTypedef(actualParamTypeName);
+                }
+                else {
+                    throw std::runtime_error("Unsupported parameter type: " +
+                        paramTypeName.toStdString());
+                }
+
+                ctx.m_out << "    " << paramTypeName << " " << param.m_name
+                    << " = " << getGenerateRandomValueFunction(actualParamTypeName)
+                    << ";" << endl;
+            }
+
+            ctx.m_out << "    IRequestContextPtr ctx = newRequestContext(";
+            if (hasAuthenticationToken) {
+                ctx.m_out << endl
+                    << "        QStringLiteral(\"authenticationToken\")";
+            }
+            ctx.m_out << ");" << endl << endl;
+
+            QString responseTypeName = typeToStr(
+                func.m_type,
+                {},
+                MethodType::TypeName);
+
+            // FIXME: must support list, set and map response types
+
+            QString actualResponseTypeName = clearInclude(responseTypeName);
+            actualResponseTypeName = clearTypedef(actualResponseTypeName);
+
+            ctx.m_out << "    " << responseTypeName << " response = "
+                << getGenerateRandomValueFunction(actualResponseTypeName)
+                << ";" << endl << endl;
+
+            ctx.m_out << "    " << s.m_name << capitalize(func.m_name)
+                << "TesterHelper helper(" << endl
+                << "        [&] (";
+
+            bool hasParams = false;
+            bool firstParam = true;
+            for(const auto & param: func.m_params)
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    // Auth token is a part of IRequestContext interface
+                    continue;
+                }
+
+                hasParams = true;
+
+                auto paramTypeName = typeToStr(
+                    param.m_type,
+                    {},
+                    MethodType::TypeName);
+
+                QSharedPointer<Parser::BaseType> baseType =
+                    param.m_type.dynamicCast<Parser::BaseType>();
+                if (baseType.isNull() ||
+                    baseType->m_baseType == QStringLiteral("string"))
+                {
+                    paramTypeName.prepend(QStringLiteral("const "));
+                    paramTypeName.append(QStringLiteral(" &"));
+                }
+
+                if (!firstParam) {
+                    ctx.m_out << "             ";
+                }
+
+                ctx.m_out << paramTypeName << " "
+                    << param.m_name << "Param," << endl;
+
+                firstParam = false;
+            }
+
+            if (hasParams) {
+                ctx.m_out << "             ";
+            }
+
+            ctx.m_out << "IRequestContextPtr ctxParam) -> "
+                << responseTypeName << endl;
+
+            ctx.m_out << "        {" << endl;
+
+            for(const auto & param: func.m_params)
+            {
+                if (param.m_name == QStringLiteral("authenticationToken")) {
+                    ctx.m_out << "            Q_ASSERT("
+                        << "ctx->authenticationToken() == "
+                        << "ctxParam->authenticationToken());" << endl;
+                    continue;
+                }
+
+                ctx.m_out << "            Q_ASSERT(" << param.m_name << " == "
+                    << param.m_name << "Param);" << endl;
+            }
+
+            ctx.m_out << "            return response;" << endl
+                << "        });" << endl;
+
+            ctx.m_out << "    // TODO: implement" << endl;
+
+            ctx.m_out << "}" << endl << endl;
         }
 
         writeBodyFooter(ctx.m_out);

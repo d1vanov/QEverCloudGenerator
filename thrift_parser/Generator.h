@@ -104,6 +104,9 @@ private:
     void generateServerHelperFunctions(
         const Parser::Service & service, OutputFileContext & ctx);
 
+    void generateTestServerHelperClassDefinition(
+        const Parser::Service & service, OutputFileContext & ctx);
+
     // Methods for writing header and source files
 
     enum class HeaderKind

@@ -195,28 +195,43 @@ QString Generator::capitalize(const QString & input) const
 
 QString Generator::getGenerateRandomValueFunction(const QString & typeName) const
 {
-    if (typeName == QStringLiteral("bool")) {
+    if (typeName == QStringLiteral("bool"))
+    {
         return QStringLiteral("tests::generateRandomBool()");
     }
-    else if (typeName == QStringLiteral("string")) {
+    else if ( (typeName == QStringLiteral("QString")) ||
+              (typeName == QStringLiteral("string")) )
+    {
         return QStringLiteral("tests::generateRandomString()");
     }
-    else if (typeName == QStringLiteral("double")) {
+    else if (typeName == QStringLiteral("double"))
+    {
         return QStringLiteral("tests::generateRandomDouble()");
     }
-    else if (typeName == QStringLiteral("binary")) {
+    else if ( (typeName == QStringLiteral("QByteArray")) ||
+              (typeName == QStringLiteral("binary")) )
+    {
         return QStringLiteral("tests::generateRandomString().toUtf8()");
     }
-    else if (typeName == QStringLiteral("byte")) {
+    else if ( (typeName == QStringLiteral("quint8")) ||
+              (typeName == QStringLiteral("byte")) ||
+              (typeName == QStringLiteral("char")) )
+    {
         return QStringLiteral("tests::generateRandomUint8()");
     }
-    else if (typeName == QStringLiteral("i16")) {
+    else if ( (typeName == QStringLiteral("qint16")) ||
+              (typeName == QStringLiteral("i16")) )
+    {
         return QStringLiteral("tests::generateRandomInt16()");
     }
-    else if (typeName == QStringLiteral("i32")) {
+    else if ( (typeName == QStringLiteral("qint32")) ||
+              (typeName == QStringLiteral("i32")) )
+    {
         return QStringLiteral("tests::generateRandomInt32()");
     }
-    else if (typeName == QStringLiteral("i64")) {
+    else if ( (typeName == QStringLiteral("qint64")) ||
+              (typeName == QStringLiteral("i64")) )
+    {
         return QStringLiteral("tests::generateRandomInt64()");
     }
     else {
@@ -2338,6 +2353,8 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
         << QStringLiteral("<QtTest/QtTest>");
     sortIncludes(additionalIncludes);
 
+    const auto & enumerations = parser->enumerations();
+
     const auto & services = parser->services();
     for(const auto & s: services)
     {
@@ -2547,8 +2564,32 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 }
 
                 ctx.m_out << "    " << paramTypeName << " " << param.m_name
-                    << " = " << getGenerateRandomValueFunction(actualParamTypeName)
-                    << ";" << endl;
+                    << " = ";
+
+                auto enumIt = std::find_if(
+                    enumerations.begin(),
+                    enumerations.end(),
+                    [&] (const Parser::Enumeration & e)
+                    {
+                        return e.m_name == actualParamTypeName;
+                    });
+                if (enumIt != enumerations.end())
+                {
+                    const Parser::Enumeration & e = *enumIt;
+                    if (e.m_values.isEmpty()) {
+                        throw std::runtime_error(
+                            "Detected enumeration without items: " +
+                            e.m_name.toStdString());
+                    }
+
+                    ctx.m_out << actualParamTypeName
+                        << "::" << e.m_values[0].first << ";" << endl << endl;
+                }
+                else
+                {
+                    ctx.m_out << getGenerateRandomValueFunction(actualParamTypeName)
+                        << ";" << endl;
+                }
             }
 
             ctx.m_out << "    IRequestContextPtr ctx = newRequestContext(";
@@ -2563,14 +2604,115 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 {},
                 MethodType::TypeName);
 
-            // FIXME: must support list, set and map response types
+            bool responseTypeIsVoid = (responseTypeName == QStringLiteral("void"));
+            if (!responseTypeIsVoid) {
+                ctx.m_out << "    " << responseTypeName << " response";
+            }
 
-            QString actualResponseTypeName = clearInclude(responseTypeName);
-            actualResponseTypeName = clearTypedef(actualResponseTypeName);
+            QSharedPointer<Parser::ListType> responseListType =
+                func.m_type.dynamicCast<Parser::ListType>();
 
-            ctx.m_out << "    " << responseTypeName << " response = "
-                << getGenerateRandomValueFunction(actualResponseTypeName)
-                << ";" << endl << endl;
+            QSharedPointer<Parser::SetType> responseSetType =
+                func.m_type.dynamicCast<Parser::SetType>();
+
+            QSharedPointer<Parser::MapType> responseMapType =
+                func.m_type.dynamicCast<Parser::MapType>();
+
+            if (!responseListType.isNull())
+            {
+                auto valueType = typeToStr(
+                    responseListType->m_valueType,
+                    {},
+                    MethodType::TypeName);
+
+                auto actualValueType = clearInclude(valueType);
+                actualValueType = clearTypedef(actualValueType);
+
+                ctx.m_out << ";" << endl;
+                for(size_t i = 0; i < 3; ++i) {
+                    ctx.m_out << "    response << "
+                        << getGenerateRandomValueFunction(actualValueType)
+                        << ";" << endl;
+                }
+                ctx.m_out << endl;
+            }
+            else if (!responseSetType.isNull())
+            {
+                auto valueType = typeToStr(
+                    responseSetType->m_valueType,
+                    {},
+                    MethodType::TypeName);
+
+                auto actualValueType = clearInclude(valueType);
+                actualValueType = clearTypedef(actualValueType);
+
+                ctx.m_out << ";" << endl;
+                for(size_t i = 0; i < 3; ++i) {
+                    ctx.m_out << "    Q_UNUSED(response.insert("
+                        << getGenerateRandomValueFunction(actualValueType)
+                        << "))" << endl;
+                }
+                ctx.m_out << endl;
+            }
+            else if (!responseMapType.isNull())
+            {
+                auto keyType = typeToStr(
+                    responseMapType->m_keyType,
+                    {},
+                    MethodType::TypeName);
+
+                auto valueType = typeToStr(
+                    responseMapType->m_valueType,
+                    {},
+                    MethodType::TypeName);
+
+                auto actualKeyType = clearInclude(keyType);
+                actualKeyType = clearTypedef(actualKeyType);
+
+                auto actualValueType = clearInclude(valueType);
+                actualValueType = clearTypedef(actualValueType);
+
+                ctx.m_out << ";" << endl;
+                for(size_t i = 0; i < 3; ++i) {
+                    ctx.m_out << "    response["
+                        << getGenerateRandomValueFunction(actualKeyType)
+                        << "] = "
+                        << getGenerateRandomValueFunction(actualValueType)
+                        << ";" << endl;
+                }
+                ctx.m_out << endl;
+            }
+            else if (!responseTypeIsVoid)
+            {
+                QString actualResponseTypeName = clearInclude(responseTypeName);
+                actualResponseTypeName = clearTypedef(actualResponseTypeName);
+
+                auto enumIt = std::find_if(
+                    enumerations.begin(),
+                    enumerations.end(),
+                    [&] (const Parser::Enumeration & e)
+                    {
+                        return e.m_name == actualResponseTypeName;
+                    });
+                if (enumIt != enumerations.end())
+                {
+                    const Parser::Enumeration & e = *enumIt;
+                    if (e.m_values.isEmpty()) {
+                        throw std::runtime_error(
+                            "Detected enumeration without items: " +
+                            e.m_name.toStdString());
+                    }
+
+                    ctx.m_out << " = " << actualResponseTypeName
+                        << "::" << e.m_values[0].first << ";" << endl << endl;
+                }
+                else
+                {
+                    ctx.m_out << " = "
+                        << getGenerateRandomValueFunction(actualResponseTypeName)
+                        << ";" << endl << endl;
+                }
+            }
 
             ctx.m_out << "    " << s.m_name << capitalize(func.m_name)
                 << "TesterHelper helper(" << endl
@@ -2633,7 +2775,12 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                     << param.m_name << "Param);" << endl;
             }
 
-            ctx.m_out << "            return response;" << endl
+            ctx.m_out << "            return";
+            if (!responseTypeIsVoid) {
+                ctx.m_out << " response";
+            }
+
+            ctx.m_out << ";" << endl
                 << "        });" << endl;
 
             ctx.m_out << "    // TODO: implement" << endl;

@@ -107,6 +107,16 @@ private:
     void generateTestServerHelperClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);
 
+    void generateTestServerPrepareRequestParams(
+        const Parser::Function & func,
+        const QList<Parser::Enumeration> & enumerations,
+        OutputFileContext & ctx);
+
+    void generateTestServerPrepareRequestResponse(
+        const Parser::Function & func,
+        const QList<Parser::Enumeration> & enumerations,
+        OutputFileContext & ctx);
+
     // Methods for writing header and source files
 
     enum class HeaderKind

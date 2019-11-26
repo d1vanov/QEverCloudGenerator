@@ -569,6 +569,203 @@ void Generator::generateTestServerHelperClassDefinition(
     }
 }
 
+void Generator::generateTestServerPrepareRequestParams(
+    const Parser::Function & func,
+    const QList<Parser::Enumeration> & enumerations,
+    OutputFileContext & ctx)
+{
+    bool hasAuthenticationToken = false;
+    for(const auto & param: func.m_params)
+    {
+        if (param.m_name == QStringLiteral("authenticationToken")) {
+            // Auth token is a part of IRequestContext interface
+            hasAuthenticationToken = true;
+            continue;
+        }
+
+        auto paramTypeName = typeToStr(
+            param.m_type,
+            {},
+            MethodType::TypeName);
+
+        QSharedPointer<Parser::BaseType> baseType =
+            param.m_type.dynamicCast<Parser::BaseType>();
+
+        QSharedPointer<Parser::IdentifierType> identifierType =
+            param.m_type.dynamicCast<Parser::IdentifierType>();
+
+        QString actualParamTypeName;
+
+        if (!baseType.isNull()) {
+            actualParamTypeName = baseType->m_baseType;
+        }
+        else if (!identifierType.isNull()) {
+            actualParamTypeName = clearInclude(identifierType->m_identifier);
+            actualParamTypeName = clearTypedef(actualParamTypeName);
+        }
+        else {
+            throw std::runtime_error("Unsupported parameter type: " +
+                                     paramTypeName.toStdString());
+        }
+
+        ctx.m_out << "    " << paramTypeName << " " << param.m_name
+            << " = ";
+
+        auto enumIt = std::find_if(
+            enumerations.begin(),
+            enumerations.end(),
+            [&] (const Parser::Enumeration & e)
+            {
+                return e.m_name == actualParamTypeName;
+            });
+        if (enumIt != enumerations.end())
+        {
+            const Parser::Enumeration & e = *enumIt;
+            if (e.m_values.isEmpty()) {
+                throw std::runtime_error(
+                    "Detected enumeration without items: " +
+                    e.m_name.toStdString());
+            }
+
+            ctx.m_out << actualParamTypeName
+                << "::" << e.m_values[0].first << ";" << endl;
+        }
+        else
+        {
+            ctx.m_out << getGenerateRandomValueFunction(actualParamTypeName)
+                << ";" << endl;
+        }
+    }
+
+    ctx.m_out << "    IRequestContextPtr ctx = newRequestContext(";
+    if (hasAuthenticationToken) {
+        ctx.m_out << endl
+            << "        QStringLiteral(\"authenticationToken\")";
+    }
+    ctx.m_out << ");" << endl << endl;
+}
+
+void Generator::generateTestServerPrepareRequestResponse(
+    const Parser::Function & func,
+    const QList<Parser::Enumeration> & enumerations,
+    OutputFileContext & ctx)
+{
+    QString responseTypeName = typeToStr(
+        func.m_type,
+        {},
+        MethodType::TypeName);
+
+    bool responseTypeIsVoid = (responseTypeName == QStringLiteral("void"));
+    if (!responseTypeIsVoid) {
+        ctx.m_out << "    " << responseTypeName << " response";
+    }
+
+    QSharedPointer<Parser::ListType> responseListType =
+        func.m_type.dynamicCast<Parser::ListType>();
+
+    QSharedPointer<Parser::SetType> responseSetType =
+        func.m_type.dynamicCast<Parser::SetType>();
+
+    QSharedPointer<Parser::MapType> responseMapType =
+        func.m_type.dynamicCast<Parser::MapType>();
+
+    if (!responseListType.isNull())
+    {
+        auto valueType = typeToStr(
+            responseListType->m_valueType,
+            {},
+            MethodType::TypeName);
+
+        auto actualValueType = clearInclude(valueType);
+        actualValueType = clearTypedef(actualValueType);
+
+        ctx.m_out << ";" << endl;
+        for(size_t i = 0; i < 3; ++i) {
+            ctx.m_out << "    response << "
+                << getGenerateRandomValueFunction(actualValueType)
+                << ";" << endl;
+        }
+        ctx.m_out << endl;
+    }
+    else if (!responseSetType.isNull())
+    {
+        auto valueType = typeToStr(
+            responseSetType->m_valueType,
+            {},
+            MethodType::TypeName);
+
+        auto actualValueType = clearInclude(valueType);
+        actualValueType = clearTypedef(actualValueType);
+
+        ctx.m_out << ";" << endl;
+        for(size_t i = 0; i < 3; ++i) {
+            ctx.m_out << "    Q_UNUSED(response.insert("
+                << getGenerateRandomValueFunction(actualValueType)
+                << "))" << endl;
+        }
+        ctx.m_out << endl;
+    }
+    else if (!responseMapType.isNull())
+    {
+        auto keyType = typeToStr(
+            responseMapType->m_keyType,
+            {},
+            MethodType::TypeName);
+
+        auto valueType = typeToStr(
+            responseMapType->m_valueType,
+            {},
+            MethodType::TypeName);
+
+        auto actualKeyType = clearInclude(keyType);
+        actualKeyType = clearTypedef(actualKeyType);
+
+        auto actualValueType = clearInclude(valueType);
+        actualValueType = clearTypedef(actualValueType);
+
+        ctx.m_out << ";" << endl;
+        for(size_t i = 0; i < 3; ++i) {
+            ctx.m_out << "    response["
+                << getGenerateRandomValueFunction(actualKeyType)
+                << "] = "
+                << getGenerateRandomValueFunction(actualValueType)
+                << ";" << endl;
+        }
+        ctx.m_out << endl;
+    }
+    else if (!responseTypeIsVoid)
+    {
+        QString actualResponseTypeName = clearInclude(responseTypeName);
+        actualResponseTypeName = clearTypedef(actualResponseTypeName);
+
+        auto enumIt = std::find_if(
+            enumerations.begin(),
+            enumerations.end(),
+            [&] (const Parser::Enumeration & e)
+            {
+                return e.m_name == actualResponseTypeName;
+            });
+        if (enumIt != enumerations.end())
+        {
+            const Parser::Enumeration & e = *enumIt;
+            if (e.m_values.isEmpty()) {
+                throw std::runtime_error(
+                    "Detected enumeration without items: " +
+                    e.m_name.toStdString());
+            }
+
+            ctx.m_out << " = " << actualResponseTypeName
+                << "::" << e.m_values[0].first << ";" << endl << endl;
+        }
+        else
+        {
+            ctx.m_out << " = "
+                << getGenerateRandomValueFunction(actualResponseTypeName)
+                << ";" << endl << endl;
+        }
+    }
+}
+
 void Generator::writeHeaderHeader(
     QTextStream & out, const QString & fileName,
     const QStringList & additionalIncludes,
@@ -2533,191 +2730,8 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             ctx.m_out << "{" << endl;
 
-            quint32 paramCounter = 0;
-            bool hasAuthenticationToken = false;
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    hasAuthenticationToken = true;
-                    continue;
-                }
-
-                auto paramTypeName = typeToStr(
-                    param.m_type,
-                    {},
-                    MethodType::TypeName);
-
-                QSharedPointer<Parser::BaseType> baseType =
-                    param.m_type.dynamicCast<Parser::BaseType>();
-
-                QSharedPointer<Parser::IdentifierType> identifierType =
-                    param.m_type.dynamicCast<Parser::IdentifierType>();
-
-                QString actualParamTypeName;
-
-                if (!baseType.isNull()) {
-                    actualParamTypeName = baseType->m_baseType;
-                }
-                else if (!identifierType.isNull()) {
-                    actualParamTypeName = clearInclude(identifierType->m_identifier);
-                    actualParamTypeName = clearTypedef(actualParamTypeName);
-                }
-                else {
-                    throw std::runtime_error("Unsupported parameter type: " +
-                        paramTypeName.toStdString());
-                }
-
-                ctx.m_out << "    " << paramTypeName << " " << param.m_name
-                    << " = ";
-
-                auto enumIt = std::find_if(
-                    enumerations.begin(),
-                    enumerations.end(),
-                    [&] (const Parser::Enumeration & e)
-                    {
-                        return e.m_name == actualParamTypeName;
-                    });
-                if (enumIt != enumerations.end())
-                {
-                    const Parser::Enumeration & e = *enumIt;
-                    if (e.m_values.isEmpty()) {
-                        throw std::runtime_error(
-                            "Detected enumeration without items: " +
-                            e.m_name.toStdString());
-                    }
-
-                    ctx.m_out << actualParamTypeName
-                        << "::" << e.m_values[0].first << ";" << endl;
-                }
-                else
-                {
-                    ctx.m_out << getGenerateRandomValueFunction(actualParamTypeName)
-                        << ";" << endl;
-                }
-            }
-
-            ctx.m_out << "    IRequestContextPtr ctx = newRequestContext(";
-            if (hasAuthenticationToken) {
-                ctx.m_out << endl
-                    << "        QStringLiteral(\"authenticationToken\")";
-            }
-            ctx.m_out << ");" << endl << endl;
-
-            QString responseTypeName = typeToStr(
-                func.m_type,
-                {},
-                MethodType::TypeName);
-
-            bool responseTypeIsVoid = (responseTypeName == QStringLiteral("void"));
-            if (!responseTypeIsVoid) {
-                ctx.m_out << "    " << responseTypeName << " response";
-            }
-
-            QSharedPointer<Parser::ListType> responseListType =
-                func.m_type.dynamicCast<Parser::ListType>();
-
-            QSharedPointer<Parser::SetType> responseSetType =
-                func.m_type.dynamicCast<Parser::SetType>();
-
-            QSharedPointer<Parser::MapType> responseMapType =
-                func.m_type.dynamicCast<Parser::MapType>();
-
-            if (!responseListType.isNull())
-            {
-                auto valueType = typeToStr(
-                    responseListType->m_valueType,
-                    {},
-                    MethodType::TypeName);
-
-                auto actualValueType = clearInclude(valueType);
-                actualValueType = clearTypedef(actualValueType);
-
-                ctx.m_out << ";" << endl;
-                for(size_t i = 0; i < 3; ++i) {
-                    ctx.m_out << "    response << "
-                        << getGenerateRandomValueFunction(actualValueType)
-                        << ";" << endl;
-                }
-                ctx.m_out << endl;
-            }
-            else if (!responseSetType.isNull())
-            {
-                auto valueType = typeToStr(
-                    responseSetType->m_valueType,
-                    {},
-                    MethodType::TypeName);
-
-                auto actualValueType = clearInclude(valueType);
-                actualValueType = clearTypedef(actualValueType);
-
-                ctx.m_out << ";" << endl;
-                for(size_t i = 0; i < 3; ++i) {
-                    ctx.m_out << "    Q_UNUSED(response.insert("
-                        << getGenerateRandomValueFunction(actualValueType)
-                        << "))" << endl;
-                }
-                ctx.m_out << endl;
-            }
-            else if (!responseMapType.isNull())
-            {
-                auto keyType = typeToStr(
-                    responseMapType->m_keyType,
-                    {},
-                    MethodType::TypeName);
-
-                auto valueType = typeToStr(
-                    responseMapType->m_valueType,
-                    {},
-                    MethodType::TypeName);
-
-                auto actualKeyType = clearInclude(keyType);
-                actualKeyType = clearTypedef(actualKeyType);
-
-                auto actualValueType = clearInclude(valueType);
-                actualValueType = clearTypedef(actualValueType);
-
-                ctx.m_out << ";" << endl;
-                for(size_t i = 0; i < 3; ++i) {
-                    ctx.m_out << "    response["
-                        << getGenerateRandomValueFunction(actualKeyType)
-                        << "] = "
-                        << getGenerateRandomValueFunction(actualValueType)
-                        << ";" << endl;
-                }
-                ctx.m_out << endl;
-            }
-            else if (!responseTypeIsVoid)
-            {
-                QString actualResponseTypeName = clearInclude(responseTypeName);
-                actualResponseTypeName = clearTypedef(actualResponseTypeName);
-
-                auto enumIt = std::find_if(
-                    enumerations.begin(),
-                    enumerations.end(),
-                    [&] (const Parser::Enumeration & e)
-                    {
-                        return e.m_name == actualResponseTypeName;
-                    });
-                if (enumIt != enumerations.end())
-                {
-                    const Parser::Enumeration & e = *enumIt;
-                    if (e.m_values.isEmpty()) {
-                        throw std::runtime_error(
-                            "Detected enumeration without items: " +
-                            e.m_name.toStdString());
-                    }
-
-                    ctx.m_out << " = " << actualResponseTypeName
-                        << "::" << e.m_values[0].first << ";" << endl << endl;
-                }
-                else
-                {
-                    ctx.m_out << " = "
-                        << getGenerateRandomValueFunction(actualResponseTypeName)
-                        << ";" << endl << endl;
-                }
-            }
+            generateTestServerPrepareRequestParams(func, enumerations, ctx);
+            generateTestServerPrepareRequestResponse(func, enumerations, ctx);
 
             ctx.m_out << "    " << s.m_name << capitalize(func.m_name)
                 << "TesterHelper helper(" << endl
@@ -2762,8 +2776,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 ctx.m_out << "             ";
             }
 
-            ctx.m_out << "IRequestContextPtr ctxParam) -> "
-                << responseTypeName << endl;
+            ctx.m_out << "IRequestContextPtr ctxParam)" << endl;
 
             ctx.m_out << "        {" << endl;
 
@@ -2781,7 +2794,10 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             }
 
             ctx.m_out << "            return";
-            if (!responseTypeIsVoid) {
+
+            QSharedPointer<Parser::VoidType> funcVoidType =
+                func.m_type.dynamicCast<Parser::VoidType>();
+            if (funcVoidType.isNull()) {
                 ctx.m_out << " response";
             }
 

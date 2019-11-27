@@ -766,6 +766,220 @@ void Generator::generateTestServerPrepareRequestResponse(
     }
 }
 
+void Generator::generateTestServerHelperLambda(
+    const Parser::Service & service,
+    const Parser::Function & func,
+    OutputFileContext & ctx)
+{
+    ctx.m_out << "    " << service.m_name << capitalize(func.m_name)
+        << "TesterHelper helper(" << endl
+        << "        [&] (";
+
+    bool hasParams = false;
+    bool firstParam = true;
+    for(const auto & param: func.m_params)
+    {
+        if (param.m_name == QStringLiteral("authenticationToken")) {
+            // Auth token is a part of IRequestContext interface
+            continue;
+        }
+
+        hasParams = true;
+
+        auto paramTypeName = typeToStr(
+            param.m_type,
+            {},
+            MethodType::TypeName);
+
+        QSharedPointer<Parser::BaseType> baseType =
+            param.m_type.dynamicCast<Parser::BaseType>();
+        if (baseType.isNull() ||
+            baseType->m_baseType == QStringLiteral("string"))
+        {
+            paramTypeName.prepend(QStringLiteral("const "));
+            paramTypeName.append(QStringLiteral(" &"));
+        }
+
+        if (!firstParam) {
+            ctx.m_out << "             ";
+        }
+
+        ctx.m_out << paramTypeName << " "
+            << param.m_name << "Param," << endl;
+
+        firstParam = false;
+    }
+
+    if (hasParams) {
+        ctx.m_out << "             ";
+    }
+
+    ctx.m_out << "IRequestContextPtr ctxParam)" << endl;
+
+    ctx.m_out << "        {" << endl;
+
+    for(const auto & param: func.m_params)
+    {
+        if (param.m_name == QStringLiteral("authenticationToken")) {
+            ctx.m_out << "            Q_ASSERT("
+                << "ctx->authenticationToken() == "
+                << "ctxParam->authenticationToken());" << endl;
+            continue;
+        }
+
+        ctx.m_out << "            Q_ASSERT(" << param.m_name << " == "
+            << param.m_name << "Param);" << endl;
+    }
+
+    ctx.m_out << "            return";
+
+    QSharedPointer<Parser::VoidType> funcVoidType =
+        func.m_type.dynamicCast<Parser::VoidType>();
+    if (funcVoidType.isNull()) {
+        ctx.m_out << " response";
+    }
+
+    ctx.m_out << ";" << endl
+        << "        });" << endl << endl;
+}
+
+void Generator::generateTestServerSocketSetup(
+    const Parser::Service & service,
+    const Parser::Function & func,
+    OutputFileContext & ctx)
+{
+    auto funcName = capitalize(func.m_name);
+
+    ctx.m_out << "    " << service.m_name << "Server server;" << endl
+        << "    QObject::connect(" << endl
+        << "        &server," << endl
+        << "        &" << service.m_name << "Server::" << func.m_name
+        << "Request," << endl
+        << "        &helper," << endl
+        << "        &" << service.m_name << funcName
+        << "TesterHelper::on" << funcName << "RequestReceived);"
+        << endl;
+
+    ctx.m_out << "    QObject::connect(" << endl
+        << "        &helper," << endl
+        << "        &" << service.m_name << funcName << "TesterHelper::"
+        << func.m_name << "RequestReady," << endl
+        << "        &server," << endl
+        << "        &" << service.m_name << "Server::on" << funcName
+        << "RequestReady);" << endl << endl;
+
+    ctx.m_out << "    QTcpServer tcpServer;" << endl
+        << "    QVERIFY(tcpServer.listen(QHostAddress::LocalHost));"
+        << endl
+        << "    quint16 port = tcpServer.serverPort();" << endl
+        << endl;
+
+    ctx.m_out << "    QTcpSocket * pSocket = nullptr;" << endl
+        << "    QObject::connect(" << endl
+        << "        &tcpServer," << endl
+        << "        &QTcpServer::newConnection," << endl
+        << "        [&] {" << endl
+        << "            pSocket = tcpServer.nextPendingConnection();"
+        << endl
+        << "            Q_ASSERT(pSocket);" << endl
+        << "            QObject::connect(" << endl
+        << "                pSocket," << endl
+        << "                &QAbstractSocket::disconnected," << endl
+        << "                pSocket," << endl
+        << "                &QAbstractSocket::deleteLater);" << endl
+        << "            if (!pSocket->waitForConnected()) {" << endl
+        << "                QFAIL(\"Failed to establish connection\");"
+        << endl
+        << "            }" << endl << endl
+        << "            QByteArray requestData = "
+        << "tests::readThriftRequestFromSocket(*pSocket);" << endl
+        << "            server.onRequest(requestData);" << endl
+        << "        });" << endl << endl;
+
+    ctx.m_out << "    QObject::connect(" << endl
+        << "        &server," << endl
+        << "        &" << service.m_name << "Server::" << func.m_name
+        << "RequestReady," << endl
+        << "        [&] (QByteArray responseData)" << endl
+        << "        {" << endl
+        << "            QByteArray buffer;" << endl
+        << "            buffer.append(\"HTTP/1.1 200 OK\\r\\n\");"
+        << endl
+        << "            buffer.append(\"Content-Length: \");" << endl
+        << "            buffer.append(QString::number("
+        << "responseData.size()).toUtf8());" << endl
+        << "            buffer.append(\"\\r\\n\");" << endl
+        << "            buffer.append(\"Content-Type: "
+        << "application/x-thrift\\r\\n\\r\\n\");" << endl
+        << "            buffer.append(responseData);" << endl << endl
+        << "            if (!tests::writeBufferToSocket(buffer, "
+        << "*pSocket)) {" << endl
+        << "                QFAIL(\"Failed to write response to socket\");"
+        << endl
+        << "            }" << endl
+        << "        });" << endl << endl;
+}
+
+void Generator::generateTestServerServiceCall(
+    const Parser::Service & service,
+    const Parser::Function & func,
+    OutputFileContext & ctx)
+{
+    auto funcReturnTypeName = typeToStr(
+        func.m_type,
+        {},
+        MethodType::TypeName);
+
+    if (service.m_name == QStringLiteral("UserStore"))
+    {
+        ctx.m_out << "    auto userStore = newUserStore(" << endl
+            << "        QStringLiteral(\"127.0.0.1\")," << endl
+            << "        port," << endl
+            << "        QStringLiteral(\"http\"));" << endl;
+
+        ctx.m_out << "    ";
+        if (funcReturnTypeName != QStringLiteral("void")) {
+            ctx.m_out << funcReturnTypeName << " res = ";
+        }
+
+        ctx.m_out << "userStore->" << func.m_name << "(" << endl;
+    }
+    else if (service.m_name == QStringLiteral("NoteStore"))
+    {
+        ctx.m_out << "    auto noteStore = newNoteStore(" << endl
+            << "        QStringLiteral(\"http://127.0.0.1:\") + "
+            << "QString::number(port));" << endl;
+
+        ctx.m_out << "    ";
+        if (funcReturnTypeName != QStringLiteral("void")) {
+            ctx.m_out << funcReturnTypeName << " res = ";
+        }
+
+        ctx.m_out << "noteStore->" << func.m_name << "(" << endl;
+    }
+    else
+    {
+        throw std::runtime_error(
+            "Unsupported service: " + service.m_name.toStdString());
+    }
+
+    for(const auto & param: func.m_params)
+    {
+        if (param.m_name == QStringLiteral("authenticationToken")) {
+            // Auth token is a part of IRequestContext interface
+            continue;
+        }
+
+        ctx.m_out << "        " << param.m_name << "," << endl;
+    }
+
+    ctx.m_out << "        ctx);" << endl;
+
+    if (funcReturnTypeName != QStringLiteral("void")) {
+        ctx.m_out << "    QVERIFY(res == response);" << endl;
+    }
+}
+
 void Generator::writeHeaderHeader(
     QTextStream & out, const QString & fileName,
     const QStringList & additionalIncludes,
@@ -2732,79 +2946,9 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             generateTestServerPrepareRequestParams(func, enumerations, ctx);
             generateTestServerPrepareRequestResponse(func, enumerations, ctx);
-
-            ctx.m_out << "    " << s.m_name << capitalize(func.m_name)
-                << "TesterHelper helper(" << endl
-                << "        [&] (";
-
-            bool hasParams = false;
-            bool firstParam = true;
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                hasParams = true;
-
-                auto paramTypeName = typeToStr(
-                    param.m_type,
-                    {},
-                    MethodType::TypeName);
-
-                QSharedPointer<Parser::BaseType> baseType =
-                    param.m_type.dynamicCast<Parser::BaseType>();
-                if (baseType.isNull() ||
-                    baseType->m_baseType == QStringLiteral("string"))
-                {
-                    paramTypeName.prepend(QStringLiteral("const "));
-                    paramTypeName.append(QStringLiteral(" &"));
-                }
-
-                if (!firstParam) {
-                    ctx.m_out << "             ";
-                }
-
-                ctx.m_out << paramTypeName << " "
-                    << param.m_name << "Param," << endl;
-
-                firstParam = false;
-            }
-
-            if (hasParams) {
-                ctx.m_out << "             ";
-            }
-
-            ctx.m_out << "IRequestContextPtr ctxParam)" << endl;
-
-            ctx.m_out << "        {" << endl;
-
-            for(const auto & param: func.m_params)
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    ctx.m_out << "            Q_ASSERT("
-                        << "ctx->authenticationToken() == "
-                        << "ctxParam->authenticationToken());" << endl;
-                    continue;
-                }
-
-                ctx.m_out << "            Q_ASSERT(" << param.m_name << " == "
-                    << param.m_name << "Param);" << endl;
-            }
-
-            ctx.m_out << "            return";
-
-            QSharedPointer<Parser::VoidType> funcVoidType =
-                func.m_type.dynamicCast<Parser::VoidType>();
-            if (funcVoidType.isNull()) {
-                ctx.m_out << " response";
-            }
-
-            ctx.m_out << ";" << endl
-                << "        });" << endl;
-
-            ctx.m_out << "    // TODO: implement" << endl;
+            generateTestServerHelperLambda(s, func, ctx);
+            generateTestServerSocketSetup(s, func, ctx);
+            generateTestServerServiceCall(s, func, ctx);
 
             ctx.m_out << "}" << endl << endl;
         }

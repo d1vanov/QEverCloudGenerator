@@ -117,6 +117,21 @@ private:
         const QList<Parser::Enumeration> & enumerations,
         OutputFileContext & ctx);
 
+    void generateTestServerHelperLambda(
+        const Parser::Service & service,
+        const Parser::Function & func,
+        OutputFileContext & ctx);
+
+    void generateTestServerSocketSetup(
+        const Parser::Service & service,
+        const Parser::Function & func,
+        OutputFileContext & ctx);
+
+    void generateTestServerServiceCall(
+        const Parser::Service & service,
+        const Parser::Function & func,
+        OutputFileContext & ctx);
+
     // Methods for writing header and source files
 
     enum class HeaderKind

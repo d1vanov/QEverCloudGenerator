@@ -78,6 +78,12 @@ private:
     void generateTestServerHeaders(Parser * parser, const QString & outPath);
     void generateTestServerCpps(Parser * parser, const QString & outPath);
 
+    void generateTestRandomDataGeneratorsHeader(
+        Parser * parser, const QString & outPath);
+
+    void generateTestRandomDataGeneratorsCpp(
+        Parser * parser, const QString & outPath);
+
     enum class ServiceClassType
     {
         NonDurable,

@@ -2960,6 +2960,273 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
     }
 }
 
+void Generator::generateTestRandomDataGeneratorsHeader(
+    Parser * parser, const QString & outPath)
+{
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("<generated/Types.h>");
+    sortIncludes(additionalIncludes);
+
+    const QString fileName = QStringLiteral("RandomDataGenerators.h");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+    writeHeaderHeader(
+        ctx.m_out,
+        fileName,
+        additionalIncludes,
+        HeaderKind::Private);
+
+    // First section: generate random values of primitive types
+
+    ctx.m_out << blockSeparator << endl << endl;
+
+    ctx.m_out << "QString generateRandomString(int len = 10);" << endl << endl
+        << "qint8 generateRandomInt8();" << endl << endl
+        << "qint16 generateRandomInt16();" << endl << endl
+        << "qint32 generateRandomInt32();" << endl << endl
+        << "qint64 generateRandomInt64();" << endl << endl
+        << "quint8 generateRandomUint8();" << endl << endl
+        << "quint16 generateRandomUint16();" << endl << endl
+        << "quint32 generateRandomUint32();" << endl << endl
+        << "quint64 generateRandomUint64();" << endl << endl
+        << "double generateRandomDouble();" << endl << endl
+        << "bool generateRandomBool();" << endl << endl;
+
+    // Second section: generate random values of QEverCloud types
+
+    ctx.m_out << blockSeparator << endl << endl;
+
+    for(const auto & s: parser->structures())
+    {
+        ctx.m_out << s.m_name << " generateRandom" << s.m_name << "();" << endl
+            << endl;
+    }
+
+    writeHeaderFooter(ctx.m_out, fileName);
+}
+
+void Generator::generateTestRandomDataGeneratorsCpp(
+    Parser * parser, const QString & outPath)
+{
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("<QCryptographicHash>")
+        << QStringLiteral("<QDateTime>")
+        << QStringLiteral("<QEventLoop>")
+        << QStringLiteral("<QObject>")
+        << QStringLiteral("<algorithm>")
+        << QStringLiteral("<cstdlib>")
+        << QStringLiteral("<limits>");
+    sortIncludes(additionalIncludes);
+
+    const QString fileName = QStringLiteral("RandomDataGenerators.cpp");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+    writeHeaderBody(
+        ctx.m_out,
+        QStringLiteral("RandomDataGenerators.h"),
+        additionalIncludes,
+        HeaderKind::Test);
+
+    // First section: auxiliary helper stuff
+
+    ctx.m_out << "namespace {" << endl << endl
+        << blockSeparator << endl << endl;
+
+    ctx.m_out << "static const QString randomStringAvailableCharacters = "
+        << "QStringLiteral(" << endl
+        << "    \""
+        << "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        << "\");" << endl << endl;
+
+    ctx.m_out << "template <typename T>" << endl
+        << "T generateRandomIntType()" << endl
+        << "{" << endl
+        << "    T min = std::numeric_limits<T>::min();" << endl
+        << "    T max = std::numeric_limits<T>::max();" << endl
+        << "    return min + (rand() \% static_cast<T>(max - min + 1));"
+        << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "} // namespace" << endl << endl;
+
+    // Second section: generate random values of primitive types
+
+    ctx.m_out << blockSeparator << endl << endl;
+
+    ctx.m_out << "QString generateRandomString(int len)" << endl
+        << "{" << endl
+        << "    if (len <= 0) {" << endl
+        << "        return {};" << endl
+        << "    }" << endl << endl
+        << "    QString res;" << endl
+        << "    res.reserve(len);" << endl
+        << "    for(int i = 0; i < len; ++i) {" << endl
+        << "        int index = rand() % randomStringAvailableCharacters."
+        << "length();" << endl
+        << "        res.append(randomStringAvailableCharacters.at(index));"
+        << "    }" << endl << endl
+        << "    return res;" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "qint8 generateRandomInt8()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<qint8>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "qint16 generateRandomInt16()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<qint16>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "qint32 generateRandomInt32()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<qint32>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "qint64 generateRandomInt64()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<qint64>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "quint8 generateRandomUint8()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<quint8>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "quint16 generateRandomUint16()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<quint16>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "quint32 generateRandomUint32()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<quint32>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "quint64 generateRandomUint64()" << endl
+        << "{" << endl
+        << "    return generateRandomIntType<quint64>();" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "double generateRandomDouble()" << endl
+        << "{" << endl
+        << "    double minval = std::numeric_limits<double>::min();" << endl
+        << "    double maxval = std::numeric_limits<double>::max();" << endl
+        << "    double f = (double)rand() / RAND_MAX;" << endl
+        << "    return minval + f * (maxval - minval);" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "bool generateRandomBool()" << endl
+        << "{" << endl
+        << "    return generateRandomInt8() >= 0;" << endl
+        << "}" << endl << endl;
+
+    // Third section: generate random values of QEverCloud types
+
+    ctx.m_out << blockSeparator << endl << endl;
+
+    for(const auto & s: parser->structures())
+    {
+        ctx.m_out << s.m_name << " generateRandom" << s.m_name << "()" << endl
+            << "{" << endl;
+
+        ctx.m_out << "    " << s.m_name << " result;" << endl;
+
+        for(const auto & f: s.m_fields)
+        {
+            QSharedPointer<Parser::BaseType> baseType =
+                f.m_type.dynamicCast<Parser::BaseType>();
+
+            QSharedPointer<Parser::IdentifierType> identifierType =
+                f.m_type.dynamicCast<Parser::IdentifierType>();
+
+            QSharedPointer<Parser::ListType> listType =
+                f.m_type.dynamicCast<Parser::ListType>();
+
+            QSharedPointer<Parser::SetType> setType =
+                f.m_type.dynamicCast<Parser::SetType>();
+
+            QSharedPointer<Parser::MapType> mapType =
+                f.m_type.dynamicCast<Parser::MapType>();
+
+            if (!baseType.isNull())
+            {
+                ctx.m_out << "    result." << f.m_name << " = "
+                    << getGenerateRandomValueFunction(baseType->m_baseType)
+                    << ";" << endl;
+            }
+            else if (!identifierType.isNull())
+            {
+                auto actualType = clearInclude(identifierType->m_identifier);
+                actualType = clearTypedef(actualType);
+
+                ctx.m_out << "    result." << f.m_name << " = "
+                    << getGenerateRandomValueFunction(actualType)
+                    << ";" << endl;
+            }
+            else if (!listType.isNull())
+            {
+                auto valueType = typeToStr(
+                    listType->m_valueType,
+                    {},
+                    MethodType::TypeName);
+
+                for(size_t i = 0; i < 3; ++i)
+                {
+                    ctx.m_out << "    result." << f.m_name << " << "
+                        << getGenerateRandomValueFunction(valueType)
+                        << ";" << endl;
+                }
+            }
+            else if (!setType.isNull())
+            {
+                auto valueType = typeToStr(
+                    setType->m_valueType,
+                    {},
+                    MethodType::TypeName);
+
+                for(size_t i = 0; i < 3; ++i)
+                {
+                    ctx.m_out << "    Q_UNUSED(result." << f.m_name
+                        << ".insert("
+                        << getGenerateRandomValueFunction(valueType)
+                        << "))" << endl;
+                }
+            }
+            else if (!mapType.isNull())
+            {
+                auto keyType = typeToStr(
+                    mapType->m_keyType,
+                    {},
+                    MethodType::TypeName);
+
+                auto valueType = typeToStr(
+                    mapType->m_valueType,
+                    {},
+                    MethodType::TypeName);
+
+                for(size_t i = 0; i < 3; ++i)
+                {
+                    ctx.m_out << "    result." << f.m_name << "["
+                        << getGenerateRandomValueFunction(keyType)
+                        << "] = "
+                        << getGenerateRandomValueFunction(valueType)
+                        << ";" << endl;
+                }
+            }
+            else
+            {
+                throw std::runtime_error(
+                    "Unsupported field type: " +
+                    typeToStr(f.m_type, {}, MethodType::TypeName).toStdString());
+            }
+        }
+
+        ctx.m_out << "    return result;" << endl
+            << "}" << endl << endl;
+    }
+}
+
 void Generator::generateServiceClassDeclaration(
     const Parser::Service & service,
     const ServiceClassType serviceClassType,

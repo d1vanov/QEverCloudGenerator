@@ -193,6 +193,241 @@ QString Generator::capitalize(const QString & input) const
     return result;
 }
 
+void Generator::generateGetRandomValueExpression(
+    const Parser::Field & field,
+    const QString & prefix,
+    const Parser & parser,
+    QTextStream & out,
+    const QString & end)
+{
+    QSharedPointer<Parser::BaseType> baseType =
+        field.m_type.dynamicCast<Parser::BaseType>();
+    if (!baseType.isNull())
+    {
+        out << prefix;
+        if (!field.m_name.isEmpty()) {
+            out << field.m_name << " = ";
+        }
+
+        out << getGenerateRandomValueFunction(baseType->m_baseType) << end;
+        return;
+    }
+
+    QSharedPointer<Parser::IdentifierType> identifierType =
+        field.m_type.dynamicCast<Parser::IdentifierType>();
+    if (!identifierType.isNull())
+    {
+        auto actualType = clearInclude(identifierType->m_identifier);
+        actualType = clearTypedef(actualType);
+
+        const auto & exceptions = parser.exceptions();
+        auto exceptionIt = std::find_if(
+            exceptions.begin(),
+            exceptions.end(),
+            [&] (const Parser::Structure & s)
+            {
+                return s.m_name == actualType;
+            });
+        if (exceptionIt != exceptions.end()) {
+            // FIXME: generate proper exceptions
+            return;
+        }
+
+        out << prefix;
+        if (!field.m_name.isEmpty()) {
+            out << field.m_name << " = ";
+        }
+
+        const auto & enumerations = parser.enumerations();
+        auto enumIt = std::find_if(
+            enumerations.begin(),
+            enumerations.end(),
+            [&] (const Parser::Enumeration & e)
+            {
+                return e.m_name == actualType;
+            });
+
+        if (enumIt != enumerations.end())
+        {
+            const Parser::Enumeration & e = *enumIt;
+            if (e.m_values.isEmpty()) {
+                throw std::runtime_error(
+                    "Detected enumeration without items: " +
+                    e.m_name.toStdString());
+            }
+
+            int index = rand() % e.m_values.size();
+            out << actualType << "::" << e.m_values[index].first << end;
+        }
+        else
+        {
+            out << getGenerateRandomValueFunction(actualType) << end;
+        }
+
+        return;
+    }
+
+    QSharedPointer<Parser::ListType> listType =
+        field.m_type.dynamicCast<Parser::ListType>();
+    if (!listType.isNull())
+    {
+        verifyTypeIsBaseOrIdentifier(listType->m_valueType);
+
+        auto valueType = typeToStr(
+            listType->m_valueType,
+            {},
+            MethodType::TypeName);
+
+        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            out << prefix << field.m_name << " = QList<"
+                << valueType << ">();" << endl;
+        }
+
+        valueType = clearInclude(valueType);
+        valueType = clearTypedef(valueType);
+
+        for(size_t i = 0; i < 3; ++i)
+        {
+            out << prefix << field.m_name;
+
+            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+                out << ".ref()";
+            }
+
+            out << " << ";
+
+            Parser::Field pseudoField;
+            pseudoField.m_type = listType->m_valueType;
+            pseudoField.m_required = Parser::Field::RequiredFlag::Required;
+
+            generateGetRandomValueExpression(pseudoField, {}, parser, out);
+        }
+
+        return;
+    }
+
+    QSharedPointer<Parser::SetType> setType =
+        field.m_type.dynamicCast<Parser::SetType>();
+    if (!setType.isNull())
+    {
+        verifyTypeIsBaseOrIdentifier(setType->m_valueType);
+
+        auto valueType = typeToStr(
+            setType->m_valueType,
+            {},
+            MethodType::TypeName);
+
+        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            out << prefix << field.m_name << " = QSet<"
+                << valueType << ">();" << endl;
+        }
+
+        valueType = clearInclude(valueType);
+        valueType = clearTypedef(valueType);
+
+        for(size_t i = 0; i < 3; ++i)
+        {
+            out << prefix << field.m_name;
+
+            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+                out << "->";
+            }
+            else {
+                out << ".";
+            }
+
+            out << "insert(";
+
+            Parser::Field pseudoField;
+            pseudoField.m_type = setType->m_valueType;
+            pseudoField.m_required = Parser::Field::RequiredFlag::Required;
+
+            QString setItemEnd = QStringLiteral(");\n");
+            generateGetRandomValueExpression(
+                pseudoField,
+                {},
+                parser,
+                out,
+                setItemEnd);
+        }
+
+        return;
+    }
+
+    QSharedPointer<Parser::MapType> mapType =
+        field.m_type.dynamicCast<Parser::MapType>();
+    if (!mapType.isNull())
+    {
+        verifyTypeIsBaseOrIdentifier(mapType->m_keyType);
+        verifyTypeIsBaseOrIdentifier(mapType->m_valueType);
+
+        auto keyType = typeToStr(
+            mapType->m_keyType,
+            {},
+            MethodType::TypeName);
+
+        auto valueType = typeToStr(
+            mapType->m_valueType,
+            {},
+            MethodType::TypeName);
+
+        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            out << prefix << field.m_name << " = QMap<"
+                << keyType << ", " << valueType << ">();" << endl;
+        }
+
+        keyType = clearInclude(keyType);
+        keyType = clearTypedef(keyType);
+
+        valueType = clearInclude(valueType);
+        valueType = clearTypedef(valueType);
+
+        for(size_t i = 0; i < 3; ++i)
+        {
+            out << prefix << field.m_name;
+
+            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+                out << ".ref()";
+            }
+
+            out << "[";
+
+            Parser::Field pseudoKeyField;
+            pseudoKeyField.m_type = mapType->m_keyType;
+            pseudoKeyField.m_required = Parser::Field::RequiredFlag::Required;
+
+            generateGetRandomValueExpression(pseudoKeyField, {}, parser, out, {});
+
+            out << "] = ";
+
+            Parser::Field pseudoValueField;
+            pseudoValueField.m_type = mapType->m_valueType;
+            pseudoValueField.m_required = Parser::Field::RequiredFlag::Required;
+
+            generateGetRandomValueExpression(pseudoValueField, {}, parser, out);
+        }
+
+        return;
+    }
+
+    throw std::runtime_error(
+        "Unsupported field type: " +
+        typeToStr(field.m_type, {}, MethodType::TypeName).toStdString());
+}
+
+void Generator::verifyTypeIsBaseOrIdentifier(
+    const QSharedPointer<Parser::Type> & type) const
+{
+    if (type.dynamicCast<Parser::BaseType>().isNull() &&
+        type.dynamicCast<Parser::IdentifierType>().isNull())
+    {
+        auto typeName = typeToStr(type, {}, MethodType::TypeName);
+        throw std::runtime_error(
+            "Unsupported type: expecting base or identifier type: " +
+            typeName.toStdString());
+    }
+}
+
 QString Generator::getGenerateRandomValueFunction(const QString & typeName) const
 {
     if (typeName == QStringLiteral("bool"))
@@ -3135,285 +3370,12 @@ void Generator::generateTestRandomDataGeneratorsCpp(
 
         ctx.m_out << "    " << s.m_name << " result;" << endl;
 
-        for(const auto & f: s.m_fields)
-        {
-            QSharedPointer<Parser::BaseType> baseType =
-                f.m_type.dynamicCast<Parser::BaseType>();
-
-            QSharedPointer<Parser::IdentifierType> identifierType =
-                f.m_type.dynamicCast<Parser::IdentifierType>();
-
-            QSharedPointer<Parser::ListType> listType =
-                f.m_type.dynamicCast<Parser::ListType>();
-
-            QSharedPointer<Parser::SetType> setType =
-                f.m_type.dynamicCast<Parser::SetType>();
-
-            QSharedPointer<Parser::MapType> mapType =
-                f.m_type.dynamicCast<Parser::MapType>();
-
-            if (!baseType.isNull())
-            {
-                ctx.m_out << "    result." << f.m_name << " = "
-                    << getGenerateRandomValueFunction(baseType->m_baseType)
-                    << ";" << endl;
-            }
-            else if (!identifierType.isNull())
-            {
-                auto actualType = clearInclude(identifierType->m_identifier);
-                actualType = clearTypedef(actualType);
-
-                const auto & enumerations = parser->enumerations();
-                auto enumIt = std::find_if(
-                    enumerations.begin(),
-                    enumerations.end(),
-                    [&] (const Parser::Enumeration & e)
-                    {
-                        return e.m_name == actualType;
-                    });
-
-                const auto & exceptions = parser->exceptions();
-                auto exceptionIt = std::find_if(
-                    exceptions.begin(),
-                    exceptions.end(),
-                    [&] (const Parser::Structure & s)
-                    {
-                        return s.m_name == actualType;
-                    });
-
-                if (enumIt != enumerations.end())
-                {
-                    const Parser::Enumeration & e = *enumIt;
-                    if (e.m_values.isEmpty()) {
-                        throw std::runtime_error(
-                            "Detected enumeration without items: " +
-                            e.m_name.toStdString());
-                    }
-
-                    int index = rand() % e.m_values.size();
-                    ctx.m_out << "    result." << f.m_name << " = "
-                        << actualType << "::" << e.m_values[index].first << ";"
-                        << endl;
-                }
-                else if (exceptionIt != exceptions.end())
-                {
-                    // Don't generate anything
-                }
-                else
-                {
-                    ctx.m_out << "    result." << f.m_name << " = "
-                        << getGenerateRandomValueFunction(actualType)
-                        << ";" << endl;
-                }
-            }
-            else if (!listType.isNull())
-            {
-                auto valueType = typeToStr(
-                    listType->m_valueType,
-                    {},
-                    MethodType::TypeName);
-
-                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                    ctx.m_out << "    result." << f.m_name << " = QList<"
-                        << valueType << ">();" << endl;
-                }
-
-                valueType = clearInclude(valueType);
-                valueType = clearTypedef(valueType);
-
-                const auto & enumerations = parser->enumerations();
-                auto enumIt = std::find_if(
-                    enumerations.begin(),
-                    enumerations.end(),
-                    [&] (const Parser::Enumeration & e)
-                    {
-                        return e.m_name == valueType;
-                    });
-
-                for(size_t i = 0; i < 3; ++i)
-                {
-                    ctx.m_out << "    result." << f.m_name;
-
-                    if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                        ctx.m_out << ".ref()";
-                    }
-
-                    ctx.m_out << " << ";
-
-                    if (enumIt != enumerations.end())
-                    {
-                        const Parser::Enumeration & e = *enumIt;
-                        if (e.m_values.isEmpty()) {
-                            throw std::runtime_error(
-                                "Detected enumeration without items: " +
-                                e.m_name.toStdString());
-                        }
-
-                        int index = rand() % e.m_values.size();
-                        ctx.m_out << valueType << "::" << e.m_values[index].first
-                            << ";" << endl;
-                    }
-                    else
-                    {
-                        ctx.m_out << getGenerateRandomValueFunction(valueType)
-                            << ";" << endl;
-                    }
-                }
-            }
-            else if (!setType.isNull())
-            {
-                auto valueType = typeToStr(
-                    setType->m_valueType,
-                    {},
-                    MethodType::TypeName);
-
-                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                    ctx.m_out << "    result." << f.m_name << " = QSet<"
-                        << valueType << ">();" << endl;
-                }
-
-                valueType = clearInclude(valueType);
-                valueType = clearTypedef(valueType);
-
-                const auto & enumerations = parser->enumerations();
-                auto enumIt = std::find_if(
-                    enumerations.begin(),
-                    enumerations.end(),
-                    [&] (const Parser::Enumeration & e)
-                    {
-                        return e.m_name == valueType;
-                    });
-
-                for(size_t i = 0; i < 3; ++i)
-                {
-                    ctx.m_out << "    Q_UNUSED(result." << f.m_name;
-
-                    if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                        ctx.m_out << "->";
-                    }
-                    else {
-                        ctx.m_out << ".";
-                    }
-
-                    ctx.m_out << "insert(";
-
-                    if (enumIt != enumerations.end())
-                    {
-                        const Parser::Enumeration & e = *enumIt;
-                        if (e.m_values.isEmpty()) {
-                            throw std::runtime_error(
-                                "Detected enumeration without items: " +
-                                e.m_name.toStdString());
-                        }
-
-                        int index = rand() % e.m_values.size();
-                        ctx.m_out << valueType << "::" << e.m_values[index].first
-                            << "))" << endl;
-                    }
-                    else
-                    {
-                        ctx.m_out << getGenerateRandomValueFunction(valueType)
-                            << "))" << endl;
-                    }
-                }
-            }
-            else if (!mapType.isNull())
-            {
-                auto keyType = typeToStr(
-                    mapType->m_keyType,
-                    {},
-                    MethodType::TypeName);
-
-                auto valueType = typeToStr(
-                    mapType->m_valueType,
-                    {},
-                    MethodType::TypeName);
-
-                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                    ctx.m_out << "    result." << f.m_name << " = QMap<"
-                        << keyType << ", " << valueType << ">();" << endl;
-                }
-
-                keyType = clearInclude(keyType);
-                keyType = clearTypedef(keyType);
-
-                valueType = clearInclude(valueType);
-                valueType = clearTypedef(valueType);
-
-                const auto & enumerations = parser->enumerations();
-
-                auto keyEnumIt = std::find_if(
-                    enumerations.begin(),
-                    enumerations.end(),
-                    [&] (const Parser::Enumeration & e)
-                    {
-                        return e.m_name == keyType;
-                    });
-
-                auto valueEnumIt = std::find_if(
-                    enumerations.begin(),
-                    enumerations.end(),
-                    [&] (const Parser::Enumeration & e)
-                    {
-                        return e.m_name == valueType;
-                    });
-
-                for(size_t i = 0; i < 3; ++i)
-                {
-                    ctx.m_out << "    result." << f.m_name;
-
-                    if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                        ctx.m_out << ".ref()";
-                    }
-
-                    ctx.m_out << "[";
-
-                    if (keyEnumIt != enumerations.end())
-                    {
-                        const Parser::Enumeration & e = *keyEnumIt;
-                        if (e.m_values.isEmpty()) {
-                            throw std::runtime_error(
-                                "Detected enumeration without items: " +
-                                e.m_name.toStdString());
-                        }
-
-                        int index = rand() % e.m_values.size();
-                        ctx.m_out << valueType << "::" << e.m_values[index].first;
-                    }
-                    else
-                    {
-                        ctx.m_out << getGenerateRandomValueFunction(keyType);
-                    }
-
-                    ctx.m_out
-                        << "] = ";
-
-                    if (valueEnumIt != enumerations.end())
-                    {
-                        const Parser::Enumeration & e = *valueEnumIt;
-                        if (e.m_values.isEmpty()) {
-                            throw std::runtime_error(
-                                "Detected enumeration without items: " +
-                                e.m_name.toStdString());
-                        }
-
-                        int index = rand() % e.m_values.size();
-                        ctx.m_out << valueType << "::" << e.m_values[index].first;
-                    }
-                    else
-                    {
-                        ctx.m_out << getGenerateRandomValueFunction(valueType);
-                    }
-
-                    ctx.m_out << ";" << endl;
-                }
-            }
-            else
-            {
-                throw std::runtime_error(
-                    "Unsupported field type: " +
-                    typeToStr(f.m_type, {}, MethodType::TypeName).toStdString());
-            }
+        for(const auto & f: s.m_fields) {
+            generateGetRandomValueExpression(
+                f,
+                QStringLiteral("    result."),
+                *parser,
+                ctx.m_out);
         }
 
         ctx.m_out << "    return result;" << endl

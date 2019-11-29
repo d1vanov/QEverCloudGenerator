@@ -218,6 +218,16 @@ private:
 
     QString capitalize(const QString & input) const;
 
+    void generateGetRandomValueExpression(
+        const Parser::Field & field,
+        const QString & prefix,
+        const Parser & parser,
+        QTextStream & out,
+        const QString & end = QStringLiteral(";\n"));
+
+    void verifyTypeIsBaseOrIdentifier(
+        const QSharedPointer<Parser::Type> & type) const;
+
     QString getGenerateRandomValueFunction(const QString & typeName) const;
 
     // Write methods for particular parsed fields

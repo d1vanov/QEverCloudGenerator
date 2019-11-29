@@ -217,6 +217,11 @@ void Generator::generateGetRandomValueExpression(
         field.m_type.dynamicCast<Parser::IdentifierType>();
     if (!identifierType.isNull())
     {
+        out << prefix;
+        if (!field.m_name.isEmpty()) {
+            out << field.m_name << " = ";
+        }
+
         auto actualType = clearInclude(identifierType->m_identifier);
         actualType = clearTypedef(actualType);
 
@@ -228,15 +233,6 @@ void Generator::generateGetRandomValueExpression(
             {
                 return s.m_name == actualType;
             });
-        if (exceptionIt != exceptions.end()) {
-            // FIXME: generate proper exceptions
-            return;
-        }
-
-        out << prefix;
-        if (!field.m_name.isEmpty()) {
-            out << field.m_name << " = ";
-        }
 
         const auto & enumerations = parser.enumerations();
         auto enumIt = std::find_if(
@@ -258,6 +254,11 @@ void Generator::generateGetRandomValueExpression(
 
             int index = rand() % e.m_values.size();
             out << actualType << "::" << e.m_values[index].first << end;
+        }
+        else if (exceptionIt != exceptions.end())
+        {
+            generateGetRandomExceptionExpression(
+                field, *exceptionIt, prefix, parser, out);
         }
         else
         {
@@ -425,6 +426,29 @@ void Generator::verifyTypeIsBaseOrIdentifier(
         throw std::runtime_error(
             "Unsupported type: expecting base or identifier type: " +
             typeName.toStdString());
+    }
+}
+
+void Generator::generateGetRandomExceptionExpression(
+    const Parser::Field & field,
+    const Parser::Structure & e,
+    const QString & prefix,
+    const Parser & parser,
+    QTextStream & out)
+{
+    out << e.m_name << "();" << endl;
+
+    QString fieldPrefix = prefix + field.m_name;
+    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+        fieldPrefix += QStringLiteral("->");
+    }
+    else {
+        fieldPrefix += QStringLiteral(".");
+    }
+
+    for(const auto & f: e.m_fields) {
+        verifyTypeIsBaseOrIdentifier(f.m_type);
+        generateGetRandomValueExpression(f, fieldPrefix, parser, out);
     }
 }
 

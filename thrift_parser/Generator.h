@@ -228,6 +228,13 @@ private:
     void verifyTypeIsBaseOrIdentifier(
         const QSharedPointer<Parser::Type> & type) const;
 
+    void generateGetRandomExceptionExpression(
+        const Parser::Field & field,
+        const Parser::Structure & e,
+        const QString & prefix,
+        const Parser & parser,
+        QTextStream & out);
+
     QString getGenerateRandomValueFunction(const QString & typeName) const;
 
     // Write methods for particular parsed fields

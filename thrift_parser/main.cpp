@@ -31,8 +31,13 @@
 #include <QDir>
 #include <QDebug>
 
+#include <cstdlib>
+
 int main(int argc, char *argv[])
 {
+    // Fixed seed for rand() calls
+    std::srand(1575003691);
+
     QCoreApplication app(argc, argv);
 
     try

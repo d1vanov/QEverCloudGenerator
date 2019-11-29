@@ -197,45 +197,45 @@ QString Generator::getGenerateRandomValueFunction(const QString & typeName) cons
 {
     if (typeName == QStringLiteral("bool"))
     {
-        return QStringLiteral("tests::generateRandomBool()");
+        return QStringLiteral("generateRandomBool()");
     }
     else if ( (typeName == QStringLiteral("QString")) ||
               (typeName == QStringLiteral("string")) )
     {
-        return QStringLiteral("tests::generateRandomString()");
+        return QStringLiteral("generateRandomString()");
     }
     else if (typeName == QStringLiteral("double"))
     {
-        return QStringLiteral("tests::generateRandomDouble()");
+        return QStringLiteral("generateRandomDouble()");
     }
     else if ( (typeName == QStringLiteral("QByteArray")) ||
               (typeName == QStringLiteral("binary")) )
     {
-        return QStringLiteral("tests::generateRandomString().toUtf8()");
+        return QStringLiteral("generateRandomString().toUtf8()");
     }
     else if ( (typeName == QStringLiteral("quint8")) ||
               (typeName == QStringLiteral("byte")) ||
               (typeName == QStringLiteral("char")) )
     {
-        return QStringLiteral("tests::generateRandomUint8()");
+        return QStringLiteral("generateRandomUint8()");
     }
     else if ( (typeName == QStringLiteral("qint16")) ||
               (typeName == QStringLiteral("i16")) )
     {
-        return QStringLiteral("tests::generateRandomInt16()");
+        return QStringLiteral("generateRandomInt16()");
     }
     else if ( (typeName == QStringLiteral("qint32")) ||
               (typeName == QStringLiteral("i32")) )
     {
-        return QStringLiteral("tests::generateRandomInt32()");
+        return QStringLiteral("generateRandomInt32()");
     }
     else if ( (typeName == QStringLiteral("qint64")) ||
               (typeName == QStringLiteral("i64")) )
     {
-        return QStringLiteral("tests::generateRandomInt64()");
+        return QStringLiteral("generateRandomInt64()");
     }
     else {
-        return QStringLiteral("tests::generate") + typeName + QStringLiteral("()");
+        return QStringLiteral("generateRandom") + typeName + QStringLiteral("()");
     }
 }
 
@@ -627,8 +627,9 @@ void Generator::generateTestServerPrepareRequestParams(
                     e.m_name.toStdString());
             }
 
+            int index = rand() % e.m_values.size();
             ctx.m_out << actualParamTypeName
-                << "::" << e.m_values[0].first << ";" << endl;
+                << "::" << e.m_values[index].first << ";" << endl;
         }
         else
         {
@@ -754,8 +755,9 @@ void Generator::generateTestServerPrepareRequestResponse(
                     e.m_name.toStdString());
             }
 
+            int index = rand() % e.m_values.size();
             ctx.m_out << " = " << actualResponseTypeName
-                << "::" << e.m_values[0].first << ";" << endl << endl;
+                << "::" << e.m_values[index].first << ";" << endl << endl;
         }
         else
         {
@@ -892,7 +894,7 @@ void Generator::generateTestServerSocketSetup(
         << endl
         << "            }" << endl << endl
         << "            QByteArray requestData = "
-        << "tests::readThriftRequestFromSocket(*pSocket);" << endl
+        << "readThriftRequestFromSocket(*pSocket);" << endl
         << "            server.onRequest(requestData);" << endl
         << "        });" << endl << endl;
 
@@ -912,7 +914,7 @@ void Generator::generateTestServerSocketSetup(
         << "            buffer.append(\"Content-Type: "
         << "application/x-thrift\\r\\n\\r\\n\");" << endl
         << "            buffer.append(responseData);" << endl << endl
-        << "            if (!tests::writeBufferToSocket(buffer, "
+        << "            if (!writeBufferToSocket(buffer, "
         << "*pSocket)) {" << endl
         << "                QFAIL(\"Failed to write response to socket\");"
         << endl
@@ -2850,7 +2852,7 @@ void Generator::generateTestServerHeaders(
     Parser * parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../Common.h") << QStringLiteral("<QObject>");
+        << QStringLiteral("../SocketHelpers.h") << QStringLiteral("<QObject>");
     sortIncludes(additionalIncludes);
 
     const auto & services = parser->services();
@@ -2900,7 +2902,8 @@ void Generator::generateTestServerHeaders(
 void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../Common.h")
+        << QStringLiteral("../SocketHelpers.h")
+        << QStringLiteral("RandomDataGenerators.h")
         << QStringLiteral("<generated/Servers.h>")
         << QStringLiteral("<generated/Services.h>")
         << QStringLiteral("<QTcpServer>")
@@ -3041,8 +3044,8 @@ void Generator::generateTestRandomDataGeneratorsCpp(
     ctx.m_out << "template <typename T>" << endl
         << "T generateRandomIntType()" << endl
         << "{" << endl
-        << "    T min = std::numeric_limits<T>::min();" << endl
-        << "    T max = std::numeric_limits<T>::max();" << endl
+        << "    T min = std::numeric_limits<T>::min() / 4;" << endl
+        << "    T max = std::numeric_limits<T>::max() / 4;" << endl
         << "    return min + (rand() \% static_cast<T>(max - min + 1));"
         << endl
         << "}" << endl << endl;
@@ -3160,9 +3163,48 @@ void Generator::generateTestRandomDataGeneratorsCpp(
                 auto actualType = clearInclude(identifierType->m_identifier);
                 actualType = clearTypedef(actualType);
 
-                ctx.m_out << "    result." << f.m_name << " = "
-                    << getGenerateRandomValueFunction(actualType)
-                    << ";" << endl;
+                const auto & enumerations = parser->enumerations();
+                auto enumIt = std::find_if(
+                    enumerations.begin(),
+                    enumerations.end(),
+                    [&] (const Parser::Enumeration & e)
+                    {
+                        return e.m_name == actualType;
+                    });
+
+                const auto & exceptions = parser->exceptions();
+                auto exceptionIt = std::find_if(
+                    exceptions.begin(),
+                    exceptions.end(),
+                    [&] (const Parser::Structure & s)
+                    {
+                        return s.m_name == actualType;
+                    });
+
+                if (enumIt != enumerations.end())
+                {
+                    const Parser::Enumeration & e = *enumIt;
+                    if (e.m_values.isEmpty()) {
+                        throw std::runtime_error(
+                            "Detected enumeration without items: " +
+                            e.m_name.toStdString());
+                    }
+
+                    int index = rand() % e.m_values.size();
+                    ctx.m_out << "    result." << f.m_name << " = "
+                        << actualType << "::" << e.m_values[index].first << ";"
+                        << endl;
+                }
+                else if (exceptionIt != exceptions.end())
+                {
+                    // Don't generate anything
+                }
+                else
+                {
+                    ctx.m_out << "    result." << f.m_name << " = "
+                        << getGenerateRandomValueFunction(actualType)
+                        << ";" << endl;
+                }
             }
             else if (!listType.isNull())
             {
@@ -3171,11 +3213,51 @@ void Generator::generateTestRandomDataGeneratorsCpp(
                     {},
                     MethodType::TypeName);
 
+                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                    ctx.m_out << "    result." << f.m_name << " = QList<"
+                        << valueType << ">();" << endl;
+                }
+
+                valueType = clearInclude(valueType);
+                valueType = clearTypedef(valueType);
+
+                const auto & enumerations = parser->enumerations();
+                auto enumIt = std::find_if(
+                    enumerations.begin(),
+                    enumerations.end(),
+                    [&] (const Parser::Enumeration & e)
+                    {
+                        return e.m_name == valueType;
+                    });
+
                 for(size_t i = 0; i < 3; ++i)
                 {
-                    ctx.m_out << "    result." << f.m_name << " << "
-                        << getGenerateRandomValueFunction(valueType)
-                        << ";" << endl;
+                    ctx.m_out << "    result." << f.m_name;
+
+                    if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                        ctx.m_out << ".ref()";
+                    }
+
+                    ctx.m_out << " << ";
+
+                    if (enumIt != enumerations.end())
+                    {
+                        const Parser::Enumeration & e = *enumIt;
+                        if (e.m_values.isEmpty()) {
+                            throw std::runtime_error(
+                                "Detected enumeration without items: " +
+                                e.m_name.toStdString());
+                        }
+
+                        int index = rand() % e.m_values.size();
+                        ctx.m_out << valueType << "::" << e.m_values[index].first
+                            << ";" << endl;
+                    }
+                    else
+                    {
+                        ctx.m_out << getGenerateRandomValueFunction(valueType)
+                            << ";" << endl;
+                    }
                 }
             }
             else if (!setType.isNull())
@@ -3185,12 +3267,54 @@ void Generator::generateTestRandomDataGeneratorsCpp(
                     {},
                     MethodType::TypeName);
 
+                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                    ctx.m_out << "    result." << f.m_name << " = QSet<"
+                        << valueType << ">();" << endl;
+                }
+
+                valueType = clearInclude(valueType);
+                valueType = clearTypedef(valueType);
+
+                const auto & enumerations = parser->enumerations();
+                auto enumIt = std::find_if(
+                    enumerations.begin(),
+                    enumerations.end(),
+                    [&] (const Parser::Enumeration & e)
+                    {
+                        return e.m_name == valueType;
+                    });
+
                 for(size_t i = 0; i < 3; ++i)
                 {
-                    ctx.m_out << "    Q_UNUSED(result." << f.m_name
-                        << ".insert("
-                        << getGenerateRandomValueFunction(valueType)
-                        << "))" << endl;
+                    ctx.m_out << "    Q_UNUSED(result." << f.m_name;
+
+                    if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                        ctx.m_out << "->";
+                    }
+                    else {
+                        ctx.m_out << ".";
+                    }
+
+                    ctx.m_out << "insert(";
+
+                    if (enumIt != enumerations.end())
+                    {
+                        const Parser::Enumeration & e = *enumIt;
+                        if (e.m_values.isEmpty()) {
+                            throw std::runtime_error(
+                                "Detected enumeration without items: " +
+                                e.m_name.toStdString());
+                        }
+
+                        int index = rand() % e.m_values.size();
+                        ctx.m_out << valueType << "::" << e.m_values[index].first
+                            << "))" << endl;
+                    }
+                    else
+                    {
+                        ctx.m_out << getGenerateRandomValueFunction(valueType)
+                            << "))" << endl;
+                    }
                 }
             }
             else if (!mapType.isNull())
@@ -3205,13 +3329,83 @@ void Generator::generateTestRandomDataGeneratorsCpp(
                     {},
                     MethodType::TypeName);
 
+                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                    ctx.m_out << "    result." << f.m_name << " = QMap<"
+                        << keyType << ", " << valueType << ">();" << endl;
+                }
+
+                keyType = clearInclude(keyType);
+                keyType = clearTypedef(keyType);
+
+                valueType = clearInclude(valueType);
+                valueType = clearTypedef(valueType);
+
+                const auto & enumerations = parser->enumerations();
+
+                auto keyEnumIt = std::find_if(
+                    enumerations.begin(),
+                    enumerations.end(),
+                    [&] (const Parser::Enumeration & e)
+                    {
+                        return e.m_name == keyType;
+                    });
+
+                auto valueEnumIt = std::find_if(
+                    enumerations.begin(),
+                    enumerations.end(),
+                    [&] (const Parser::Enumeration & e)
+                    {
+                        return e.m_name == valueType;
+                    });
+
                 for(size_t i = 0; i < 3; ++i)
                 {
-                    ctx.m_out << "    result." << f.m_name << "["
-                        << getGenerateRandomValueFunction(keyType)
-                        << "] = "
-                        << getGenerateRandomValueFunction(valueType)
-                        << ";" << endl;
+                    ctx.m_out << "    result." << f.m_name;
+
+                    if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                        ctx.m_out << ".ref()";
+                    }
+
+                    ctx.m_out << "[";
+
+                    if (keyEnumIt != enumerations.end())
+                    {
+                        const Parser::Enumeration & e = *keyEnumIt;
+                        if (e.m_values.isEmpty()) {
+                            throw std::runtime_error(
+                                "Detected enumeration without items: " +
+                                e.m_name.toStdString());
+                        }
+
+                        int index = rand() % e.m_values.size();
+                        ctx.m_out << valueType << "::" << e.m_values[index].first;
+                    }
+                    else
+                    {
+                        ctx.m_out << getGenerateRandomValueFunction(keyType);
+                    }
+
+                    ctx.m_out
+                        << "] = ";
+
+                    if (valueEnumIt != enumerations.end())
+                    {
+                        const Parser::Enumeration & e = *valueEnumIt;
+                        if (e.m_values.isEmpty()) {
+                            throw std::runtime_error(
+                                "Detected enumeration without items: " +
+                                e.m_name.toStdString());
+                        }
+
+                        int index = rand() % e.m_values.size();
+                        ctx.m_out << valueType << "::" << e.m_values[index].first;
+                    }
+                    else
+                    {
+                        ctx.m_out << getGenerateRandomValueFunction(valueType);
+                    }
+
+                    ctx.m_out << ";" << endl;
                 }
             }
             else
@@ -3225,6 +3419,8 @@ void Generator::generateTestRandomDataGeneratorsCpp(
         ctx.m_out << "    return result;" << endl
             << "}" << endl << endl;
     }
+
+    writeBodyFooter(ctx.m_out);
 }
 
 void Generator::generateServiceClassDeclaration(
@@ -4613,5 +4809,8 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
 
     generateTestServerHeaders(parser, outPath);
     generateTestServerCpps(parser, outPath);
+
+    generateTestRandomDataGeneratorsHeader(parser, outPath);
+    generateTestRandomDataGeneratorsCpp(parser, outPath);
 }
 

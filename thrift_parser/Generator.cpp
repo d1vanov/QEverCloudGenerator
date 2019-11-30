@@ -200,8 +200,7 @@ void Generator::generateGetRandomValueExpression(
     QTextStream & out,
     const QString & end)
 {
-    QSharedPointer<Parser::BaseType> baseType =
-        field.m_type.dynamicCast<Parser::BaseType>();
+    auto baseType = field.m_type.dynamicCast<Parser::BaseType>();
     if (!baseType.isNull())
     {
         out << prefix;
@@ -213,8 +212,7 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    QSharedPointer<Parser::IdentifierType> identifierType =
-        field.m_type.dynamicCast<Parser::IdentifierType>();
+    auto identifierType = field.m_type.dynamicCast<Parser::IdentifierType>();
     if (!identifierType.isNull())
     {
         out << prefix;
@@ -268,8 +266,7 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    QSharedPointer<Parser::ListType> listType =
-        field.m_type.dynamicCast<Parser::ListType>();
+    auto listType = field.m_type.dynamicCast<Parser::ListType>();
     if (!listType.isNull())
     {
         verifyTypeIsBaseOrIdentifier(listType->m_valueType);
@@ -307,8 +304,7 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    QSharedPointer<Parser::SetType> setType =
-        field.m_type.dynamicCast<Parser::SetType>();
+    auto setType = field.m_type.dynamicCast<Parser::SetType>();
     if (!setType.isNull())
     {
         verifyTypeIsBaseOrIdentifier(setType->m_valueType);
@@ -355,8 +351,7 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    QSharedPointer<Parser::MapType> mapType =
-        field.m_type.dynamicCast<Parser::MapType>();
+    auto mapType = field.m_type.dynamicCast<Parser::MapType>();
     if (!mapType.isNull())
     {
         verifyTypeIsBaseOrIdentifier(mapType->m_keyType);
@@ -447,7 +442,6 @@ void Generator::generateGetRandomExceptionExpression(
     }
 
     for(const auto & f: e.m_fields) {
-        verifyTypeIsBaseOrIdentifier(f.m_type);
         generateGetRandomValueExpression(f, fieldPrefix, parser, out);
     }
 }
@@ -920,19 +914,11 @@ void Generator::generateTestServerPrepareRequestResponse(
         ctx.m_out << "    " << responseTypeName << " response";
     }
 
-    QSharedPointer<Parser::ListType> responseListType =
-        func.m_type.dynamicCast<Parser::ListType>();
-
-    QSharedPointer<Parser::SetType> responseSetType =
-        func.m_type.dynamicCast<Parser::SetType>();
-
-    QSharedPointer<Parser::MapType> responseMapType =
-        func.m_type.dynamicCast<Parser::MapType>();
-
-    if (!responseListType.isNull())
+    auto listType = func.m_type.dynamicCast<Parser::ListType>();
+    if (!listType.isNull())
     {
         auto valueType = typeToStr(
-            responseListType->m_valueType,
+            listType->m_valueType,
             {},
             MethodType::TypeName);
 
@@ -946,11 +932,15 @@ void Generator::generateTestServerPrepareRequestResponse(
                 << ";" << endl;
         }
         ctx.m_out << endl;
+
+        return;
     }
-    else if (!responseSetType.isNull())
+
+    auto setType = func.m_type.dynamicCast<Parser::SetType>();
+    if (!setType.isNull())
     {
         auto valueType = typeToStr(
-            responseSetType->m_valueType,
+            setType->m_valueType,
             {},
             MethodType::TypeName);
 
@@ -964,16 +954,19 @@ void Generator::generateTestServerPrepareRequestResponse(
                 << "))" << endl;
         }
         ctx.m_out << endl;
+        return;
     }
-    else if (!responseMapType.isNull())
+
+    auto mapType = func.m_type.dynamicCast<Parser::MapType>();
+    if (!mapType.isNull())
     {
         auto keyType = typeToStr(
-            responseMapType->m_keyType,
+            mapType->m_keyType,
             {},
             MethodType::TypeName);
 
         auto valueType = typeToStr(
-            responseMapType->m_valueType,
+            mapType->m_valueType,
             {},
             MethodType::TypeName);
 
@@ -992,6 +985,7 @@ void Generator::generateTestServerPrepareRequestResponse(
                 << ";" << endl;
         }
         ctx.m_out << endl;
+        return;
     }
     else if (!responseTypeIsVoid)
     {
@@ -1027,10 +1021,50 @@ void Generator::generateTestServerPrepareRequestResponse(
     }
 }
 
+void Generator::generateTestServerPrepareRequestExceptionResponse(
+    const Parser & parser,
+    const Parser::Field & e,
+    OutputFileContext & ctx)
+{
+    auto exceptionTypeName = typeToStr(
+        e.m_type,
+        {},
+        MethodType::TypeName);
+
+    const auto & exceptions = parser.exceptions();
+    auto exceptionIt = std::find_if(
+        exceptions.begin(),
+        exceptions.end(),
+        [&] (const Parser::Structure & s)
+        {
+            return s.m_name == exceptionTypeName;
+        });
+
+    if (Q_UNLIKELY(exceptionIt == exceptions.end())) {
+        throw std::runtime_error(
+            "Failed to find exception by type name: " +
+            exceptionTypeName.toStdString());
+    }
+
+    ctx.m_out << "    auto " << e.m_name << " = ";
+
+    const QString prefix = QStringLiteral("    ");
+    generateGetRandomExceptionExpression(
+        e,
+        *exceptionIt,
+        prefix,
+        parser,
+        ctx.m_out);
+
+    ctx.m_out << endl;
+}
+
 void Generator::generateTestServerHelperLambda(
     const Parser::Service & service,
     const Parser::Function & func,
-    OutputFileContext & ctx)
+    const Parser & parser,
+    OutputFileContext & ctx,
+    const QString & exceptionToThrow)
 {
     ctx.m_out << "    " << service.m_name << capitalize(func.m_name)
         << "TesterHelper helper(" << endl
@@ -1075,7 +1109,12 @@ void Generator::generateTestServerHelperLambda(
         ctx.m_out << "             ";
     }
 
-    ctx.m_out << "IRequestContextPtr ctxParam)" << endl;
+    auto returnTypeName = typeToStr(
+        func.m_type,
+        {},
+        MethodType::TypeName);
+
+    ctx.m_out << "IRequestContextPtr ctxParam) -> " << returnTypeName << endl;
 
     ctx.m_out << "        {" << endl;
 
@@ -1090,6 +1129,12 @@ void Generator::generateTestServerHelperLambda(
 
         ctx.m_out << "            Q_ASSERT(" << param.m_name << " == "
             << param.m_name << "Param);" << endl;
+    }
+
+    if (!exceptionToThrow.isEmpty()) {
+        ctx.m_out << "            throw " << exceptionToThrow << ";" << endl
+            << "        });" << endl << endl;
+        return;
     }
 
     ctx.m_out << "            return";
@@ -1184,45 +1229,51 @@ void Generator::generateTestServerSocketSetup(
 void Generator::generateTestServerServiceCall(
     const Parser::Service & service,
     const Parser::Function & func,
-    OutputFileContext & ctx)
+    OutputFileContext & ctx,
+    const QString & exceptionTypeToCatch,
+    const QString & exceptionNameToCompare)
 {
     auto funcReturnTypeName = typeToStr(
         func.m_type,
         {},
         MethodType::TypeName);
 
-    if (service.m_name == QStringLiteral("UserStore"))
-    {
-        ctx.m_out << "    auto userStore = newUserStore(" << endl
+    QString serviceName;
+    if (service.m_name == QStringLiteral("UserStore")) {
+        serviceName = QStringLiteral("userStore");
+        ctx.m_out << "    auto " << serviceName << " = newUserStore(" << endl
             << "        QStringLiteral(\"127.0.0.1\")," << endl
             << "        port," << endl
             << "        QStringLiteral(\"http\"));" << endl;
-
-        ctx.m_out << "    ";
-        if (funcReturnTypeName != QStringLiteral("void")) {
-            ctx.m_out << funcReturnTypeName << " res = ";
-        }
-
-        ctx.m_out << "userStore->" << func.m_name << "(" << endl;
     }
-    else if (service.m_name == QStringLiteral("NoteStore"))
-    {
-        ctx.m_out << "    auto noteStore = newNoteStore(" << endl
+    else if (service.m_name == QStringLiteral("NoteStore")) {
+        serviceName = QStringLiteral("noteStore");
+        ctx.m_out << "    auto " << serviceName << " = newNoteStore(" << endl
             << "        QStringLiteral(\"http://127.0.0.1:\") + "
             << "QString::number(port));" << endl;
-
-        ctx.m_out << "    ";
-        if (funcReturnTypeName != QStringLiteral("void")) {
-            ctx.m_out << funcReturnTypeName << " res = ";
-        }
-
-        ctx.m_out << "noteStore->" << func.m_name << "(" << endl;
     }
-    else
-    {
+    else {
         throw std::runtime_error(
             "Unsupported service: " + service.m_name.toStdString());
     }
+
+    QString indent = QStringLiteral("    ");
+    if (!exceptionTypeToCatch.isEmpty())
+    {
+        ctx.m_out << indent << "bool caughtException = false;" << endl;
+
+        ctx.m_out << indent << "try" << endl
+            << indent << "{" << endl;
+
+        indent += indent;
+    }
+
+    ctx.m_out << indent;
+    if (funcReturnTypeName != QStringLiteral("void")) {
+        ctx.m_out << funcReturnTypeName << " res = ";
+    }
+
+    ctx.m_out << serviceName << "->" << func.m_name << "(" << endl;
 
     for(const auto & param: func.m_params)
     {
@@ -1231,10 +1282,27 @@ void Generator::generateTestServerServiceCall(
             continue;
         }
 
-        ctx.m_out << "        " << param.m_name << "," << endl;
+        ctx.m_out << indent << "    " << param.m_name << "," << endl;
     }
 
-    ctx.m_out << "        ctx);" << endl;
+    ctx.m_out << indent << "    ctx);" << endl;
+
+    if (!exceptionTypeToCatch.isEmpty())
+    {
+        if (funcReturnTypeName != QStringLiteral("void")) {
+            ctx.m_out << indent << "Q_UNUSED(res)" << endl;
+        }
+
+        ctx.m_out << "    }" << endl
+            << "    catch(const " << exceptionTypeToCatch << " & e)" << endl
+            << "    {" << endl
+            << "        caughtException = true;" << endl
+            << "        QVERIFY(e == " << exceptionNameToCompare << ");" << endl
+            << "    }" << endl << endl;
+
+        ctx.m_out << "    QVERIFY(caughtException);" << endl;
+        return;
+    }
 
     if (funcReturnTypeName != QStringLiteral("void")) {
         ctx.m_out << "    QVERIFY(res == response);" << endl;
@@ -3148,8 +3216,19 @@ void Generator::generateTestServerHeaders(
                 throw std::runtime_error("oneway functions are not supported");
             }
 
-            ctx.m_out << "    void shouldExecute" << capitalize(func.m_name)
-                << "();" << endl;
+            auto funcName = capitalize(func.m_name);
+            ctx.m_out << "    void shouldExecute" << funcName << "();" << endl;
+
+            for(const auto & e: func.m_throws)
+            {
+                auto exceptionTypeName = typeToStr(
+                    e.m_type,
+                    {},
+                    MethodType::TypeName);
+
+                ctx.m_out << "    void shouldDeliver" << exceptionTypeName
+                    << "In" << funcName << "();" << endl;
+            }
         }
 
         ctx.m_out << "};" << endl << endl;
@@ -3201,18 +3280,46 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
         {
             ctx.m_out << blockSeparator << endl << endl;
 
+            auto funcName = capitalize(func.m_name);
+
+            // Should deliver request and response for successful scenario
+
             ctx.m_out << "void " << s.m_name << "Tester::shouldExecute"
-                << capitalize(func.m_name) << "()" << endl;
+                << funcName << "()" << endl;
 
             ctx.m_out << "{" << endl;
 
             generateTestServerPrepareRequestParams(func, enumerations, ctx);
             generateTestServerPrepareRequestResponse(func, enumerations, ctx);
-            generateTestServerHelperLambda(s, func, ctx);
+            generateTestServerHelperLambda(s, func, *parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
             generateTestServerServiceCall(s, func, ctx);
 
             ctx.m_out << "}" << endl << endl;
+
+            // Should deliver request and response in case of exception
+
+            for(const auto & e: func.m_throws)
+            {
+                auto exceptionTypeName = typeToStr(
+                    e.m_type,
+                    {},
+                    MethodType::TypeName);
+
+                ctx.m_out << "void " << s.m_name << "Tester::shouldDeliver"
+                    << exceptionTypeName << "In" << funcName << "()" << endl;
+
+                ctx.m_out << "{" << endl;
+
+                generateTestServerPrepareRequestParams(func, enumerations, ctx);
+                generateTestServerPrepareRequestExceptionResponse(*parser, e, ctx);
+                generateTestServerHelperLambda(s, func, *parser, ctx, e.m_name);
+                generateTestServerSocketSetup(s, func, ctx);
+                generateTestServerServiceCall(
+                    s, func, ctx, exceptionTypeName, e.m_name);
+
+                ctx.m_out << "}" << endl << endl;
+            }
         }
 
         writeBodyFooter(ctx.m_out);
@@ -4427,7 +4534,9 @@ void Generator::generateServerClassDefinition(
             << "                ThriftMessageType::T_EXCEPTION," << endl
             << "                cseqid);" << endl
             << "            writeThriftException(writer, exception);" << endl
-            << "            writer.writeMessageEnd();" << endl
+            << "            writer.writeMessageEnd();" << endl << endl
+            << "            Q_EMIT " << func.m_name << "RequestReady(" << endl
+            << "                writer.buffer());" << endl
             << "            return;" << endl
             << "        }" << endl
             << "        catch(...)" << endl
@@ -4473,7 +4582,10 @@ void Generator::generateServerClassDefinition(
                     << "            // Finalize message and return immediately"
                     << endl
                     << "            writer.writeStructEnd();" << endl
-                    << "            writer.writeMessageEnd();" << endl
+                    << "            writer.writeMessageEnd();" << endl << endl
+                    << "            Q_EMIT " << func.m_name << "RequestReady("
+                    << endl
+                    << "                writer.buffer());" << endl
                     << "            return;" << endl
                     << "        }" << endl;
             }

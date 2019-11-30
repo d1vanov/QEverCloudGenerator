@@ -123,10 +123,17 @@ private:
         const QList<Parser::Enumeration> & enumerations,
         OutputFileContext & ctx);
 
+    void generateTestServerPrepareRequestExceptionResponse(
+        const Parser & parser,
+        const Parser::Field & e,
+        OutputFileContext & ctx);
+
     void generateTestServerHelperLambda(
         const Parser::Service & service,
         const Parser::Function & func,
-        OutputFileContext & ctx);
+        const Parser & parser,
+        OutputFileContext & ctx,
+        const QString & exceptionToThrow = {});
 
     void generateTestServerSocketSetup(
         const Parser::Service & service,
@@ -136,7 +143,28 @@ private:
     void generateTestServerServiceCall(
         const Parser::Service & service,
         const Parser::Function & func,
-        OutputFileContext & ctx);
+        OutputFileContext & ctx,
+        const QString & exceptionTypeToCatch = {},
+        const QString & exceptionNameToCompare = {});
+
+    void generateGetRandomValueExpression(
+        const Parser::Field & field,
+        const QString & prefix,
+        const Parser & parser,
+        QTextStream & out,
+        const QString & end = QStringLiteral(";\n"));
+
+    void verifyTypeIsBaseOrIdentifier(
+        const QSharedPointer<Parser::Type> & type) const;
+
+    void generateGetRandomExceptionExpression(
+        const Parser::Field & field,
+        const Parser::Structure & e,
+        const QString & prefix,
+        const Parser & parser,
+        QTextStream & out);
+
+    QString getGenerateRandomValueFunction(const QString & typeName) const;
 
     // Methods for writing header and source files
 
@@ -217,25 +245,6 @@ private:
     QString camelCaseToSnakeCase(const QString & input) const;
 
     QString capitalize(const QString & input) const;
-
-    void generateGetRandomValueExpression(
-        const Parser::Field & field,
-        const QString & prefix,
-        const Parser & parser,
-        QTextStream & out,
-        const QString & end = QStringLiteral(";\n"));
-
-    void verifyTypeIsBaseOrIdentifier(
-        const QSharedPointer<Parser::Type> & type) const;
-
-    void generateGetRandomExceptionExpression(
-        const Parser::Field & field,
-        const Parser::Structure & e,
-        const QString & prefix,
-        const Parser & parser,
-        QTextStream & out);
-
-    QString getGenerateRandomValueFunction(const QString & typeName) const;
 
     // Write methods for particular parsed fields
 

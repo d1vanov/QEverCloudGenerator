@@ -125,7 +125,7 @@ private:
 
     void generateTestServerPrepareRequestExceptionResponse(
         const Parser & parser,
-        const Parser::Field & e,
+        const Parser::Field & exceptionField,
         OutputFileContext & ctx);
 
     void generateTestServerHelperLambda(
@@ -162,6 +162,9 @@ private:
         const Parser::Structure & e,
         const QString & prefix,
         const Parser & parser,
+        QTextStream & out);
+
+    void generateGetThriftExceptionExpression(
         QTextStream & out);
 
     QString getGenerateRandomValueFunction(const QString & typeName) const;

@@ -446,6 +446,14 @@ void Generator::generateGetRandomExceptionExpression(
     }
 }
 
+void Generator::generateGetThriftExceptionExpression(
+    QTextStream & out)
+{
+    out << "ThriftException("
+        << "ThriftException::Type::INTERNAL_ERROR, "
+        << "QStringLiteral(\"Internal error\"));" << endl;
+}
+
 QString Generator::getGenerateRandomValueFunction(const QString & typeName) const
 {
     if (typeName == QStringLiteral("bool"))
@@ -1030,6 +1038,13 @@ void Generator::generateTestServerPrepareRequestExceptionResponse(
         e.m_type,
         {},
         MethodType::TypeName);
+
+    if (exceptionTypeName == QStringLiteral("ThriftException")) {
+        ctx.m_out << "    auto " << e.m_name << " = ";
+        generateGetThriftExceptionExpression(ctx.m_out);
+        ctx.m_out << endl;
+        return;
+    }
 
     const auto & exceptions = parser.exceptions();
     auto exceptionIt = std::find_if(
@@ -3229,6 +3244,9 @@ void Generator::generateTestServerHeaders(
                 ctx.m_out << "    void shouldDeliver" << exceptionTypeName
                     << "In" << funcName << "();" << endl;
             }
+
+            ctx.m_out << "    void shouldDeliverThriftExceptionIn" << funcName
+                << "();" << endl;
         }
 
         ctx.m_out << "};" << endl << endl;
@@ -3320,6 +3338,35 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
                 ctx.m_out << "}" << endl << endl;
             }
+
+            // Should also properly deliver ThriftExceptions
+
+            ctx.m_out << "void " << s.m_name << "Tester::shouldDeliverThriftExceptionIn" << funcName
+                << "()" << endl;
+
+            ctx.m_out << "{" << endl;
+
+            Parser::Field exceptionField;
+            exceptionField.m_name = QStringLiteral("thriftException");
+
+            auto type = QSharedPointer<Parser::IdentifierType>::create();
+            type->m_identifier = QStringLiteral("ThriftException");
+
+            exceptionField.m_type = type;
+
+            generateTestServerPrepareRequestParams(func, enumerations, ctx);
+            generateTestServerPrepareRequestExceptionResponse(
+                *parser, exceptionField, ctx);
+
+            generateTestServerHelperLambda(
+                s, func, *parser, ctx, exceptionField.m_name);
+
+            generateTestServerSocketSetup(s, func, ctx);
+            generateTestServerServiceCall(
+                s, func, ctx, QStringLiteral("ThriftException"),
+                exceptionField.m_name);
+
+            ctx.m_out << "}" << endl << endl;
         }
 
         writeBodyFooter(ctx.m_out);

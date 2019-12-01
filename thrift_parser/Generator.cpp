@@ -598,6 +598,10 @@ void Generator::writeStructPrintDefinition(
     bool previousOptional = false;
     for(const auto & f: s.m_fields)
     {
+        auto listType = f.m_type.dynamicCast<Parser::ListType>();
+        auto setType = f.m_type.dynamicCast<Parser::SetType>();
+        auto mapType = f.m_type.dynamicCast<Parser::MapType>();
+
         if (f.m_required == Parser::Field::RequiredFlag::Optional)
         {
             if (!previousOptional) {
@@ -607,7 +611,7 @@ void Generator::writeStructPrintDefinition(
             out << "    if (" << f.m_name << ".isSet()) {" << endl
                 << "        strm << \"    " << f.m_name << " = \"" << endl;
 
-            if (auto mapType = f.m_type.dynamicCast<Parser::MapType>())
+            if (!mapType.isNull())
             {
                 out << "            << \"QMap<"
                     << typeToStr(mapType->m_keyType, {}) << ", "
@@ -620,7 +624,7 @@ void Generator::writeStructPrintDefinition(
                 out << "        }" << endl;
                 out << "        strm << \"    }\\n\";" << endl;
             }
-            else if (auto setType = f.m_type.dynamicCast<Parser::SetType>())
+            else if (!setType.isNull())
             {
                 out << "            << \"QSet<"
                     << typeToStr(setType->m_valueType, {}) << "> {\";" << endl;
@@ -630,7 +634,7 @@ void Generator::writeStructPrintDefinition(
                 out << "        }" << endl;
                 out << "        strm << \"    }\\n\";" << endl;
             }
-            else if (auto listType = f.m_type.dynamicCast<Parser::ListType>())
+            else if (!listType.isNull())
             {
                 out << "            << \"QList<"
                     << typeToStr(listType->m_valueType, {}) << "> {\";" << endl;
@@ -657,7 +661,7 @@ void Generator::writeStructPrintDefinition(
         {
             out << "    strm << \"    " << f.m_name << " = \"" << endl;
 
-            if (auto mapType = f.m_type.dynamicCast<Parser::MapType>())
+            if (!mapType.isNull())
             {
                 out << "        << \"QMap<"
                     << typeToStr(mapType->m_keyType, {}) << ", "
@@ -670,7 +674,7 @@ void Generator::writeStructPrintDefinition(
                 out << "    }" << endl;
                 out << "    strm << \"}\\n\";" << endl;
             }
-            else if (auto setType = f.m_type.dynamicCast<Parser::SetType>())
+            else if (!setType.isNull())
             {
                 out << "        << \"QSet<"
                     << typeToStr(setType->m_valueType, {}) << "> {\";" << endl;
@@ -680,7 +684,7 @@ void Generator::writeStructPrintDefinition(
                 out << "    }" << endl;
                 out << "    strm << \"}\\n\";" << endl;
             }
-            else if (auto listType = f.m_type.dynamicCast<Parser::ListType>())
+            else if (!listType.isNull())
             {
                 out << "        << \"QList<"
                     << typeToStr(listType->m_valueType, {}) << "> {\";" << endl;
@@ -917,11 +921,8 @@ void Generator::generateTestServerPrepareRequestParams(
             {},
             MethodType::TypeName);
 
-        QSharedPointer<Parser::BaseType> baseType =
-            param.m_type.dynamicCast<Parser::BaseType>();
-
-        QSharedPointer<Parser::IdentifierType> identifierType =
-            param.m_type.dynamicCast<Parser::IdentifierType>();
+        auto baseType = param.m_type.dynamicCast<Parser::BaseType>();
+        auto identifierType = param.m_type.dynamicCast<Parser::IdentifierType>();
 
         QString actualParamTypeName;
 
@@ -1169,8 +1170,7 @@ void Generator::generateTestServerHelperLambda(
             {},
             MethodType::TypeName);
 
-        QSharedPointer<Parser::BaseType> baseType =
-            param.m_type.dynamicCast<Parser::BaseType>();
+        auto baseType = param.m_type.dynamicCast<Parser::BaseType>();
         if (baseType.isNull() ||
             baseType->m_baseType == QStringLiteral("string"))
         {
@@ -1222,8 +1222,7 @@ void Generator::generateTestServerHelperLambda(
 
     ctx.m_out << "            return";
 
-    QSharedPointer<Parser::VoidType> funcVoidType =
-        func.m_type.dynamicCast<Parser::VoidType>();
+    auto funcVoidType = func.m_type.dynamicCast<Parser::VoidType>();
     if (funcVoidType.isNull()) {
         ctx.m_out << " response";
     }
@@ -1558,23 +1557,12 @@ QString Generator::typeToStr(
     QSharedPointer<Parser::Type> type, const QString & identifier,
     const MethodType methodType) const
 {
-    QSharedPointer<Parser::BaseType> baseType =
-        type.dynamicCast<Parser::BaseType>();
-
-    QSharedPointer<Parser::VoidType> voidType =
-        type.dynamicCast<Parser::VoidType>();
-
-    QSharedPointer<Parser::IdentifierType> identifierType =
-        type.dynamicCast<Parser::IdentifierType>();
-
-    QSharedPointer<Parser::MapType> mapType =
-        type.dynamicCast<Parser::MapType>();
-
-    QSharedPointer<Parser::SetType> setType =
-        type.dynamicCast<Parser::SetType>();
-
-    QSharedPointer<Parser::ListType> listType =
-        type.dynamicCast<Parser::ListType>();
+    auto baseType = type.dynamicCast<Parser::BaseType>();
+    auto voidType = type.dynamicCast<Parser::VoidType>();
+    auto identifierType = type.dynamicCast<Parser::IdentifierType>();
+    auto mapType = type.dynamicCast<Parser::MapType>();
+    auto setType = type.dynamicCast<Parser::SetType>();
+    auto listType = type.dynamicCast<Parser::ListType>();
 
     QString result;
 
@@ -1997,26 +1985,14 @@ QString Generator::valueToStr(
         return QString();
     }
 
-    QSharedPointer<Parser::MapType> mapType =
-        type.dynamicCast<Parser::MapType>();
+    auto mapType = type.dynamicCast<Parser::MapType>();
+    auto setType = type.dynamicCast<Parser::SetType>();
+    auto listType = type.dynamicCast<Parser::ListType>();
 
-    QSharedPointer<Parser::SetType> setType =
-        type.dynamicCast<Parser::SetType>();
-
-    QSharedPointer<Parser::ListType> listType =
-        type.dynamicCast<Parser::ListType>();
-
-    QSharedPointer<Parser::StringValue> stringValue =
-        value.dynamicCast<Parser::StringValue>();
-
-    QSharedPointer<Parser::LiteralValue> literalValue =
-        value.dynamicCast<Parser::LiteralValue>();
-
-    QSharedPointer<Parser::ListValue> listValue =
-        value.dynamicCast<Parser::ListValue>();
-
-    QSharedPointer<Parser::MapValue> mapValue =
-        value.dynamicCast<Parser::MapValue>();
+    auto stringValue = value.dynamicCast<Parser::StringValue>();
+    auto literalValue = value.dynamicCast<Parser::LiteralValue>();
+    auto listValue = value.dynamicCast<Parser::ListValue>();
+    auto mapValue = value.dynamicCast<Parser::MapValue>();
 
     QString result;
     if (stringValue)
@@ -2189,7 +2165,7 @@ void Generator::writeThriftWriteFields(
 
         if (writeMethod.contains(QStringLiteral("writeListBegin")))
         {
-            QSharedPointer<Parser::Type> valueType =
+            auto valueType =
                 field.m_type.dynamicCast<Parser::ListType>()->m_valueType;
 
             out << ident << "    writer.writeListBegin("
@@ -2217,7 +2193,7 @@ void Generator::writeThriftWriteFields(
         }
         else if (writeMethod.contains(QStringLiteral("writeSetBegin")))
         {
-            QSharedPointer<Parser::Type> valueType =
+            auto valueType =
                 field.m_type.dynamicCast<Parser::SetType>()->m_valueType;
 
             out << ident << "    writer.writeSetBegin("
@@ -2246,10 +2222,10 @@ void Generator::writeThriftWriteFields(
         }
         else if (writeMethod.contains(QStringLiteral("writeMapBegin")))
         {
-            QSharedPointer<Parser::Type> keyType =
+            auto keyType =
                 field.m_type.dynamicCast<Parser::MapType>()->m_keyType;
 
-            QSharedPointer<Parser::Type> valueType =
+            auto valueType =
                 field.m_type.dynamicCast<Parser::MapType>()->m_valueType;
 
             out << ident << "    writer.writeMapBegin("
@@ -2322,7 +2298,7 @@ void Generator::writeThriftReadField(
         field.m_type, identPrefix + field.m_name, MethodType::ReadMethod);
     if (readMethod.contains(QStringLiteral("readListBegin")))
     {
-        QSharedPointer<Parser::Type> valueType =
+        auto valueType =
             field.m_type.dynamicCast<Parser::ListType>()->m_valueType;
 
         QString valueReadMethod = typeToStr(
@@ -2356,7 +2332,7 @@ void Generator::writeThriftReadField(
     }
     else if (readMethod.contains(QStringLiteral("readSetBegin")))
     {
-        QSharedPointer<Parser::Type> valueType =
+        auto valueType =
             field.m_type.dynamicCast<Parser::SetType>()->m_valueType;
 
         QString valueReadMethod = typeToStr(
@@ -2388,7 +2364,7 @@ void Generator::writeThriftReadField(
     }
     else if (readMethod.contains(QStringLiteral("readMapBegin")))
     {
-        QSharedPointer<Parser::Type> keyType =
+        auto keyType =
             field.m_type.dynamicCast<Parser::MapType>()->m_keyType;
 
         QString keyReadMethod = typeToStr(
@@ -2397,7 +2373,7 @@ void Generator::writeThriftReadField(
         QString keyThriftType = typeToStr(
             keyType, identPrefix + field.m_name, MethodType::ThriftFieldType);
 
-        QSharedPointer<Parser::Type> valueType =
+        auto valueType =
             field.m_type.dynamicCast<Parser::MapType>()->m_valueType;
 
         QString valueReadMethod = typeToStr(
@@ -2680,18 +2656,19 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 QString typeName2;
                 if (typeName.isEmpty())
                 {
-                    if (f.m_type.dynamicCast<Parser::SetType>()) {
-                        auto t = f.m_type.dynamicCast<Parser::SetType>();
-                        typeName = getIdentifier(t->m_valueType);
+                    auto listType = f.m_type.dynamicCast<Parser::ListType>();
+                    auto setType = f.m_type.dynamicCast<Parser::SetType>();
+                    auto mapType = f.m_type.dynamicCast<Parser::MapType>();
+
+                    if (!setType.isNull()) {
+                        typeName = getIdentifier(setType->m_valueType);
                     }
-                    else if (f.m_type.dynamicCast<Parser::ListType>()) {
-                        auto t = f.m_type.dynamicCast<Parser::ListType>();
-                        typeName = getIdentifier(t->m_valueType);
+                    else if (!listType.isNull()) {
+                        typeName = getIdentifier(listType->m_valueType);
                     }
-                    else if (f.m_type.dynamicCast<Parser::MapType>()) {
-                        auto t = f.m_type.dynamicCast<Parser::MapType>();
-                        typeName = getIdentifier(t->m_valueType);
-                        typeName2 = getIdentifier(t->m_keyType);
+                    else if (!mapType.isNull()) {
+                        typeName = getIdentifier(mapType->m_valueType);
+                        typeName2 = getIdentifier(mapType->m_keyType);
                     }
                 }
 
@@ -4829,14 +4806,9 @@ void Generator::generateServerClassDefinition(
             ctx.m_out << "    "
                 << typeToStr(func.m_type, func.m_name, MethodType::WriteMethod);
 
-            QSharedPointer<Parser::ListType> listType =
-                func.m_type.dynamicCast<Parser::ListType>();
-
-            QSharedPointer<Parser::MapType> mapType =
-                func.m_type.dynamicCast<Parser::MapType>();
-
-            QSharedPointer<Parser::SetType> setType =
-                func.m_type.dynamicCast<Parser::SetType>();
+            auto listType = func.m_type.dynamicCast<Parser::ListType>();
+            auto mapType = func.m_type.dynamicCast<Parser::MapType>();
+            auto setType = func.m_type.dynamicCast<Parser::SetType>();
 
             if (!listType.isNull())
             {

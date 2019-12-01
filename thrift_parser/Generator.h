@@ -113,6 +113,9 @@ private:
     void generateTestServerHelperClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);
 
+    void generateTestServerAsyncValueFetcherClassDefinition(
+        const Parser::Service & service, OutputFileContext & ctx);
+
     void generateTestServerPrepareRequestParams(
         const Parser::Function & func,
         const QList<Parser::Enumeration> & enumerations,
@@ -140,9 +143,16 @@ private:
         const Parser::Function & func,
         OutputFileContext & ctx);
 
+    enum class ServiceCallKind
+    {
+        Sync,
+        Async
+    };
+
     void generateTestServerServiceCall(
         const Parser::Service & service,
         const Parser::Function & func,
+        const ServiceCallKind callKind,
         OutputFileContext & ctx,
         const QString & exceptionTypeToCatch = {},
         const QString & exceptionNameToCompare = {});

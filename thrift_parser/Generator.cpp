@@ -449,9 +449,9 @@ void Generator::generateGetRandomExceptionExpression(
 void Generator::generateGetThriftExceptionExpression(
     QTextStream & out)
 {
-    out << "ThriftException("
-        << "ThriftException::Type::INTERNAL_ERROR, "
-        << "QStringLiteral(\"Internal error\"));" << endl;
+    out << "ThriftException(" << endl
+        << "        ThriftException::Type::INTERNAL_ERROR," << endl
+        << "        QStringLiteral(\"Internal error\"));" << endl;
 }
 
 QString Generator::getGenerateRandomValueFunction(const QString & typeName) const
@@ -827,6 +827,57 @@ void Generator::generateTestServerHelperClassDefinition(
             << "    Executor m_executor;" << endl;
 
         ctx.m_out << "};" << endl << endl;
+    }
+}
+
+void Generator::generateTestServerAsyncValueFetcherClassDefinition(
+    const Parser::Service & service, OutputFileContext & ctx)
+{
+    for(const auto & func: service.m_functions)
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        ctx.m_out << blockSeparator << endl << endl;
+
+        QString funcName = capitalize(func.m_name);
+
+        ctx.m_out << "class " << service.m_name << funcName
+            << "AsyncValueFetcher: public QObject" << endl
+            << "{" << endl
+            << "    Q_OBJECT" << endl
+            << "public:" << endl
+            << "    explicit " << service.m_name << funcName
+            << "AsyncValueFetcher(QObject * parent = nullptr) :" << endl
+            << "        QObject(parent)" << endl
+            << "    {}" << endl << endl;
+
+        auto responseType = typeToStr(func.m_type, {}, MethodType::TypeName);
+        if (responseType != QStringLiteral("void")) {
+            ctx.m_out << "    " << responseType << " m_value;" << endl;
+        }
+
+        ctx.m_out << "    QSharedPointer<EverCloudExceptionData> m_exceptionData;"
+            << endl << endl;
+
+        ctx.m_out << "Q_SIGNALS:" << endl
+            << "    void finished();" << endl << endl;
+
+        ctx.m_out << "public Q_SLOTS:" << endl
+            << "    void onFinished(QVariant value, "
+            "QSharedPointer<EverCloudExceptionData> data)" << endl
+            << "    {" << endl;
+
+        if (responseType != QStringLiteral("void")) {
+            ctx.m_out << "        m_value = qvariant_cast<" << responseType
+                << ">(value);" << endl;
+        }
+
+        ctx.m_out << "        m_exceptionData = data;" << endl
+            << "        Q_EMIT finished();" << endl
+            << "    }" << endl
+            << "};" << endl << endl;
     }
 }
 
@@ -1244,6 +1295,7 @@ void Generator::generateTestServerSocketSetup(
 void Generator::generateTestServerServiceCall(
     const Parser::Service & service,
     const Parser::Function & func,
+    const ServiceCallKind callKind,
     OutputFileContext & ctx,
     const QString & exceptionTypeToCatch,
     const QString & exceptionNameToCompare)
@@ -1283,12 +1335,26 @@ void Generator::generateTestServerServiceCall(
         indent += indent;
     }
 
-    ctx.m_out << indent;
-    if (funcReturnTypeName != QStringLiteral("void")) {
-        ctx.m_out << funcReturnTypeName << " res = ";
-    }
+    if (callKind == ServiceCallKind::Sync)
+    {
+        ctx.m_out << indent;
+        if (funcReturnTypeName != QStringLiteral("void")) {
+            ctx.m_out << funcReturnTypeName << " res = ";
+        }
 
-    ctx.m_out << serviceName << "->" << func.m_name << "(" << endl;
+        ctx.m_out << serviceName << "->" << func.m_name << "(" << endl;
+    }
+    else if (callKind == ServiceCallKind::Async)
+    {
+        ctx.m_out << indent << "AsyncResult * result = "
+            << serviceName << "->" << func.m_name << "Async(" << endl;
+    }
+    else
+    {
+        throw std::runtime_error(
+            "Unsupported service call kind: " +
+            QString::number(static_cast<qint64>(callKind)).toStdString());
+    }
 
     for(const auto & param: func.m_params)
     {
@@ -1302,9 +1368,55 @@ void Generator::generateTestServerServiceCall(
 
     ctx.m_out << indent << "    ctx);" << endl;
 
+    if (callKind == ServiceCallKind::Async)
+    {
+        auto funcName = capitalize(func.m_name);
+
+        ctx.m_out << endl << indent << service.m_name << funcName
+            << "AsyncValueFetcher valueFetcher;" << endl;
+
+        ctx.m_out << indent << "QObject::connect(" << endl
+            << indent << "    result," << endl
+            << indent << "    &AsyncResult::finished," << endl
+            << indent << "    &valueFetcher," << endl
+            << indent << "    &"
+            << service.m_name << funcName << "AsyncValueFetcher::onFinished);"
+            << endl << endl;
+
+        ctx.m_out << indent << "QEventLoop loop;" << endl
+            << indent << "QObject::connect(" << endl
+            << indent << "    &valueFetcher," << endl
+            << indent << "    &"
+            << service.m_name << funcName << "AsyncValueFetcher::finished,"
+            << endl
+            << indent << "    &loop," << endl
+            << indent << "    &QEventLoop::quit);" << endl << endl
+            << indent << "loop.exec();" << endl << endl;
+
+        if (exceptionTypeToCatch.isEmpty())
+        {
+            if (funcReturnTypeName != QStringLiteral("void")) {
+                ctx.m_out << indent << "QVERIFY(valueFetcher.m_value == response);"
+                    << endl;
+            }
+
+            ctx.m_out << indent << "QVERIFY(!valueFetcher.m_exceptionData);"
+                << endl;
+        }
+        else
+        {
+            ctx.m_out << indent << "QVERIFY(valueFetcher.m_exceptionData);"
+                << endl;
+            ctx.m_out << indent << "valueFetcher.m_exceptionData->throwException();"
+                << endl;
+        }
+    }
+
     if (!exceptionTypeToCatch.isEmpty())
     {
-        if (funcReturnTypeName != QStringLiteral("void")) {
+        if ((callKind == ServiceCallKind::Sync) &&
+            (funcReturnTypeName != QStringLiteral("void")))
+        {
             ctx.m_out << indent << "Q_UNUSED(res)" << endl;
         }
 
@@ -1319,7 +1431,9 @@ void Generator::generateTestServerServiceCall(
         return;
     }
 
-    if (funcReturnTypeName != QStringLiteral("void")) {
+    if ((callKind == ServiceCallKind::Sync) &&
+        (funcReturnTypeName != QStringLiteral("void")))
+    {
         ctx.m_out << "    QVERIFY(res == response);" << endl;
     }
 }
@@ -3232,6 +3346,9 @@ void Generator::generateTestServerHeaders(
             }
 
             auto funcName = capitalize(func.m_name);
+
+            // Tests for synchronous methods
+
             ctx.m_out << "    void shouldExecute" << funcName << "();" << endl;
 
             for(const auto & e: func.m_throws)
@@ -3247,6 +3364,25 @@ void Generator::generateTestServerHeaders(
 
             ctx.m_out << "    void shouldDeliverThriftExceptionIn" << funcName
                 << "();" << endl;
+
+            // Tests for asynchronous methods
+
+            ctx.m_out << "    void shouldExecute" << funcName << "Async();"
+                << endl;
+
+            for(const auto & e: func.m_throws)
+            {
+                auto exceptionTypeName = typeToStr(
+                    e.m_type,
+                    {},
+                    MethodType::TypeName);
+
+                ctx.m_out << "    void shouldDeliver" << exceptionTypeName
+                    << "In" << funcName << "Async();" << endl;
+            }
+
+            ctx.m_out << "    void shouldDeliverThriftExceptionIn" << funcName
+                << "Async();" << endl;
         }
 
         ctx.m_out << "};" << endl << endl;
@@ -3293,6 +3429,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             << "{}" << endl << endl;
 
         generateTestServerHelperClassDefinition(s, ctx);
+        generateTestServerAsyncValueFetcherClassDefinition(s, ctx);
 
         for(const auto & func: s.m_functions)
         {
@@ -3300,7 +3437,8 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             auto funcName = capitalize(func.m_name);
 
-            // Should deliver request and response for successful scenario
+            // Should deliver request and response for successful synchronous
+            // calls
 
             ctx.m_out << "void " << s.m_name << "Tester::shouldExecute"
                 << funcName << "()" << endl;
@@ -3311,11 +3449,11 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             generateTestServerPrepareRequestResponse(func, enumerations, ctx);
             generateTestServerHelperLambda(s, func, *parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
-            generateTestServerServiceCall(s, func, ctx);
+            generateTestServerServiceCall(s, func, ServiceCallKind::Sync, ctx);
 
             ctx.m_out << "}" << endl << endl;
 
-            // Should deliver request and response in case of exception
+            // Should deliver exceptions for synchronous calls
 
             for(const auto & e: func.m_throws)
             {
@@ -3333,15 +3471,19 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 generateTestServerPrepareRequestExceptionResponse(*parser, e, ctx);
                 generateTestServerHelperLambda(s, func, *parser, ctx, e.m_name);
                 generateTestServerSocketSetup(s, func, ctx);
+
                 generateTestServerServiceCall(
-                    s, func, ctx, exceptionTypeName, e.m_name);
+                    s, func, ServiceCallKind::Sync, ctx, exceptionTypeName,
+                    e.m_name);
 
                 ctx.m_out << "}" << endl << endl;
             }
 
-            // Should also properly deliver ThriftExceptions
+            // Should also properly deliver ThriftExceptions in synchronous
+            // calls
 
-            ctx.m_out << "void " << s.m_name << "Tester::shouldDeliverThriftExceptionIn" << funcName
+            ctx.m_out << "void " << s.m_name
+                << "Tester::shouldDeliverThriftExceptionIn" << funcName
                 << "()" << endl;
 
             ctx.m_out << "{" << endl;
@@ -3362,9 +3504,76 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 s, func, *parser, ctx, exceptionField.m_name);
 
             generateTestServerSocketSetup(s, func, ctx);
+
             generateTestServerServiceCall(
-                s, func, ctx, QStringLiteral("ThriftException"),
-                exceptionField.m_name);
+                s, func, ServiceCallKind::Sync, ctx,
+                QStringLiteral("ThriftException"), exceptionField.m_name);
+
+            ctx.m_out << "}" << endl << endl;
+
+            // Should deliver request and response for successful asynchonous
+            // calls
+
+            ctx.m_out << "void " << s.m_name << "Tester::shouldExecute"
+                << funcName << "Async()" << endl;
+
+            ctx.m_out << "{" << endl;
+
+            generateTestServerPrepareRequestParams(func, enumerations, ctx);
+            generateTestServerPrepareRequestResponse(func, enumerations, ctx);
+            generateTestServerHelperLambda(s, func, *parser, ctx);
+            generateTestServerSocketSetup(s, func, ctx);
+            generateTestServerServiceCall(s, func, ServiceCallKind::Async, ctx);
+
+            ctx.m_out << "}" << endl << endl;
+
+            // Should deliver exceptions for asynchronous calls
+
+            for(const auto & e: func.m_throws)
+            {
+                auto exceptionTypeName = typeToStr(
+                    e.m_type,
+                    {},
+                    MethodType::TypeName);
+
+                ctx.m_out << "void " << s.m_name << "Tester::shouldDeliver"
+                    << exceptionTypeName << "In" << funcName << "Async()" << endl;
+
+                ctx.m_out << "{" << endl;
+
+                generateTestServerPrepareRequestParams(func, enumerations, ctx);
+                generateTestServerPrepareRequestExceptionResponse(*parser, e, ctx);
+                generateTestServerHelperLambda(s, func, *parser, ctx, e.m_name);
+                generateTestServerSocketSetup(s, func, ctx);
+
+                generateTestServerServiceCall(
+                    s, func, ServiceCallKind::Async, ctx, exceptionTypeName,
+                    e.m_name);
+
+                ctx.m_out << "}" << endl << endl;
+            }
+
+            // Should also properly deliver ThriftExceptions in synchronous
+            // calls
+
+            ctx.m_out << "void " << s.m_name
+                << "Tester::shouldDeliverThriftExceptionIn" << funcName
+                << "Async()" << endl;
+
+            ctx.m_out << "{" << endl;
+
+            generateTestServerPrepareRequestParams(func, enumerations, ctx);
+            generateTestServerPrepareRequestExceptionResponse(
+                *parser, exceptionField, ctx);
+
+            generateTestServerHelperLambda(
+                s, func, *parser, ctx, exceptionField.m_name);
+
+            generateTestServerSocketSetup(s, func, ctx);
+
+            generateTestServerServiceCall(
+                s, func, ServiceCallKind::Async, ctx,
+                QStringLiteral("ThriftException"), exceptionField.m_name);
 
             ctx.m_out << "}" << endl << endl;
         }

@@ -259,6 +259,8 @@ private:
 
     QString capitalize(const QString & input) const;
 
+    QString decapitalize(const QString & input) const;
+
     // Write methods for particular parsed fields
 
     void writeEnumeration(

@@ -193,6 +193,23 @@ QString Generator::capitalize(const QString & input) const
     return result;
 }
 
+QString Generator::decapitalize(const QString & input) const
+{
+    if (input.isEmpty()) {
+        return input;
+    }
+
+    QString result;
+    result.reserve(input.size());
+
+    result.push_back(input.at(0).toLower());
+    for(int i = 1, size = input.size(); i < size; ++i) {
+        result.push_back(input.at(i));
+    }
+
+    return result;
+}
+
 void Generator::generateGetRandomValueExpression(
     const Parser::Field & field,
     const QString & prefix,
@@ -1305,24 +1322,12 @@ void Generator::generateTestServerServiceCall(
         {},
         MethodType::TypeName);
 
-    QString serviceName;
-    if (service.m_name == QStringLiteral("UserStore")) {
-        serviceName = QStringLiteral("userStore");
-        ctx.m_out << "    auto " << serviceName << " = newUserStore(" << endl
-            << "        QStringLiteral(\"127.0.0.1\")," << endl
-            << "        port," << endl
-            << "        QStringLiteral(\"http\"));" << endl;
-    }
-    else if (service.m_name == QStringLiteral("NoteStore")) {
-        serviceName = QStringLiteral("noteStore");
-        ctx.m_out << "    auto " << serviceName << " = newNoteStore(" << endl
-            << "        QStringLiteral(\"http://127.0.0.1:\") + "
-            << "QString::number(port));" << endl;
-    }
-    else {
-        throw std::runtime_error(
-            "Unsupported service: " + service.m_name.toStdString());
-    }
+    auto serviceName = decapitalize(service.m_name);
+
+    ctx.m_out << "    auto " << serviceName
+        << " = new" << service.m_name << "(" << endl
+        << "        QStringLiteral(\"http://127.0.0.1:\") + "
+        << "QString::number(port));" << endl;
 
     QString indent = QStringLiteral("    ");
     if (!exceptionTypeToCatch.isEmpty())
@@ -3142,22 +3147,14 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
 
         for(const auto & s: services)
         {
-            ctx.m_out << "I" << s.m_name << " * new" << s.m_name << "(" << endl;
+            ctx.m_out << "QEVERCLOUD_EXPORT I" << s.m_name << " * new"
+                << s.m_name << "(" << endl;
 
-            if (s.m_name == QStringLiteral("UserStore")) {
-                ctx.m_out << "    QString host," << endl
-                    << "    quint16 port," << endl
-                    << "    QString urlScheme = QStringLiteral(\"https\")," << endl
-                    << "    IRequestContextPtr ctx = {}," << endl
-                    << "    QObject * parent = nullptr);" << endl
-                    << endl;
-            }
-            else {
-                ctx.m_out << "    QString noteStoreUrl = QString()," << endl
-                    << "    IRequestContextPtr ctx = {}," << endl
-                    << "    QObject * parent = nullptr);" << endl
-                    << endl;
-            }
+            ctx.m_out << "    QString " << decapitalize(s.m_name)
+                << "Url = {}," << endl
+                << "    IRequestContextPtr ctx = {}," << endl
+                << "    QObject * parent = nullptr);" << endl
+                << endl;
         }
     }
 
@@ -3220,28 +3217,16 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     {
         ctx.m_out << "I" << s.m_name << " * new" << s.m_name << "(" << endl;
 
-        if (s.m_name == QStringLiteral("UserStore")) {
-            ctx.m_out << "    QString host," << endl
-                << "    quint16 port," << endl
-                << "    QString urlScheme," << endl
-                << "    IRequestContextPtr ctx," << endl
-                << "    QObject * parent)" << endl
-                << "{" << endl
-                << "    return new " << s.m_name
-                << "(host, port, urlScheme, ctx, parent);" << endl
-                << "}" << endl
-                << endl;
-        }
-        else {
-            ctx.m_out << "    QString noteStoreUrl," << endl
-                << "    IRequestContextPtr ctx," << endl
-                << "    QObject * parent)" << endl
-                << "{" << endl
-                << "    return new " << s.m_name
-                << "(noteStoreUrl, ctx, parent);" << endl
-                << "}" << endl
-                << endl;
-        }
+        auto serviceName = decapitalize(s.m_name);
+
+        ctx.m_out << "    QString " << serviceName << "Url," << endl
+            << "    IRequestContextPtr ctx," << endl
+            << "    QObject * parent)" << endl
+            << "{" << endl
+            << "    return new " << s.m_name
+            << "(" << serviceName << "Url, ctx, parent);" << endl
+            << "}" << endl
+            << endl;
     }
 
     writeBodyFooter(ctx.m_out);
@@ -3783,109 +3768,69 @@ void Generator::generateServiceClassDeclaration(
     }
     className += service.m_name;
 
+    auto serviceName = decapitalize(service.m_name);
+
     ctx.m_out << "class Q_DECL_HIDDEN " << className
         << ": public I" << service.m_name << endl << "{" << endl;
     ctx.m_out << "    Q_OBJECT" << endl;
     ctx.m_out << "    Q_DISABLE_COPY(" << className << ")" << endl;
     ctx.m_out << "public:" << endl;
 
-    if (service.m_name == QStringLiteral("UserStore"))
-    {
-        ctx.m_out << "    explicit " << className << "(" << endl;
+    ctx.m_out << "    explicit " << className << "(" << endl;
 
-        if (serviceClassType == ServiceClassType::NonDurable) {
-            ctx.m_out << "            QString host," << endl
-                << "            quint16 port," << endl
-                << "            QString urlScheme," << endl;
-        }
-        else {
-            ctx.m_out << "            I" << service.m_name << "Ptr service,"
-                << endl;
-        }
-
-        ctx.m_out << "            IRequestContextPtr ctx = {}," << endl
-            << "            QObject * parent = nullptr) :" << endl
-            << "        IUserStore(parent)," << endl;
-
-        if (serviceClassType == ServiceClassType::Durable) {
-            ctx.m_out << "        m_service(std::move(service))," << endl
-                << "        m_durableService(newDurableService("
-                << "newRetryPolicy(), ctx))," << endl;
-        }
-
-        ctx.m_out << "        m_ctx(std::move(ctx))" << endl
-            << "    {" << endl
-            << "        if (!m_ctx) {" << endl
-            << "            m_ctx = newRequestContext();" << endl
-            << "        }" << endl << endl;
-
-        if (serviceClassType == ServiceClassType::NonDurable) {
-            ctx.m_out << "        QUrl url;" << endl
-                << "        url.setScheme(urlScheme);" << endl
-                << "        url.setHost(host);" << endl
-                << "        url.setPort(static_cast<int>(port));" << endl
-                << "        url.setPath(QStringLiteral(\"/edam/user\"));" << endl
-                << "        m_url = url.toString(QUrl::StripTrailingSlash);"
-                << endl;
-        }
-
-        ctx.m_out << "    }" << endl << endl;
+    if (serviceClassType == ServiceClassType::NonDurable) {
+        ctx.m_out << "            QString " << serviceName << "Url = {},"
+            << endl;
     }
-    else
+    else {
+        ctx.m_out << "            I" << service.m_name << "Ptr service,"
+            << endl;
+    }
+
+    ctx.m_out << "            IRequestContextPtr ctx = {}," << endl
+        << "            QObject * parent = nullptr) :" << endl
+        << "        I" << service.m_name << "(parent)," << endl;
+
+    if (serviceClassType == ServiceClassType::NonDurable) {
+        ctx.m_out << "        m_url(std::move(" << serviceName << "Url)),"
+            << endl;
+    }
+    else {
+        ctx.m_out << "        m_service(std::move(service))," << endl
+            << "        m_durableService(newDurableService("
+            << "newRetryPolicy(), ctx))," << endl;
+    }
+
+    ctx.m_out << "        m_ctx(std::move(ctx))" << endl
+        << "    {" << endl
+        << "        if (!m_ctx) {" << endl
+        << "            m_ctx = newRequestContext();" << endl
+        << "        }" << endl
+        << "    }" << endl
+        << endl;
+
+    if (serviceClassType == ServiceClassType::NonDurable)
     {
-        ctx.m_out << "    explicit " << className << "(" << endl;
-
-        if (serviceClassType == ServiceClassType::NonDurable) {
-            ctx.m_out << "            QString noteStoreUrl = {}," << endl;
-        }
-        else {
-            ctx.m_out << "            I" << service.m_name << "Ptr service,"
-                << endl;
-        }
-
-        ctx.m_out << "            IRequestContextPtr ctx = {}," << endl
-            << "            QObject * parent = nullptr) :" << endl
-            << "        INoteStore(parent)," << endl;
-
-        if (serviceClassType == ServiceClassType::NonDurable) {
-            ctx.m_out << "        m_url(std::move(noteStoreUrl))," << endl;
-        }
-        else {
-            ctx.m_out << "        m_service(std::move(service))," << endl
-                << "        m_durableService(newDurableService("
-                << "newRetryPolicy(), ctx))," << endl;
-        }
-
-        ctx.m_out << "        m_ctx(std::move(ctx))" << endl
+        ctx.m_out << "    explicit " << className
+            << "(QObject * parent) :" << endl
+            << "        I" << service.m_name << "(parent)" << endl
             << "    {" << endl
-            << "        if (!m_ctx) {" << endl
-            << "            m_ctx = newRequestContext();" << endl
-            << "        }" << endl
+            << "        m_ctx = newRequestContext();" << endl
             << "    }" << endl
             << endl;
 
-        if (serviceClassType == ServiceClassType::NonDurable)
-        {
-            ctx.m_out << "    explicit " << className
-                << "(QObject * parent) :" << endl
-                << "        INoteStore(parent)" << endl
-                << "    {" << endl
-                << "        m_ctx = newRequestContext();" << endl
-                << "    }" << endl
-                << endl;
+        ctx.m_out << "    void set" << service.m_name
+            << "Url(QString " << serviceName << "Url)" << endl
+            << "    {" << endl
+            << "        m_url = std::move(" << serviceName << "Url);" << endl
+            << "    }"
+            << endl << endl;
 
-            ctx.m_out << "    void setNoteStoreUrl(QString noteStoreUrl)" << endl
-                << "    {" << endl
-                << "        m_url = std::move(noteStoreUrl);" << endl
-                << "    }"
-                << endl << endl;
-
-            ctx.m_out << "    QString noteStoreUrl()" << endl
-                << "    {" << endl
-                << "        return m_url;" << endl
-                << "    }"
-                << endl << endl;
-        }
+        ctx.m_out << "    QString " << serviceName << "Url()" << endl
+            << "    {" << endl
+            << "        return m_url;" << endl
+            << "    }"
+            << endl << endl;
     }
 
     for(const auto & func: qAsConst(service.m_functions))

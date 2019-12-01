@@ -84,6 +84,12 @@ private:
     void generateTestRandomDataGeneratorsCpp(
         Parser * parser, const QString & outPath);
 
+    void generateLocalDataStructDeclaration(
+        OutputFileContext & ctx);
+
+    void generateLocalDataStructDefinition(
+        OutputFileContext & ctx);
+
     enum class ServiceClassType
     {
         NonDurable,
@@ -275,7 +281,8 @@ private:
         const char * printer) const;
 
     void writeStructPrintDefinition(
-        QTextStream & out, const Parser::Structure & s) const;
+        QTextStream & out, const Parser::Structure & s,
+        const Parser & parser) const;
 
 private:
     QStringList m_includeList;

@@ -587,13 +587,26 @@ void Generator::writeEnumerationPrintDefinition(
 }
 
 void Generator::writeStructPrintDefinition(
-    QTextStream & out, const Parser::Structure & s) const
+    QTextStream & out, const Parser::Structure & s,
+    const Parser & parser) const
 {
     out << "void " << s.m_name << "::print(QTextStream & strm) const"
         << endl
         << "{" << endl;
 
     out << "    strm << \"" << s.m_name << ": {\\n\";" << endl;
+
+    const auto & exceptions = parser.exceptions();
+    auto exceptionIt = std::find_if(
+        exceptions.begin(),
+        exceptions.end(),
+        [&] (const Parser::Structure & e)
+        {
+            return e.m_name == s.m_name;
+        });
+    if (exceptionIt == exceptions.end()) {
+        out << "    localData.print(strm);" << endl;
+    }
 
     bool previousOptional = false;
     for(const auto & f: s.m_fields)
@@ -2609,11 +2622,12 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("EDAMErrorCode.h") << QStringLiteral("Printable.h")
-        << QStringLiteral("../Optional.h") << QStringLiteral("<QMetaType>")
-        << QStringLiteral("<QList>") << QStringLiteral("<QMap>")
-        << QStringLiteral("<QSet>") << QStringLiteral("<QStringList>")
-        << QStringLiteral("<QByteArray>") << QStringLiteral("<QDateTime>")
-        << QStringLiteral("<QMetaType>");
+        << QStringLiteral("../Optional.h") << QStringLiteral("<QHash>")
+        << QStringLiteral("<QMetaType>") << QStringLiteral("<QList>")
+        << QStringLiteral("<QMap>") << QStringLiteral("<QSet>")
+        << QStringLiteral("<QStringList>") << QStringLiteral("<QByteArray>")
+        << QStringLiteral("<QDateTime>") << QStringLiteral("<QMetaType>")
+        << QStringLiteral("<QVariant>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
@@ -2706,6 +2720,9 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         }
     }
 
+    generateLocalDataStructDeclaration(ctx);
+    ctx.m_out << endl;
+
     for(const auto & s: qAsConst(ordered))
     {
         if (!s.m_docComment.isEmpty()) {
@@ -2730,7 +2747,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             ctx.m_out << "    " << s.m_name
                 << "();" << endl;
             ctx.m_out << "    virtual ~" << s.m_name
-                << "() throw() override;" << endl;
+                << "() noexcept override;" << endl;
 
             if (!s.m_fields.isEmpty()) {
                 ctx.m_out << endl;
@@ -2739,7 +2756,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                     << " & other);" << endl;
             }
 
-            ctx.m_out << "    const char * what() const throw() override;"
+            ctx.m_out << "    const char * what() const noexcept override;"
                 << endl;
             ctx.m_out << "    virtual QSharedPointer<EverCloudExceptionData> "
                 << "exceptionData() const override;" << endl << endl;
@@ -2750,6 +2767,12 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         {
             ctx.m_out << "struct QEVERCLOUD_EXPORT "
                 << s.m_name << ": public Printable" << endl << "{" << endl;
+
+            ctx.m_out << "    /**" << endl
+                << "     * See the declaration of EverCloudLocalData for details"
+                << endl
+                << "     */" << endl
+                << "    EverCloudLocalData localData;" << endl << endl;
 
             for(const auto & f: qAsConst(s.m_fields))
             {
@@ -2833,7 +2856,8 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>");
+        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>")
+        << QStringLiteral("<QUuid>") << QStringLiteral("<QDebug>");
     sortIncludes(additionalIncludes);
 
     writeHeaderBody(ctx.m_out, QStringLiteral("Types.h"), additionalIncludes);
@@ -2874,6 +2898,9 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     auto structsAndExceptions = parser->structures();
     structsAndExceptions << parser->exceptions();
 
+    generateLocalDataStructDefinition(ctx);
+    ctx.m_out << endl;
+
     for(const auto & s: qAsConst(structsAndExceptions))
     {
         if (exceptions.contains(s.m_name))
@@ -2881,7 +2908,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
             ctx.m_out << s.m_name << "::" << s.m_name
                 << "() {}" << endl;
             ctx.m_out << s.m_name << "::~" << s.m_name
-                << "() throw() {}" << endl;
+                << "() noexcept {}" << endl;
 
             if (!s.m_fields.isEmpty())
             {
@@ -2985,7 +3012,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
 
         ctx.m_out << "}" << endl << endl;
 
-        writeStructPrintDefinition(ctx.m_out, s);
+        writeStructPrintDefinition(ctx.m_out, s, *parser);
         ctx.m_out << blockSeparator << endl << endl;
     }
     ctx.m_out << endl;
@@ -3732,6 +3759,128 @@ void Generator::generateTestRandomDataGeneratorsCpp(
     }
 
     writeBodyFooter(ctx.m_out);
+}
+
+void Generator::generateLocalDataStructDeclaration(
+    OutputFileContext & ctx)
+{
+    ctx.m_out << "/**" << endl
+        << " * @brief The EverCloudLocalData struct contains several" << endl
+        << " * data elements which are not synchronized with Evernote service"
+        << endl
+        << " * but which are nevertheless useful in applications using" << endl
+        << " * QEverCloud to implement feature rich full sync Evernote clients."
+        << endl
+        << " * Values of this struct's types are contained within QEverCloud"
+        << endl
+        << " * types corresponding to actual Evernote API types" << endl
+        << " */" << endl;
+
+    ctx.m_out << "struct QEVERCLOUD_EXPORT EverCloudLocalData"
+        << ": public Printable" << endl
+        << "{" << endl
+        << "    EverCloudLocalData();" << endl
+        << "    virtual ~EverCloudLocalData() noexcept override;" << endl << endl;
+
+    ctx.m_out << "    virtual void print(QTextStream & strm) const override;"
+        << endl << endl;
+
+    ctx.m_out << "    /**" << endl
+        << "     * @brief id property can be used as a local unique identifier"
+        << endl
+        << "     * for any data item before it has been synchronized with"
+        << endl
+        << "     * Evernote and thus before it can be identified using its guid."
+        << endl
+        << "     *" << endl
+        << "     * id property is generated automatically on EverCloudLocalData"
+        << endl
+        << "     * construction for convenience but can be overridden manually"
+        << endl
+        << "     */" << endl
+        << "    QString id;" << endl << endl;
+
+    ctx.m_out << "    /**" << endl
+        << "     * @brief dirty property can be used to keep track which"
+        << endl
+        << "     * objects have been modified locally and thus need to be "
+        << "synchronized" << endl
+        << "     * with Evernote service" << endl
+        << "     */" << endl
+        << "    bool dirty = false;" << endl << endl;
+
+    ctx.m_out << "    /**" << endl
+        << "     * @brief local property can be used to keep track which"
+        << endl
+        << "     * data items are meant to be local only and thus never be "
+        << "synchronized" << endl
+        << "     * with Evernote service" << endl
+        << "     */" << endl
+        << "    bool local = false;" << endl << endl;
+
+    ctx.m_out << "    /**" << endl
+        << "     * @brief favorited property can be used to keep track which"
+        << endl
+        << "     * data items were favorited in the client. Unfortunately,"
+        << endl
+        << "     * Evernote has never provided a way to synchronize such"
+        << endl
+        << "     * property between different clients" << endl
+        << "     */" << endl
+        << "    bool favorited = false;" << endl << endl;
+
+    ctx.m_out << "    /**" << endl
+        << "     * @brief dict can be used for storage of any other auxiliary"
+        << endl
+        << "     * values associated with objects of QEverCloud types" << endl
+        << "     */" << endl
+        << "    QHash<QString, QVariant> dict;" << endl;
+
+    ctx.m_out << "};" << endl;
+}
+
+void Generator::generateLocalDataStructDefinition(
+    OutputFileContext & ctx)
+{
+    ctx.m_out << "EverCloudLocalData::EverCloudLocalData()" << endl
+        << "{" << endl
+        << "    id = QUuid::createUuid().toString();" << endl
+        << "    // Remove curvy braces" << endl
+        << "    id.remove(id.size() - 1, 1);" << endl
+        << "    id.remove(0, 1);" << endl
+        << "}" << endl << endl;
+
+    ctx.m_out << "EverCloudLocalData::~EverCloudLocalData() noexcept" << endl
+        << "{}" << endl << endl;
+
+    ctx.m_out << "void EverCloudLocalData::print(QTextStream & strm) const"
+        << endl
+        << "{" << endl
+        << "    strm << \"    localData.id = \" << id << \"\\n\"" << endl
+        << "        << \"    localData.dirty = \" << (dirty ? \"true\" : \"false\")"
+        << " << \"\\n\"" << endl
+        << "        << \"    localData.local = \" << (local ? \"true\" : \"false\")"
+        << " << \"\\n\"" << endl
+        << "        << \"    localData.favorited = \" "
+        << "<< (favorited ? \"true\" : \"false\")"
+        << " << \"\\n\";" << endl << endl;
+
+    ctx.m_out << "    if (!dict.isEmpty())" << endl
+        << "    {" << endl
+        << "        strm << \"    localData.dict:\" << \"\\n\";" << endl
+        << "        QString valueStr;" << endl
+        << "        for(const auto & it: toRange(dict)) {" << endl
+        << "            strm << \"        [\" << it.key() << \"] = \";" << endl
+        << "            valueStr.resize(0);" << endl
+        << "            QDebug dbg(&valueStr);" << endl
+        << "            dbg.noquote();" << endl
+        << "            dbg.nospace();" << endl
+        << "            dbg << it.value();" << endl
+        << "            strm << valueStr << \"\\n\";" << endl
+        << "        }" << endl
+        << "    }" << endl;
+
+    ctx.m_out << "}" << endl;
 }
 
 void Generator::generateServiceClassDeclaration(

@@ -84,10 +84,10 @@ private:
     void generateTestRandomDataGeneratorsCpp(
         Parser * parser, const QString & outPath);
 
-    void generateLocalDataStructDeclaration(
+    void generateLocalDataClassDeclaration(
         OutputFileContext & ctx);
 
-    void generateLocalDataStructDefinition(
+    void generateLocalDataClassDefinition(
         OutputFileContext & ctx);
 
     enum class ServiceClassType

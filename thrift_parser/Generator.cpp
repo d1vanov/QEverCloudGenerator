@@ -2720,7 +2720,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         }
     }
 
-    generateLocalDataStructDeclaration(ctx);
+    generateLocalDataClassDeclaration(ctx);
     ctx.m_out << endl;
 
     for(const auto & s: qAsConst(ordered))
@@ -2737,6 +2737,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
                 << ": public EvernoteException, public Printable"
                 << endl << "{" << endl
+                << "    Q_GADGET" << endl
                 << "public:" << endl;
 
             for(const auto & f : s.m_fields) {
@@ -2766,7 +2767,11 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         else
         {
             ctx.m_out << "struct QEVERCLOUD_EXPORT "
-                << s.m_name << ": public Printable" << endl << "{" << endl;
+                << s.m_name << ": public Printable" << endl
+                << "{" << endl
+                << "private:" << endl
+                << "    Q_GADGET" << endl
+                << "public:" << endl;
 
             ctx.m_out << "    /**" << endl
                 << "     * See the declaration of EverCloudLocalData for details"
@@ -2831,11 +2836,40 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         ctx.m_out << "        return !(*this == other);" << endl;
         ctx.m_out << "    }" << endl;
 
+        ctx.m_out << endl;
+        if (!exceptions.contains(s.m_name)) {
+            ctx.m_out << "    Q_PROPERTY(EverCloudLocalData localData MEMBER "
+                << "localData)" << endl;
+        }
+
+        for(const auto & f: s.m_fields)
+        {
+            auto fieldTypeName = typeToStr(
+                f.m_type,
+                {},
+                MethodType::TypeName);
+
+            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                fieldTypeName = QStringLiteral("Optional<") +
+                    fieldTypeName + QStringLiteral(">");
+            }
+
+            ctx.m_out << "    Q_PROPERTY("
+                << fieldTypeName
+                << " " << f.m_name << " MEMBER " << f.m_name << ")"
+                << endl;
+        }
+
         ctx.m_out << "};" << endl << endl;
     }
 
     QStringList extraLinesOutsideNamespace;
-    extraLinesOutsideNamespace.reserve(ordered.size() + 1);
+    extraLinesOutsideNamespace.reserve(ordered.size() + 2);
+
+    Parser::Structure everCloudLocalDataStruct;
+    everCloudLocalDataStruct.m_name = QStringLiteral("EverCloudLocalData");
+    ordered.prepend(everCloudLocalDataStruct);
+
     for(const auto & s: qAsConst(ordered)) {
         QString line;
         QTextStream lineOut(&line);
@@ -2898,7 +2932,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     auto structsAndExceptions = parser->structures();
     structsAndExceptions << parser->exceptions();
 
-    generateLocalDataStructDefinition(ctx);
+    generateLocalDataClassDefinition(ctx);
     ctx.m_out << endl;
 
     for(const auto & s: qAsConst(structsAndExceptions))
@@ -3761,29 +3795,36 @@ void Generator::generateTestRandomDataGeneratorsCpp(
     writeBodyFooter(ctx.m_out);
 }
 
-void Generator::generateLocalDataStructDeclaration(
+void Generator::generateLocalDataClassDeclaration(
     OutputFileContext & ctx)
 {
     ctx.m_out << "/**" << endl
-        << " * @brief The EverCloudLocalData struct contains several" << endl
+        << " * @brief The EverCloudLocalData class contains several" << endl
         << " * data elements which are not synchronized with Evernote service"
         << endl
         << " * but which are nevertheless useful in applications using" << endl
         << " * QEverCloud to implement feature rich full sync Evernote clients."
         << endl
-        << " * Values of this struct's types are contained within QEverCloud"
+        << " * Values of this class' types are contained within QEverCloud"
         << endl
         << " * types corresponding to actual Evernote API types" << endl
         << " */" << endl;
 
-    ctx.m_out << "struct QEVERCLOUD_EXPORT EverCloudLocalData"
+    ctx.m_out << "class QEVERCLOUD_EXPORT EverCloudLocalData"
         << ": public Printable" << endl
         << "{" << endl
+        << "    Q_GADGET" << endl
+        << "public:" << endl
         << "    EverCloudLocalData();" << endl
         << "    virtual ~EverCloudLocalData() noexcept override;" << endl << endl;
 
     ctx.m_out << "    virtual void print(QTextStream & strm) const override;"
         << endl << endl;
+
+    ctx.m_out << "    bool operator==(const EverCloudLocalData & other) const;"
+        << endl
+        << "    bool operator!=(const EverCloudLocalData & other) const;"
+        << endl;
 
     ctx.m_out << "    /**" << endl
         << "     * @brief id property can be used as a local unique identifier"
@@ -3834,12 +3875,19 @@ void Generator::generateLocalDataStructDeclaration(
         << endl
         << "     * values associated with objects of QEverCloud types" << endl
         << "     */" << endl
-        << "    QHash<QString, QVariant> dict;" << endl;
+        << "    QHash<QString, QVariant> dict;" << endl << endl;
+
+    ctx.m_out << "    // Properties declaration for meta-object system" << endl
+        << "    Q_PROPERTY(QString id MEMBER id USER true)" << endl
+        << "    Q_PROPERTY(bool dirty MEMBER dirty)" << endl
+        << "    Q_PROPERTY(bool local MEMBER local)" << endl
+        << "    Q_PROPERTY(bool favorited MEMBER favorited)" << endl
+        << "    Q_PROPERTY(QHash<QString, QVariant> dict MEMBER dict)" << endl;
 
     ctx.m_out << "};" << endl;
 }
 
-void Generator::generateLocalDataStructDefinition(
+void Generator::generateLocalDataClassDefinition(
     OutputFileContext & ctx)
 {
     ctx.m_out << "EverCloudLocalData::EverCloudLocalData()" << endl
@@ -3880,7 +3928,21 @@ void Generator::generateLocalDataStructDefinition(
         << "        }" << endl
         << "    }" << endl;
 
-    ctx.m_out << "}" << endl;
+    ctx.m_out << "}" << endl << endl;
+
+    ctx.m_out << "bool EverCloudLocalData::operator==(" << endl
+        << "    const EverCloudLocalData & other) const" << endl
+        << "{" << endl
+        << "    return id == other.id && dirty == other.dirty &&" << endl
+        << "        local == other.local && favorited == other.favorited &&"
+        << endl
+        << "        dict == other.dict;" << endl
+        << "}" << endl << endl
+        << "bool EverCloudLocalData::operator!=(" << endl
+        << "    const EverCloudLocalData & other) const" << endl
+        << "{" << endl
+        << "    return !operator==(other);" << endl
+        << "}" << endl;
 }
 
 void Generator::generateServiceClassDeclaration(

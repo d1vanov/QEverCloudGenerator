@@ -2621,7 +2621,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     QStringList additionalIncludes = QStringList()
-        << QStringLiteral("EDAMErrorCode.h") << QStringLiteral("Printable.h")
+        << QStringLiteral("EDAMErrorCode.h") << QStringLiteral("../Printable.h")
         << QStringLiteral("../Optional.h") << QStringLiteral("<QHash>")
         << QStringLiteral("<QMetaType>") << QStringLiteral("<QList>")
         << QStringLiteral("<QMap>") << QStringLiteral("<QSet>")

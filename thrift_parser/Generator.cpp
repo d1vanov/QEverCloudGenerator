@@ -3095,6 +3095,10 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
         ctx.m_out << "        QObject(parent)" << endl;
         ctx.m_out << "    {}" << endl << endl;
         ctx.m_out << "public:" << endl;
+        ctx.m_out << "    virtual QString " << decapitalize(s.m_name)
+            << "Url() const = 0;" << endl;
+        ctx.m_out << "    virtual void set" << s.m_name << "Url(QString url) = 0;"
+            << endl << endl;
 
         for(const auto & func: qAsConst(s.m_functions))
         {
@@ -4007,16 +4011,34 @@ void Generator::generateServiceClassDeclaration(
             << "    }" << endl
             << endl;
 
-        ctx.m_out << "    void set" << service.m_name
-            << "Url(QString " << serviceName << "Url)" << endl
+        ctx.m_out << "    virtual void set" << service.m_name
+            << "Url(QString " << serviceName << "Url) override" << endl
             << "    {" << endl
             << "        m_url = std::move(" << serviceName << "Url);" << endl
             << "    }"
             << endl << endl;
 
-        ctx.m_out << "    QString " << serviceName << "Url()" << endl
+        ctx.m_out << "    virtual QString " << serviceName
+            << "Url() const override" << endl
             << "    {" << endl
             << "        return m_url;" << endl
+            << "    }"
+            << endl << endl;
+    }
+    else
+    {
+        ctx.m_out << "    virtual void set" << service.m_name
+            << "Url(QString " << serviceName << "Url) override" << endl
+            << "    {" << endl
+            << "        m_service->set" << service.m_name << "Url("
+            << serviceName << "Url);" << endl
+            << "    }"
+            << endl << endl;
+
+        ctx.m_out << "    virtual QString " << serviceName
+            << "Url() const override" << endl
+            << "    {" << endl
+            << "        return m_service->" << serviceName << "Url();" << endl
             << "    }"
             << endl << endl;
     }

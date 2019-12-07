@@ -4352,7 +4352,7 @@ void Generator::generateServiceClassDefinition(
             << "{" << endl;
 
         ctx.m_out << "    if (!ctx) {" << endl
-            << "        ctx = m_ctx;" << endl
+            << "        ctx = m_ctx.clone();" << endl
             << "    }" << endl << endl;
 
         ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
@@ -4459,7 +4459,7 @@ void Generator::generateServiceClassDefinition(
 
         ctx.m_out << endl;
         ctx.m_out << "    if (!ctx) {" << endl
-            << "        ctx = m_ctx;" << endl
+            << "        ctx = m_ctx.clone();" << endl
             << "    }" << endl << endl;
 
         ctx.m_out << "    QByteArray params = " << prepareParamsName << "("
@@ -4522,7 +4522,7 @@ void Generator::generateDurableServiceClassDefinition(
             << "{" << endl;
 
         ctx.m_out << "    if (!ctx) {" << endl
-            << "        ctx = m_ctx;" << endl
+            << "        ctx = m_ctx.clone();" << endl
             << "    }" << endl << endl;
 
         bool isVoidResult =
@@ -4650,7 +4650,7 @@ void Generator::generateDurableServiceClassDefinition(
             << "{" << endl;
 
         ctx.m_out << "    if (!ctx) {" << endl
-            << "        ctx = m_ctx;" << endl
+            << "        ctx = m_ctx.clone();" << endl
             << "    }" << endl << endl;
 
         ctx.m_out << "    auto call = "

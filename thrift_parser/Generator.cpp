@@ -3018,10 +3018,12 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
                 ctx.m_out, field, s.m_name + QStringLiteral("."),
                 QStringLiteral("s."));
 
-            ctx.m_out << "            } else {" << endl;
+            ctx.m_out << "            }" << endl
+                << "            else {" << endl;
             ctx.m_out << "                reader.skip(fieldType);" << endl;
             ctx.m_out << "            }" << endl;
-            ctx.m_out << "        } else" << endl;
+            ctx.m_out << "        }" << endl
+                << "        else" << endl;
         }
 
         ctx.m_out << "        {" << endl;
@@ -4717,9 +4719,9 @@ void Generator::generateServerClassDeclaration(
     ctx.m_out << blockSeparator << endl << endl;
 
     ctx.m_out << "/**" << endl
-        << " * @brief The " << service.m_name << "Server class represents "
+        << " * @brief The " << service.m_name << "Server class represents"
         << endl
-        << " * customizable server for " << service.m_name << " requests. "
+        << " * customizable server for " << service.m_name << " requests."
         << endl
         << " * It is primarily used for testing of QEverCloud" << endl
         << " */" << endl;

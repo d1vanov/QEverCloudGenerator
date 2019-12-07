@@ -112,6 +112,8 @@ Generator::OutputFileContext::OutputFileContext(
             .arg(m_file.fileName()).toStdString());
     }
 
+    m_type = type;
+
     m_out.setDevice(&m_file);
     m_out.setCodec("UTF-8");
 }
@@ -517,36 +519,52 @@ QString Generator::getGenerateRandomValueFunction(const QString & typeName) cons
     }
 }
 
+void Generator::writeNamespaceBegin(OutputFileContext & ctx)
+{
+    ctx.m_out << "namespace qevercloud {" << endl << endl;
+}
+
+void Generator::writeNamespaceEnd(QTextStream & out)
+{
+    out << "} // namespace qevercloud" << endl;
+}
+
 void Generator::writeEnumeration(
-    QTextStream & out, const Parser::Enumeration & e) const
+    OutputFileContext & ctx, const Parser::Enumeration & e) const
 {
     if (!e.m_docComment.isEmpty()) {
-        out << e.m_docComment << endl;
+        ctx.m_out << e.m_docComment << endl;
     }
 
-    out << "enum class " << e.m_name << endl << "{" << endl;
+    ctx.m_out << "enum class " << e.m_name << endl << "{" << endl;
 
     size_t i = 0;
     size_t numValues = e.m_values.size();
     for(const auto & v: e.m_values)
     {
-        out << "    " << v.first;
+        ctx.m_out << "    " << v.first;
 
         if (!v.second.isEmpty()) {
-            out << " = " << v.second;
+            ctx.m_out << " = " << v.second;
         }
 
         if (i < (numValues - 1)) {
-            out << ",";
+            ctx.m_out << ",";
         }
 
-        out << endl;
+        ctx.m_out << endl;
         ++i;
     }
 
-    out << "};" << endl << endl;
+    ctx.m_out << "};" << endl << endl;
 
-    out << "inline uint qHash(" << e.m_name << " value)"
+    if (ctx.m_type == OutputFileType::Interface) {
+        ctx.m_out << "#if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)" << endl
+            << "Q_ENUM_NS(" << e.m_name << ")" << endl
+            << "#endif" << endl << endl;
+    }
+
+    ctx.m_out << "inline uint qHash(" << e.m_name << " value)"
         << endl
         << "{" << endl
         << "    return static_cast<uint>(value);" << endl
@@ -1456,78 +1474,74 @@ void Generator::generateTestServerServiceCall(
 }
 
 void Generator::writeHeaderHeader(
-    QTextStream & out, const QString & fileName,
+    OutputFileContext & ctx, const QString & fileName,
     const QStringList & additionalIncludes,
     const HeaderKind headerKind)
 {
-    out << disclaimer << endl;
+    ctx.m_out << disclaimer << endl;
 
     QString guard =
         QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H")
         .arg(fileName.split(QChar::fromLatin1('.'))[0].toUpper());
-    out << "#ifndef " << guard << endl;
-    out << "#define " << guard << endl;
-    out << endl;
+    ctx.m_out << "#ifndef " << guard << endl;
+    ctx.m_out << "#define " << guard << endl;
+    ctx.m_out << endl;
 
     if (headerKind == HeaderKind::Public) {
-        out << "#include \"../Export.h\"" << endl;
-        out << endl;
+        ctx.m_out << "#include \"../Export.h\"" << endl;
+        ctx.m_out << endl;
     }
 
     for(const auto & include: qAsConst(additionalIncludes))
     {
         if (include.startsWith(QChar::fromLatin1('<'))) {
-            out << "#include " << include << endl;
+            ctx.m_out << "#include " << include << endl;
         }
         else {
-            out << "#include \"" << include << "\"" << endl;
+            ctx.m_out << "#include \"" << include << "\"" << endl;
         }
     }
 
     if (!additionalIncludes.isEmpty()) {
-        out << endl;
+        ctx.m_out << endl;
     }
 
-    out << "namespace qevercloud {";
-    out << endl;
-    out << endl;
+    writeNamespaceBegin(ctx);
 }
 
 void Generator::writeHeaderBody(
-    QTextStream & out, const QString & headerFileName,
+    OutputFileContext & ctx, const QString & headerFileName,
     const QStringList & additionalIncludes,
     const HeaderKind headerKind)
 {
-    out << disclaimer << endl;
+    ctx.m_out << disclaimer << endl;
 
     if (headerKind == HeaderKind::Public) {
-        out << "#include <generated/" << headerFileName << ">" << endl;
+        ctx.m_out << "#include <generated/" << headerFileName << ">" << endl;
     }
     else {
-        out << "#include \"" << headerFileName << "\"" << endl;
+        ctx.m_out << "#include \"" << headerFileName << "\"" << endl;
     }
 
     if (headerKind == HeaderKind::Test) {
-        out << "#include \"../../Impl.h\"" << endl;
+        ctx.m_out << "#include \"../../Impl.h\"" << endl;
     }
     else {
-        out << "#include \"../Impl.h\"" << endl;
+        ctx.m_out << "#include \"../Impl.h\"" << endl;
     }
 
     for(const auto & include: additionalIncludes)
     {
         if (include.startsWith(QChar::fromLatin1('<'))) {
-            out << "#include " << include << endl;
+            ctx.m_out << "#include " << include << endl;
         }
         else {
-            out << "#include \"" << include << "\"" << endl;
+            ctx.m_out << "#include \"" << include << "\"" << endl;
         }
     }
 
-    out << endl;
-    out << "namespace qevercloud {";
-    out << endl;
-    out << endl;
+    ctx.m_out << endl;
+    writeNamespaceBegin(ctx);
 }
 
 void Generator::writeHeaderFooter(
@@ -1543,7 +1557,7 @@ void Generator::writeHeaderFooter(
         out << endl;
     }
 
-    out << "} // namespace qevercloud" << endl;
+    writeNamespaceEnd(out);
 
     if (!extraLinesOutsideNamespace.empty()) {
         out << endl;
@@ -1559,11 +1573,6 @@ void Generator::writeHeaderFooter(
 
     out << endl;
     out << "#endif // " << guard << endl;
-}
-
-void Generator::writeBodyFooter(QTextStream & out)
-{
-    out << "} // namespace qevercloud" << endl;
 }
 
 QString Generator::typeToStr(
@@ -2057,7 +2066,7 @@ void Generator::generateConstantsHeader(
     const QString fileName = QStringLiteral("Constants.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
-    writeHeaderHeader(ctx.m_out, fileName);
+    writeHeaderHeader(ctx, fileName);
 
     ctx.m_out << blockSeparator << endl << endl;
 
@@ -2088,8 +2097,7 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
     auto additionalIncludes = QStringList() << QStringLiteral("<Helpers.h>");
     sortIncludes(additionalIncludes);
 
-    writeHeaderBody(
-        ctx.m_out, QStringLiteral("Constants.h"), additionalIncludes);
+    writeHeaderBody(ctx, QStringLiteral("Constants.h"), additionalIncludes);
 
     ctx.m_out << blockSeparator << endl << endl;
 
@@ -2113,7 +2121,7 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
     }
 
     ctx.m_out << endl;
-    writeBodyFooter(ctx.m_out);
+    writeNamespaceEnd(ctx.m_out);
 }
 
 QString Generator::fieldDeclarationToStr(const Parser::Field & field)
@@ -2501,19 +2509,20 @@ void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     auto additionalIncludes = QStringList()
+        << QStringLiteral("../Helpers.h")
         << QStringLiteral("<QDebug>") << QStringLiteral("<QMetaType>")
         << QStringLiteral("<QTextStream>");
 
     sortIncludes(additionalIncludes);
 
-    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
+    writeHeaderHeader(ctx, fileName, additionalIncludes);
 
     const auto & enumerations = parser->enumerations();
     int enumerationsCount = enumerations.size();
     int i = 0;
     for(const auto & e: enumerations)
     {
-        writeEnumeration(ctx.m_out, e);
+        writeEnumeration(ctx, e);
         ctx.m_out << blockSeparator << endl << endl;
 
         writeEnumerationPrintDeclaration(ctx.m_out, e, "QTextStream");
@@ -2548,7 +2557,7 @@ void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
     const QString fileName = QStringLiteral("EDAMErrorCode.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    writeHeaderBody(ctx.m_out, QStringLiteral("EDAMErrorCode.h"));
+    writeHeaderBody(ctx, QStringLiteral("EDAMErrorCode.h"));
 
     ctx.m_out << blockSeparator << endl << endl;
 
@@ -2568,7 +2577,7 @@ void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
         ++i;
     }
 
-    writeBodyFooter(ctx.m_out);
+    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
@@ -2582,7 +2591,7 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
-        ctx.m_out, fileName, additionalIncludes, HeaderKind::Private);
+        ctx, fileName, additionalIncludes, HeaderKind::Private);
 
     ctx.m_out << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
 
@@ -2630,7 +2639,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         << QStringLiteral("<QVariant>");
     sortIncludes(additionalIncludes);
 
-    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
+    writeHeaderHeader(ctx, fileName, additionalIncludes);
 
     const auto & typedefs = parser->typedefs();
     for(const auto & t: typedefs)
@@ -2894,7 +2903,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
         << QStringLiteral("<QUuid>") << QStringLiteral("<QDebug>");
     sortIncludes(additionalIncludes);
 
-    writeHeaderBody(ctx.m_out, QStringLiteral("Types.h"), additionalIncludes);
+    writeHeaderBody(ctx, QStringLiteral("Types.h"), additionalIncludes);
 
     ctx.m_out << blockSeparator << endl << endl;
     ctx.m_out << "/** @cond HIDDEN_SYMBOLS  */" << endl << endl;
@@ -3051,12 +3060,10 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
         writeStructPrintDefinition(ctx.m_out, s, *parser);
         ctx.m_out << blockSeparator << endl << endl;
     }
-    ctx.m_out << endl;
 
     ctx.m_out << "/** @endcond */" << endl << endl;
-    ctx.m_out << endl << endl;
 
-    writeBodyFooter(ctx.m_out);
+    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
@@ -3073,7 +3080,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
         << QStringLiteral("<QObject>");
     sortIncludes(additionalIncludes);
 
-    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
+    writeHeaderHeader(ctx, fileName, additionalIncludes);
 
     const auto & services = parser->services();
     for(const auto & s: services)
@@ -3235,7 +3242,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
         << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
     sortIncludes(additionalIncludes);
 
-    writeHeaderBody(ctx.m_out, QStringLiteral("Services.h"), additionalIncludes);
+    writeHeaderBody(ctx, QStringLiteral("Services.h"), additionalIncludes);
 
     const auto & services = parser->services();
 
@@ -3273,7 +3280,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
             << endl;
     }
 
-    writeBodyFooter(ctx.m_out);
+    writeNamespaceEnd(ctx.m_out);
 
     ctx.m_out << endl;
     ctx.m_out << "#include <Services.moc>" << endl;
@@ -3293,7 +3300,7 @@ void Generator::generateServerHeader(Parser * parser, const QString & outPath)
         << QStringLiteral("<functional>");
     sortIncludes(additionalIncludes);
 
-    writeHeaderHeader(ctx.m_out, fileName, additionalIncludes);
+    writeHeaderHeader(ctx, fileName, additionalIncludes);
 
     const auto & services = parser->services();
     for(const auto & s: services) {
@@ -3311,7 +3318,7 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
     auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
         << QStringLiteral("Types_io.h") << QStringLiteral("<Log.h>");
     sortIncludes(additionalIncludes);
-    writeHeaderBody(ctx.m_out, QStringLiteral("Servers.h"), additionalIncludes);
+    writeHeaderBody(ctx, QStringLiteral("Servers.h"), additionalIncludes);
 
     // First generate some helper functions
 
@@ -3330,7 +3337,7 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
         generateServerClassDefinition(s, ctx);
     }
 
-    writeBodyFooter(ctx.m_out);
+    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateTestServerHeaders(
@@ -3352,11 +3359,7 @@ void Generator::generateTestServerHeaders(
 
         OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
 
-        writeHeaderHeader(
-            ctx.m_out,
-            fileName,
-            additionalIncludes,
-            HeaderKind::Private);
+        writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
 
         ctx.m_out << blockSeparator << endl << endl;
 
@@ -3445,7 +3448,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
         OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
 
         writeHeaderBody(
-            ctx.m_out,
+            ctx,
             QStringLiteral("Test") + s.m_name + QStringLiteral(".h"),
             additionalIncludes,
             HeaderKind::Test);
@@ -3607,7 +3610,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             ctx.m_out << "}" << endl << endl;
         }
 
-        writeBodyFooter(ctx.m_out);
+        writeNamespaceEnd(ctx.m_out);
 
         ctx.m_out << endl
             << "#include <Test" << s.m_name << ".moc>" << endl;
@@ -3624,11 +3627,7 @@ void Generator::generateTestRandomDataGeneratorsHeader(
     const QString fileName = QStringLiteral("RandomDataGenerators.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
 
-    writeHeaderHeader(
-        ctx.m_out,
-        fileName,
-        additionalIncludes,
-        HeaderKind::Private);
+    writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
 
     // First section: generate random values of primitive types
 
@@ -3676,7 +3675,7 @@ void Generator::generateTestRandomDataGeneratorsCpp(
     OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
 
     writeHeaderBody(
-        ctx.m_out,
+        ctx,
         QStringLiteral("RandomDataGenerators.h"),
         additionalIncludes,
         HeaderKind::Test);
@@ -3798,7 +3797,7 @@ void Generator::generateTestRandomDataGeneratorsCpp(
             << "}" << endl << endl;
     }
 
-    writeBodyFooter(ctx.m_out);
+    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateLocalDataClassDeclaration(

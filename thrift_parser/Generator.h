@@ -55,6 +55,7 @@ private:
             const OutputFileType type);
 
         QFile m_file;
+        OutputFileType m_type;
         QTextStream m_out;
     };
 
@@ -195,12 +196,12 @@ private:
     };
 
     void writeHeaderHeader(
-        QTextStream & out, const QString & fileName,
+        OutputFileContext & ctx, const QString & fileName,
         const QStringList & additionalIncludes = QStringList(),
         const HeaderKind headerKind = HeaderKind::Public);
 
     void writeHeaderBody(
-        QTextStream & out, const QString & headerFileName,
+        OutputFileContext & ctx, const QString & headerFileName,
         const QStringList & additionalIncludes = QStringList(),
         const HeaderKind headerKind = HeaderKind::Public);
 
@@ -208,8 +209,6 @@ private:
         QTextStream & out, const QString & fileName,
         const QStringList & extraLinesInsideNamespace = QStringList(),
         const QStringList & extraLinesOutsideNamespace = QStringList());
-
-    void writeBodyFooter(QTextStream & out);
 
     void writeThriftWriteFields(
         QTextStream & out, const QList<Parser::Field> & fields,
@@ -269,8 +268,12 @@ private:
 
     // Write methods for particular parsed fields
 
+    void writeNamespaceBegin(OutputFileContext & ctx);
+
+    void writeNamespaceEnd(QTextStream & out);
+
     void writeEnumeration(
-        QTextStream & out, const Parser::Enumeration & e) const;
+        OutputFileContext & ctx, const Parser::Enumeration & e) const;
 
     void writeEnumerationPrintDeclaration(
         QTextStream & out, const Parser::Enumeration & e,

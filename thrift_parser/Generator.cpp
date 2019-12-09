@@ -917,14 +917,21 @@ void Generator::generateTestServerAsyncValueFetcherClassDefinition(
             << "    void finished();" << endl << endl;
 
         ctx.m_out << "public Q_SLOTS:" << endl
-            << "    void onFinished(QVariant value, "
-            "QSharedPointer<EverCloudExceptionData> data)" << endl
+            << "    void onFinished(" << endl
+            << "        QSharedPointer<IRequestContext> ctx," << endl
+            << "        QVariant value," << endl
+            << "        QSharedPointer<EverCloudExceptionData> data)" << endl
             << "    {" << endl;
 
         if (responseType != QStringLiteral("void")) {
             ctx.m_out << "        m_value = qvariant_cast<" << responseType
                 << ">(value);" << endl;
         }
+        else {
+            ctx.m_out << "        Q_UNUSED(value)" << endl;
+        }
+
+        ctx.m_out << "        Q_UNUSED(ctx)" << endl;
 
         ctx.m_out << "        m_exceptionData = data;" << endl
             << "        Q_EMIT finished();" << endl
@@ -4482,8 +4489,7 @@ void Generator::generateServiceClassDefinition(
             << "    return new AsyncResult(" << endl
             << "        m_url," << endl
             << "        params," << endl
-            << "        ctx->requestTimeout()," << endl
-            << "        ctx->requestId()," << endl
+            << "        ctx," << endl
             << "        " << asyncReadFunctionName << ");" << endl;
 
         ctx.m_out << "}" << endl << endl;

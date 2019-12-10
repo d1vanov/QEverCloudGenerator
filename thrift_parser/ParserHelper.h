@@ -30,6 +30,8 @@
 
 #include <QString>
 
+#include <memory>
+
 ////////////////////////////////////////////////////////////////////////////////
 
 class AbstractNoterminal
@@ -45,7 +47,7 @@ inline AbstractNoterminal::~AbstractNoterminal() {}
 class Fieldtype: public AbstractNoterminal
 {
 public:
-    virtual QSharedPointer<Parser::Type> type() = 0;
+    virtual std::shared_ptr<Parser::Type> type() = 0;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -53,9 +55,9 @@ public:
 class VoidType: public Fieldtype
 {
 public:
-    QSharedPointer<Parser::Type> type() override
+    std::shared_ptr<Parser::Type> type() override
     {
-        QSharedPointer<Parser::VoidType> p(new Parser::VoidType);
+        std::shared_ptr<Parser::VoidType> p(new Parser::VoidType);
         return p;
     }
 };
@@ -67,9 +69,9 @@ class IdentifierFieldType: public Fieldtype
 public:
     ~IdentifierFieldType() override {}
 
-    QSharedPointer<Parser::Type> type() override
+    std::shared_ptr<Parser::Type> type() override
     {
-        QSharedPointer<Parser::IdentifierType> p(new Parser::IdentifierType);
+        std::shared_ptr<Parser::IdentifierType> p(new Parser::IdentifierType);
         p->m_identifier = m_identifier;
         return p;
     }
@@ -90,9 +92,9 @@ class BasenameDefinitiontype: public DefinitionType
 public:
     ~BasenameDefinitiontype() override {}
 
-    QSharedPointer<Parser::Type> type() override
+    std::shared_ptr<Parser::Type> type() override
     {
-        QSharedPointer<Parser::BaseType> p(new Parser::BaseType);
+        std::shared_ptr<Parser::BaseType> p(new Parser::BaseType);
         p->m_baseType = m_baseType;
         return p;
     }
@@ -106,7 +108,7 @@ public:
 class ContainerType: public AbstractNoterminal
 {
 public:
-    virtual QSharedPointer<Parser::Type> type() = 0;
+    virtual std::shared_ptr<Parser::Type> type() = 0;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +125,7 @@ public:
         delete m_containerType;
     }
 
-    QSharedPointer<Parser::Type> type() override
+    std::shared_ptr<Parser::Type> type() override
     {
         if (m_containerType) {
             return m_containerType->type();
@@ -143,17 +145,17 @@ class MapType: public ContainerType
 public:
     ~MapType() override {}
 
-    QSharedPointer<Parser::Type> type() override
+    std::shared_ptr<Parser::Type> type() override
     {
-        QSharedPointer<Parser::MapType> p(new Parser::MapType);
+        std::shared_ptr<Parser::MapType> p(new Parser::MapType);
         p->m_keyType = m_keyType;
         p->m_valueType = m_valueType;
         return p;
     }
 
 public:
-    QSharedPointer<Parser::Type> m_keyType;
-    QSharedPointer<Parser::Type> m_valueType;
+    std::shared_ptr<Parser::Type> m_keyType;
+    std::shared_ptr<Parser::Type> m_valueType;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -163,15 +165,15 @@ class ListType: public ContainerType
 public:
     ~ListType() override {}
 
-    QSharedPointer<Parser::Type> type() override
+    std::shared_ptr<Parser::Type> type() override
     {
-        QSharedPointer<Parser::ListType> p(new Parser::ListType);
+        std::shared_ptr<Parser::ListType> p(new Parser::ListType);
         p->m_valueType = m_valueType;
         return p;
     }
 
 public:
-    QSharedPointer<Parser::Type> m_valueType;
+    std::shared_ptr<Parser::Type> m_valueType;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -181,15 +183,15 @@ class SetType: public ContainerType
 public:
     ~SetType() override {}
 
-    QSharedPointer<Parser::Type> type() override
+    std::shared_ptr<Parser::Type> type() override
     {
-        QSharedPointer<Parser::SetType> p(new Parser::SetType);
+        std::shared_ptr<Parser::SetType> p(new Parser::SetType);
         p->m_valueType = m_valueType;
         return p;
     }
 
 public:
-    QSharedPointer<Parser::Type> m_valueType;
+    std::shared_ptr<Parser::Type> m_valueType;
 };
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_PARSER_HELPER_H

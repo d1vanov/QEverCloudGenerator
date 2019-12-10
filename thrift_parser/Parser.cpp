@@ -28,6 +28,7 @@
 #include <QMap>
 #include <QtDebug>
 
+#include <memory>
 #include <stdexcept>
 #include <cstdlib>
 
@@ -149,7 +150,7 @@ void Parser::complete()
 }
 
 void Parser::addTypedef(
-    QString name, QSharedPointer<Type> type, QString docComment)
+    QString name, std::shared_ptr<Type> type, QString docComment)
 {
     TypeDefinition td;
     td.m_fileName = m_fileName;
@@ -169,7 +170,7 @@ void Parser::addNamespace(QString scope, QString name)
 }
 
 void Parser::addConst(
-    QSharedPointer<Type> type, QString name, QSharedPointer<ConstValue> value,
+    std::shared_ptr<Type> type, QString name, std::shared_ptr<ConstValue> value,
     QString docComment)
 {
     Constant c;

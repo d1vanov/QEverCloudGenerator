@@ -30,6 +30,8 @@
 
 #include <QFile>
 
+#include <memory>
+
 ////////////////////////////////////////////////////////////////////////////////
 
 enum class OutputFileType
@@ -172,7 +174,7 @@ private:
         const QString & end = QStringLiteral(";\n"));
 
     void verifyTypeIsBaseOrIdentifier(
-        const QSharedPointer<Parser::Type> & type) const;
+        const std::shared_ptr<Parser::Type> & type) const;
 
     void generateGetRandomExceptionExpression(
         const Parser::Field & field,
@@ -224,8 +226,8 @@ private:
     // Methods for taking a string representation of things
 
     QString valueToStr(
-        QSharedPointer<Parser::ConstValue> value,
-        QSharedPointer<Parser::Type> type,
+        std::shared_ptr<Parser::ConstValue> value,
+        std::shared_ptr<Parser::Type> type,
         const QString & identifier,
         const QString & offset = QString());
 
@@ -242,12 +244,12 @@ private:
     };
 
     QString typeToStr(
-        QSharedPointer<Parser::Type> type, const QString & identifier,
+        std::shared_ptr<Parser::Type> type, const QString & identifier,
         const MethodType methodType = MethodType::TypeName) const;
 
     // Other auxiliary methods
 
-    QString getIdentifier(const QSharedPointer<Parser::Type> & type);
+    QString getIdentifier(const std::shared_ptr<Parser::Type> & type);
 
     QString clearInclude(const QString & s) const;
     QString clearTypedef(const QString & s) const;

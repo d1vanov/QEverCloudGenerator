@@ -33,7 +33,8 @@
 #include <QtDebug>
 #include <QString>
 #include <QStringList>
-#include <QSharedPointer>
+
+#include <memory>
 
 using Term = QString;
 
@@ -85,8 +86,8 @@ public:
     class MapType: public Type
     {
     public:
-        QSharedPointer<Type> m_keyType;
-        QSharedPointer<Type> m_valueType;
+        std::shared_ptr<Type> m_keyType;
+        std::shared_ptr<Type> m_valueType;
 
         ~MapType() override {}
     };
@@ -94,7 +95,7 @@ public:
     class SetType: public Type
     {
     public:
-        QSharedPointer<Type> m_valueType;
+        std::shared_ptr<Type> m_valueType;
 
         ~SetType() override {}
     };
@@ -102,7 +103,7 @@ public:
     class ListType: public Type
     {
     public:
-        QSharedPointer<Type> m_valueType;
+        std::shared_ptr<Type> m_valueType;
 
         ~ListType() override {}
     };
@@ -112,7 +113,7 @@ public:
         QString m_fileName;
         QString m_name;
         QString m_docComment;
-        QSharedPointer<Type> m_type;
+        std::shared_ptr<Type> m_type;
     };
 
     class ConstValue
@@ -154,7 +155,7 @@ public:
     class ListValue: public ConstValue
     {
     public:
-        QList<QSharedPointer<ConstValue>> m_values;
+        QList<std::shared_ptr<ConstValue>> m_values;
 
         ~ListValue() override {}
     };
@@ -163,7 +164,7 @@ public:
     {
     public:
         using ValuesList =
-            QList<QPair<QSharedPointer<ConstValue>,QSharedPointer<ConstValue>>>;
+            QList<QPair<std::shared_ptr<ConstValue>,std::shared_ptr<ConstValue>>>;
 
         ValuesList m_values;
 
@@ -181,9 +182,9 @@ public:
         int m_id;
         RequiredFlag m_required;
 
-        QSharedPointer<Type> m_type;
+        std::shared_ptr<Type> m_type;
         QString m_name;
-        QSharedPointer<ConstValue> m_initializer;
+        std::shared_ptr<ConstValue> m_initializer;
     };
 
     struct Structure
@@ -208,7 +209,7 @@ public:
     struct Function
     {
         bool m_isOneway;
-        QSharedPointer<Type> m_type;
+        std::shared_ptr<Type> m_type;
         QString m_name;
         QList<Field> m_params;
         QList<Field> m_throws;
@@ -227,9 +228,9 @@ public:
     struct Constant
     {
         QString m_fileName;
-        QSharedPointer<Type> m_type;
+        std::shared_ptr<Type> m_type;
         QString m_name;
-        QSharedPointer<ConstValue> m_value;
+        std::shared_ptr<ConstValue> m_value;
         QString m_docComment;
     };
 
@@ -317,13 +318,13 @@ public:
     }
 
     void addTypedef(
-        QString name, QSharedPointer<Type> type, QString docComment);
+        QString name, std::shared_ptr<Type> type, QString docComment);
 
     void addNamespace(QString scope, QString name);
 
     void addConst(
-        QSharedPointer<Type> type, QString name,
-        QSharedPointer<ConstValue> value, QString docComment);
+        std::shared_ptr<Type> type, QString name,
+        std::shared_ptr<ConstValue> value, QString docComment);
 
     void addInclude(QString name);
     void addStructure(QString name, QList<Field> fields, QString docComment);

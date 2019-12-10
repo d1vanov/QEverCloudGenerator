@@ -32,6 +32,7 @@
 #include <QString>
 
 #include <algorithm>
+#include <memory>
 
 using namespace qevercloud;
 
@@ -219,8 +220,8 @@ void Generator::generateGetRandomValueExpression(
     QTextStream & out,
     const QString & end)
 {
-    auto baseType = field.m_type.dynamicCast<Parser::BaseType>();
-    if (!baseType.isNull())
+    auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(field.m_type);
+    if (baseType)
     {
         out << prefix;
         if (!field.m_name.isEmpty()) {
@@ -231,8 +232,9 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto identifierType = field.m_type.dynamicCast<Parser::IdentifierType>();
-    if (!identifierType.isNull())
+    auto identifierType = std::dynamic_pointer_cast<Parser::IdentifierType>(
+        field.m_type);
+    if (identifierType)
     {
         out << prefix;
         if (!field.m_name.isEmpty()) {
@@ -285,8 +287,8 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto listType = field.m_type.dynamicCast<Parser::ListType>();
-    if (!listType.isNull())
+    auto listType = std::dynamic_pointer_cast<Parser::ListType>(field.m_type);
+    if (listType)
     {
         verifyTypeIsBaseOrIdentifier(listType->m_valueType);
 
@@ -323,8 +325,8 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto setType = field.m_type.dynamicCast<Parser::SetType>();
-    if (!setType.isNull())
+    auto setType = std::dynamic_pointer_cast<Parser::SetType>(field.m_type);
+    if (setType)
     {
         verifyTypeIsBaseOrIdentifier(setType->m_valueType);
 
@@ -370,8 +372,8 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto mapType = field.m_type.dynamicCast<Parser::MapType>();
-    if (!mapType.isNull())
+    auto mapType = std::dynamic_pointer_cast<Parser::MapType>(field.m_type);
+    if (mapType)
     {
         verifyTypeIsBaseOrIdentifier(mapType->m_keyType);
         verifyTypeIsBaseOrIdentifier(mapType->m_valueType);
@@ -431,10 +433,10 @@ void Generator::generateGetRandomValueExpression(
 }
 
 void Generator::verifyTypeIsBaseOrIdentifier(
-    const QSharedPointer<Parser::Type> & type) const
+    const std::shared_ptr<Parser::Type> & type) const
 {
-    if (type.dynamicCast<Parser::BaseType>().isNull() &&
-        type.dynamicCast<Parser::IdentifierType>().isNull())
+    if (std::dynamic_pointer_cast<Parser::BaseType>(type) != nullptr &&
+        std::dynamic_pointer_cast<Parser::IdentifierType>(type) != nullptr)
     {
         auto typeName = typeToStr(type, {}, MethodType::TypeName);
         throw std::runtime_error(
@@ -629,9 +631,9 @@ void Generator::writeStructPrintDefinition(
     bool previousOptional = false;
     for(const auto & f: s.m_fields)
     {
-        auto listType = f.m_type.dynamicCast<Parser::ListType>();
-        auto setType = f.m_type.dynamicCast<Parser::SetType>();
-        auto mapType = f.m_type.dynamicCast<Parser::MapType>();
+        auto listType = std::dynamic_pointer_cast<Parser::ListType>(f.m_type);
+        auto setType = std::dynamic_pointer_cast<Parser::SetType>(f.m_type);
+        auto mapType = std::dynamic_pointer_cast<Parser::MapType>(f.m_type);
 
         if (f.m_required == Parser::Field::RequiredFlag::Optional)
         {
@@ -642,7 +644,7 @@ void Generator::writeStructPrintDefinition(
             out << "    if (" << f.m_name << ".isSet()) {" << endl
                 << "        strm << \"    " << f.m_name << " = \"" << endl;
 
-            if (!mapType.isNull())
+            if (mapType)
             {
                 out << "            << \"QMap<"
                     << typeToStr(mapType->m_keyType, {}) << ", "
@@ -655,7 +657,7 @@ void Generator::writeStructPrintDefinition(
                 out << "        }" << endl;
                 out << "        strm << \"    }\\n\";" << endl;
             }
-            else if (!setType.isNull())
+            else if (setType)
             {
                 out << "            << \"QSet<"
                     << typeToStr(setType->m_valueType, {}) << "> {\";" << endl;
@@ -665,7 +667,7 @@ void Generator::writeStructPrintDefinition(
                 out << "        }" << endl;
                 out << "        strm << \"    }\\n\";" << endl;
             }
-            else if (!listType.isNull())
+            else if (listType)
             {
                 out << "            << \"QList<"
                     << typeToStr(listType->m_valueType, {}) << "> {\";" << endl;
@@ -692,7 +694,7 @@ void Generator::writeStructPrintDefinition(
         {
             out << "    strm << \"    " << f.m_name << " = \"" << endl;
 
-            if (!mapType.isNull())
+            if (mapType)
             {
                 out << "        << \"QMap<"
                     << typeToStr(mapType->m_keyType, {}) << ", "
@@ -705,7 +707,7 @@ void Generator::writeStructPrintDefinition(
                 out << "    }" << endl;
                 out << "    strm << \"}\\n\";" << endl;
             }
-            else if (!setType.isNull())
+            else if (setType)
             {
                 out << "        << \"QSet<"
                     << typeToStr(setType->m_valueType, {}) << "> {\";" << endl;
@@ -715,7 +717,7 @@ void Generator::writeStructPrintDefinition(
                 out << "    }" << endl;
                 out << "    strm << \"}\\n\";" << endl;
             }
-            else if (!listType.isNull())
+            else if (listType)
             {
                 out << "        << \"QList<"
                     << typeToStr(listType->m_valueType, {}) << "> {\";" << endl;
@@ -794,7 +796,7 @@ void Generator::generateTestServerHelperClassDefinition(
         if (responseType != QStringLiteral("void")) {
             ctx.m_out << "        " << responseType << " value," << endl;
         }
-        ctx.m_out << "        QSharedPointer<EverCloudExceptionData> "
+        ctx.m_out << "        EverCloudExceptionDataPtr "
             << "exceptionData);" << endl << endl;
 
         ctx.m_out << "public Q_SLOTS:" << endl
@@ -856,7 +858,7 @@ void Generator::generateTestServerHelperClassDefinition(
         }
 
         ctx.m_out << "                "
-            << "QSharedPointer<EverCloudExceptionData>());" << endl
+            << "EverCloudExceptionDataPtr());" << endl
             << "        }" << endl;
 
         ctx.m_out << "        catch(const EverCloudException & e)" << endl
@@ -910,7 +912,7 @@ void Generator::generateTestServerAsyncValueFetcherClassDefinition(
             ctx.m_out << "    " << responseType << " m_value;" << endl;
         }
 
-        ctx.m_out << "    QSharedPointer<EverCloudExceptionData> m_exceptionData;"
+        ctx.m_out << "    EverCloudExceptionDataPtr m_exceptionData;"
             << endl << endl;
 
         ctx.m_out << "Q_SIGNALS:" << endl
@@ -919,7 +921,7 @@ void Generator::generateTestServerAsyncValueFetcherClassDefinition(
         ctx.m_out << "public Q_SLOTS:" << endl
             << "    void onFinished(" << endl
             << "        QVariant value," << endl
-            << "        QSharedPointer<EverCloudExceptionData> data," << endl
+            << "        EverCloudExceptionDataPtr data," << endl
             << "        IRequestContextPtr ctx)" << endl
             << "    {" << endl;
 
@@ -959,15 +961,16 @@ void Generator::generateTestServerPrepareRequestParams(
             {},
             MethodType::TypeName);
 
-        auto baseType = param.m_type.dynamicCast<Parser::BaseType>();
-        auto identifierType = param.m_type.dynamicCast<Parser::IdentifierType>();
+        auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(param.m_type);
+        auto identifierType = std::dynamic_pointer_cast<Parser::IdentifierType>(
+            param.m_type);
 
         QString actualParamTypeName;
 
-        if (!baseType.isNull()) {
+        if (baseType) {
             actualParamTypeName = baseType->m_baseType;
         }
-        else if (!identifierType.isNull()) {
+        else if (identifierType) {
             actualParamTypeName = clearInclude(identifierType->m_identifier);
             actualParamTypeName = clearTypedef(actualParamTypeName);
         }
@@ -1029,8 +1032,8 @@ void Generator::generateTestServerPrepareRequestResponse(
         ctx.m_out << "    " << responseTypeName << " response";
     }
 
-    auto listType = func.m_type.dynamicCast<Parser::ListType>();
-    if (!listType.isNull())
+    auto listType = std::dynamic_pointer_cast<Parser::ListType>(func.m_type);
+    if (listType)
     {
         auto valueType = typeToStr(
             listType->m_valueType,
@@ -1051,8 +1054,8 @@ void Generator::generateTestServerPrepareRequestResponse(
         return;
     }
 
-    auto setType = func.m_type.dynamicCast<Parser::SetType>();
-    if (!setType.isNull())
+    auto setType = std::dynamic_pointer_cast<Parser::SetType>(func.m_type);
+    if (setType)
     {
         auto valueType = typeToStr(
             setType->m_valueType,
@@ -1072,8 +1075,8 @@ void Generator::generateTestServerPrepareRequestResponse(
         return;
     }
 
-    auto mapType = func.m_type.dynamicCast<Parser::MapType>();
-    if (!mapType.isNull())
+    auto mapType = std::dynamic_pointer_cast<Parser::MapType>(func.m_type);
+    if (mapType)
     {
         auto keyType = typeToStr(
             mapType->m_keyType,
@@ -1208,8 +1211,8 @@ void Generator::generateTestServerHelperLambda(
             {},
             MethodType::TypeName);
 
-        auto baseType = param.m_type.dynamicCast<Parser::BaseType>();
-        if (baseType.isNull() ||
+        auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(param.m_type);
+        if (!baseType ||
             baseType->m_baseType == QStringLiteral("string"))
         {
             paramTypeName.prepend(QStringLiteral("const "));
@@ -1260,8 +1263,8 @@ void Generator::generateTestServerHelperLambda(
 
     ctx.m_out << "            return";
 
-    auto funcVoidType = func.m_type.dynamicCast<Parser::VoidType>();
-    if (funcVoidType.isNull()) {
+    auto funcVoidType = std::dynamic_pointer_cast<Parser::VoidType>(func.m_type);
+    if (!funcVoidType) {
         ctx.m_out << " response";
     }
 
@@ -1583,15 +1586,15 @@ void Generator::writeHeaderFooter(
 }
 
 QString Generator::typeToStr(
-    QSharedPointer<Parser::Type> type, const QString & identifier,
+    std::shared_ptr<Parser::Type> type, const QString & identifier,
     const MethodType methodType) const
 {
-    auto baseType = type.dynamicCast<Parser::BaseType>();
-    auto voidType = type.dynamicCast<Parser::VoidType>();
-    auto identifierType = type.dynamicCast<Parser::IdentifierType>();
-    auto mapType = type.dynamicCast<Parser::MapType>();
-    auto setType = type.dynamicCast<Parser::SetType>();
-    auto listType = type.dynamicCast<Parser::ListType>();
+    auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(type);
+    auto voidType = std::dynamic_pointer_cast<Parser::VoidType>(type);
+    auto identifierType = std::dynamic_pointer_cast<Parser::IdentifierType>(type);
+    auto mapType = std::dynamic_pointer_cast<Parser::MapType>(type);
+    auto setType = std::dynamic_pointer_cast<Parser::SetType>(type);
+    auto listType = std::dynamic_pointer_cast<Parser::ListType>(type);
 
     QString result;
 
@@ -1600,7 +1603,7 @@ QString Generator::typeToStr(
         typeName = typeToStr(type, identifier, MethodType::TypeName);
     }
 
-    if (!baseType.isNull())
+    if (baseType)
     {
         if (baseType->m_baseType == QStringLiteral("bool"))
         {
@@ -1846,7 +1849,7 @@ QString Generator::typeToStr(
                         "typedefs are supported for base types only");
                 }
 
-                QSharedPointer<Parser::BaseType> type2(new Parser::BaseType);
+                std::shared_ptr<Parser::BaseType> type2(new Parser::BaseType);
                 type2->m_baseType = nameOfType2;
                 result = typeToStr(type2, identifier, methodType);
             }
@@ -2006,22 +2009,22 @@ QString Generator::typeToStr(
 }
 
 QString Generator::valueToStr(
-    QSharedPointer<Parser::ConstValue> value,
-    QSharedPointer<Parser::Type> type, const QString & identifier,
+    std::shared_ptr<Parser::ConstValue> value,
+    std::shared_ptr<Parser::Type> type, const QString & identifier,
     const QString & offset)
 {
-    if (value.isNull()) {
+    if (!value) {
         return QString();
     }
 
-    auto mapType = type.dynamicCast<Parser::MapType>();
-    auto setType = type.dynamicCast<Parser::SetType>();
-    auto listType = type.dynamicCast<Parser::ListType>();
+    auto mapType = std::dynamic_pointer_cast<Parser::MapType>(type);
+    auto setType = std::dynamic_pointer_cast<Parser::SetType>(type);
+    auto listType = std::dynamic_pointer_cast<Parser::ListType>(type);
 
-    auto stringValue = value.dynamicCast<Parser::StringValue>();
-    auto literalValue = value.dynamicCast<Parser::LiteralValue>();
-    auto listValue = value.dynamicCast<Parser::ListValue>();
-    auto mapValue = value.dynamicCast<Parser::MapValue>();
+    auto stringValue = std::dynamic_pointer_cast<Parser::StringValue>(value);
+    auto literalValue = std::dynamic_pointer_cast<Parser::LiteralValue>(value);
+    auto listValue = std::dynamic_pointer_cast<Parser::ListValue>(value);
+    auto mapValue = std::dynamic_pointer_cast<Parser::MapValue>(value);
 
     QString result;
     if (stringValue)
@@ -2047,7 +2050,7 @@ QString Generator::valueToStr(
         strm << endl;
         for(const auto & v: qAsConst(listValue->m_values)) {
             strm << offset << "<< "
-                << valueToStr(v, QSharedPointer<Parser::Type>(nullptr),
+                << valueToStr(v, std::shared_ptr<Parser::Type>(nullptr),
                               identifier, nextOffset)
                 << endl;
         }
@@ -2115,7 +2118,7 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
             ctx.m_out << "// " << c.m_fileName << endl << endl;
         }
 
-        if (c.m_value.isNull()) {
+        if (!c.m_value) {
             throw std::runtime_error(
                 QString::fromUtf8("Constant without a value: %1")
                 .arg(c.m_name).toStdString());
@@ -2147,9 +2150,9 @@ QString Generator::fieldDeclarationToStr(const Parser::Field & field)
     return s;
 }
 
-QString Generator::getIdentifier(const QSharedPointer<Parser::Type> & type)
+QString Generator::getIdentifier(const std::shared_ptr<Parser::Type> & type)
 {
-    auto it = type.dynamicCast<Parser::IdentifierType>();
+    auto it = std::dynamic_pointer_cast<Parser::IdentifierType>(type);
     return (it
             ? clearInclude(it->m_identifier)
             : QString());
@@ -2194,7 +2197,7 @@ void Generator::writeThriftWriteFields(
         if (writeMethod.contains(QStringLiteral("writeListBegin")))
         {
             auto valueType =
-                field.m_type.dynamicCast<Parser::ListType>()->m_valueType;
+                std::dynamic_pointer_cast<Parser::ListType>(field.m_type)->m_valueType;
 
             out << ident << "    writer.writeListBegin("
                 << typeToStr(
@@ -2222,7 +2225,7 @@ void Generator::writeThriftWriteFields(
         else if (writeMethod.contains(QStringLiteral("writeSetBegin")))
         {
             auto valueType =
-                field.m_type.dynamicCast<Parser::SetType>()->m_valueType;
+                std::dynamic_pointer_cast<Parser::SetType>(field.m_type)->m_valueType;
 
             out << ident << "    writer.writeSetBegin("
                 << typeToStr(
@@ -2251,10 +2254,10 @@ void Generator::writeThriftWriteFields(
         else if (writeMethod.contains(QStringLiteral("writeMapBegin")))
         {
             auto keyType =
-                field.m_type.dynamicCast<Parser::MapType>()->m_keyType;
+                std::dynamic_pointer_cast<Parser::MapType>(field.m_type)->m_keyType;
 
             auto valueType =
-                field.m_type.dynamicCast<Parser::MapType>()->m_valueType;
+                std::dynamic_pointer_cast<Parser::MapType>(field.m_type)->m_valueType;
 
             out << ident << "    writer.writeMapBegin("
                 << typeToStr(
@@ -2327,7 +2330,7 @@ void Generator::writeThriftReadField(
     if (readMethod.contains(QStringLiteral("readListBegin")))
     {
         auto valueType =
-            field.m_type.dynamicCast<Parser::ListType>()->m_valueType;
+            std::dynamic_pointer_cast<Parser::ListType>(field.m_type)->m_valueType;
 
         QString valueReadMethod = typeToStr(
             valueType, identPrefix + field.m_name, MethodType::ReadMethod);
@@ -2361,7 +2364,7 @@ void Generator::writeThriftReadField(
     else if (readMethod.contains(QStringLiteral("readSetBegin")))
     {
         auto valueType =
-            field.m_type.dynamicCast<Parser::SetType>()->m_valueType;
+            std::dynamic_pointer_cast<Parser::SetType>(field.m_type)->m_valueType;
 
         QString valueReadMethod = typeToStr(
             valueType, identPrefix + field.m_name, MethodType::ReadMethod);
@@ -2393,7 +2396,7 @@ void Generator::writeThriftReadField(
     else if (readMethod.contains(QStringLiteral("readMapBegin")))
     {
         auto keyType =
-            field.m_type.dynamicCast<Parser::MapType>()->m_keyType;
+            std::dynamic_pointer_cast<Parser::MapType>(field.m_type)->m_keyType;
 
         QString keyReadMethod = typeToStr(
             keyType, identPrefix + field.m_name, MethodType::ReadMethod);
@@ -2402,7 +2405,7 @@ void Generator::writeThriftReadField(
             keyType, identPrefix + field.m_name, MethodType::ThriftFieldType);
 
         auto valueType =
-            field.m_type.dynamicCast<Parser::MapType>()->m_valueType;
+            std::dynamic_pointer_cast<Parser::MapType>(field.m_type)->m_valueType;
 
         QString valueReadMethod = typeToStr(
             valueType, identPrefix + field.m_name, MethodType::ReadMethod);
@@ -2686,17 +2689,20 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 QString typeName2;
                 if (typeName.isEmpty())
                 {
-                    auto listType = f.m_type.dynamicCast<Parser::ListType>();
-                    auto setType = f.m_type.dynamicCast<Parser::SetType>();
-                    auto mapType = f.m_type.dynamicCast<Parser::MapType>();
+                    auto listType =
+                        std::dynamic_pointer_cast<Parser::ListType>(f.m_type);
+                    auto setType =
+                        std::dynamic_pointer_cast<Parser::SetType>(f.m_type);
+                    auto mapType =
+                        std::dynamic_pointer_cast<Parser::MapType>(f.m_type);
 
-                    if (!setType.isNull()) {
+                    if (setType) {
                         typeName = getIdentifier(setType->m_valueType);
                     }
-                    else if (!listType.isNull()) {
+                    else if (listType) {
                         typeName = getIdentifier(listType->m_valueType);
                     }
-                    else if (!mapType.isNull()) {
+                    else if (mapType) {
                         typeName = getIdentifier(mapType->m_valueType);
                         typeName2 = getIdentifier(mapType->m_keyType);
                     }
@@ -2775,7 +2781,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
             ctx.m_out << "    const char * what() const noexcept override;"
                 << endl;
-            ctx.m_out << "    virtual QSharedPointer<EverCloudExceptionData> "
+            ctx.m_out << "    virtual EverCloudExceptionDataPtr "
                 << "exceptionData() const override;" << endl << endl;
             ctx.m_out << "    virtual void print(QTextStream & strm) const override;"
                 << endl;
@@ -3195,7 +3201,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
         }
 
         ctx.m_out << "};" << endl << endl;
-        ctx.m_out << "using I" << s.m_name << "Ptr = QSharedPointer<I"
+        ctx.m_out << "using I" << s.m_name << "Ptr = std::shared_ptr<I"
             << s.m_name << ">;" << endl << endl;
     }
 
@@ -3530,7 +3536,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             Parser::Field exceptionField;
             exceptionField.m_name = QStringLiteral("thriftException");
 
-            auto type = QSharedPointer<Parser::IdentifierType>::create();
+            auto type = std::make_shared<Parser::IdentifierType>();
             type->m_identifier = QStringLiteral("ThriftException");
 
             exceptionField.m_type = type;
@@ -4145,7 +4151,7 @@ void Generator::generateServiceClassDefinition(
         int lastId = f.m_params.last().m_id;
 
         bool isVoidResult =
-            !f.m_type.dynamicCast<Parser::VoidType>().isNull();
+            (std::dynamic_pointer_cast<Parser::VoidType>(f.m_type) != nullptr);
 
         ctx.m_out << "namespace {" << endl << endl;
 
@@ -4533,7 +4539,7 @@ void Generator::generateDurableServiceClassDefinition(
             << "    }" << endl << endl;
 
         bool isVoidResult =
-            !func.m_type.dynamicCast<Parser::VoidType>().isNull();
+            (std::dynamic_pointer_cast<Parser::VoidType>(func.m_type) != nullptr);
 
         ctx.m_out << "    auto call = "
             << "IDurableService::SyncServiceCall(" << endl
@@ -4810,7 +4816,7 @@ void Generator::generateServerClassDeclaration(
         if (responseType != QStringLiteral("void")) {
             ctx.m_out << "        " << responseType << " value," << endl;
         }
-        ctx.m_out << "        QSharedPointer<EverCloudExceptionData> "
+        ctx.m_out << "        EverCloudExceptionDataPtr "
             << "exceptionData);" << endl << endl;
     }
 
@@ -4930,7 +4936,7 @@ void Generator::generateServerClassDefinition(
         if (responseTypeName != QStringLiteral("void")) {
             ctx.m_out << "    " << responseTypeName << " value," << endl;
         }
-        ctx.m_out << "    QSharedPointer<EverCloudExceptionData> exceptionData)"
+        ctx.m_out << "    EverCloudExceptionDataPtr exceptionData)"
             << endl;
 
         ctx.m_out << "{" << endl;
@@ -4938,7 +4944,7 @@ void Generator::generateServerClassDefinition(
         ctx.m_out << "    ThriftBinaryBufferWriter writer;" << endl
             << "    qint32 cseqid = 0;" << endl << endl;
 
-        ctx.m_out << "    if (!exceptionData.isNull())" << endl
+        ctx.m_out << "    if (exceptionData)" << endl
             << "    {" << endl
             << "        try" << endl
             << "        {" << endl
@@ -4973,7 +4979,7 @@ void Generator::generateServerClassDefinition(
 
         if (!func.m_throws.isEmpty())
         {
-            ctx.m_out << "    if (!exceptionData.isNull())" << endl
+            ctx.m_out << "    if (exceptionData)" << endl
                 << "    {" << endl;
 
             ctx.m_out << "        try" << endl
@@ -5046,11 +5052,11 @@ void Generator::generateServerClassDefinition(
             ctx.m_out << "    "
                 << typeToStr(func.m_type, func.m_name, MethodType::WriteMethod);
 
-            auto listType = func.m_type.dynamicCast<Parser::ListType>();
-            auto mapType = func.m_type.dynamicCast<Parser::MapType>();
-            auto setType = func.m_type.dynamicCast<Parser::SetType>();
+            auto listType = std::dynamic_pointer_cast<Parser::ListType>(func.m_type);
+            auto mapType = std::dynamic_pointer_cast<Parser::MapType>(func.m_type);
+            auto setType = std::dynamic_pointer_cast<Parser::SetType>(func.m_type);
 
-            if (!listType.isNull())
+            if (listType)
             {
                 ctx.m_out << typeToStr(
                     listType->m_valueType,
@@ -5069,7 +5075,7 @@ void Generator::generateServerClassDefinition(
                     << "    }" << endl
                     << "    writer.writeListEnd();" << endl;
             }
-            else if (!setType.isNull())
+            else if (setType)
             {
                 ctx.m_out << typeToStr(
                     listType->m_valueType,
@@ -5088,7 +5094,7 @@ void Generator::generateServerClassDefinition(
                     << "    }" << endl
                     << "    writer.writeSetEnd();" << endl;
             }
-            else if (!mapType.isNull())
+            else if (mapType)
             {
                 ctx.m_out << typeToStr(
                     mapType->m_keyType,
@@ -5296,8 +5302,8 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
     const auto & typedefs = parser->typedefs();
     for(const auto & t: typedefs)
     {
-        auto casted = t.m_type.dynamicCast<Parser::BaseType>();
-        if (!casted.isNull()) {
+        auto casted = std::dynamic_pointer_cast<Parser::BaseType>(t.m_type);
+        if (casted) {
             m_typedefMap[t.m_name] = casted->m_baseType;
         }
     }

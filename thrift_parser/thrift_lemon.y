@@ -62,16 +62,16 @@ const      ::= constbody .
 const      ::= constbody LISTSEP .
 constbody  ::= DOC_COMMENT(D) CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 {
-  QSharedPointer<Parser::Type> t = A->type();
-  pParser->addConst(t, *B, QSharedPointer<Parser::ConstValue>(C), *D);
+  std::shared_ptr<Parser::Type> t = A->type();
+  pParser->addConst(t, *B, std::shared_ptr<Parser::ConstValue>(C), *D);
   delete A;
   delete B;
   delete D;
 }
 constbody  ::= CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 {
-  QSharedPointer<Parser::Type> t = A->type();
-  pParser->addConst(t, *B, QSharedPointer<Parser::ConstValue>(C), QString());
+  std::shared_ptr<Parser::Type> t = A->type();
+  pParser->addConst(t, *B, std::shared_ptr<Parser::ConstValue>(C), QString());
   delete A;
   delete B;
 }
@@ -79,7 +79,7 @@ constbody  ::= CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 
 typedef    ::= DOC_COMMENT(D) TYPEDEF definitiontype(B) IDENTIFIER(C).
 {
-  QSharedPointer<Parser::Type> t = B->type();
+  std::shared_ptr<Parser::Type> t = B->type();
   pParser->addTypedef(*C, t, *D);
   delete B;
   delete C;
@@ -88,7 +88,7 @@ typedef    ::= DOC_COMMENT(D) TYPEDEF definitiontype(B) IDENTIFIER(C).
 
 typedef    ::= TYPEDEF definitiontype(B) IDENTIFIER(C).
 {
-  QSharedPointer<Parser::Type> t = B->type();
+  std::shared_ptr<Parser::Type> t = B->type();
   pParser->addTypedef(*C, t, QString());
   delete B;
   delete C;
@@ -210,9 +210,9 @@ fieldbody(A) ::= fieldidoption(B) fieldreq(C) fieldtype(D) IDENTIFIER(E) fieldin
   A = new Parser::Field;
   A->m_id = B;
   A->m_required = C;
-  A->m_type = QSharedPointer<Parser::Type>(D->type());
+  A->m_type = std::shared_ptr<Parser::Type>(D->type());
   A->m_name = *E;
-  A->m_initializer = QSharedPointer<Parser::ConstValue>(F);
+  A->m_initializer = std::shared_ptr<Parser::ConstValue>(F);
   delete E;
 }
 
@@ -493,9 +493,9 @@ constvalue(A)    ::=  constmap(B) .
   delete B;
 }
 
-%type constlist {QList<QSharedPointer<Parser::ConstValue>>*}
+%type constlist {QList<std::shared_ptr<Parser::ConstValue>>*}
 %destructor constvaluelist {delete $$;}
-%type constvaluelist {QList<QSharedPointer<Parser::ConstValue>>*}
+%type constvaluelist {QList<std::shared_ptr<Parser::ConstValue>>*}
 %destructor constvaluelist {delete $$;}
 constlist(A)     ::=  BRACKET_OPEN constvaluelist(B) BRACKET_CLOSE .
 {
@@ -503,22 +503,22 @@ constlist(A)     ::=  BRACKET_OPEN constvaluelist(B) BRACKET_CLOSE .
 }
 constvaluelist(A) ::= .
 {
-  A = new QList<QSharedPointer<Parser::ConstValue>>;
+  A = new QList<std::shared_ptr<Parser::ConstValue>>;
 }
 constvaluelist(A) ::= constvalue(B) constvaluelist(C).
 {
   A = C;
-  A->prepend(QSharedPointer<Parser::ConstValue>(B));
+  A->prepend(std::shared_ptr<Parser::ConstValue>(B));
 }
 constvaluelist(A) ::= constvalue(B) LISTSEP constvaluelist(C).
 {
   A = C;
-  A->prepend(QSharedPointer<Parser::ConstValue>(B));
+  A->prepend(std::shared_ptr<Parser::ConstValue>(B));
 }
 
-%type constmap {QList<QPair<QSharedPointer<Parser::ConstValue>, QSharedPointer<Parser::ConstValue>>>*}
+%type constmap {QList<QPair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
 %destructor constmap {delete $$;}
-%type constmapvaluelist {QList<QPair<QSharedPointer<Parser::ConstValue>, QSharedPointer<Parser::ConstValue>>>*}
+%type constmapvaluelist {QList<QPair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
 %destructor constmapvaluelist {delete $$;}
 constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 {
@@ -526,18 +526,18 @@ constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 }
 constmapvaluelist(A) ::= .
 {
-  A = new QList<QPair<QSharedPointer<Parser::ConstValue>, QSharedPointer<Parser::ConstValue>>>;
+  A = new QList<QPair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>;
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) constmapvaluelist(D).
 {
   A = D;
-  auto p = qMakePair(QSharedPointer<Parser::ConstValue>(B), QSharedPointer<Parser::ConstValue>(C));
+  auto p = qMakePair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
   A->prepend(p);
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) LISTSEP constmapvaluelist(D).
 {
   A = D;
-  auto p = qMakePair(QSharedPointer<Parser::ConstValue>(B), QSharedPointer<Parser::ConstValue>(C));
+  auto p = qMakePair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
   A->prepend(p);
 }
 

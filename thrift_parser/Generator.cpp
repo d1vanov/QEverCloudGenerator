@@ -918,9 +918,9 @@ void Generator::generateTestServerAsyncValueFetcherClassDefinition(
 
         ctx.m_out << "public Q_SLOTS:" << endl
             << "    void onFinished(" << endl
-            << "        QSharedPointer<IRequestContext> ctx," << endl
             << "        QVariant value," << endl
-            << "        QSharedPointer<EverCloudExceptionData> data)" << endl
+            << "        QSharedPointer<EverCloudExceptionData> data," << endl
+            << "        IRequestContextPtr ctx)" << endl
             << "    {" << endl;
 
         if (responseType != QStringLiteral("void")) {

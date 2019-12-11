@@ -4,10 +4,11 @@
 %stack_size 2000
 
 %include {
-#include <assert.h>
 #include "Parser.h"
 #include "ParserHelper.h"
 #include <QDebug>
+#include <assert.h>
+#include <utility>
 }
 
 %token_prefix TERM_
@@ -109,11 +110,11 @@ enum       ::= DOC_COMMENT(D) ENUM IDENTIFIER(A) CURLY_OPEN enumbody(B) CURLY_CL
   delete D;
 }
 
-%type enumbody {QList<QPair<QString, QString>>*}
+%type enumbody {QList<std::pair<QString, QString>>*}
 %destructor enumbody {delete $$;}
 enumbody(A)    ::= .
 {
-  A = new QList<QPair<QString, QString>>;
+  A = new QList<std::pair<QString, QString>>;
 }
 enumbody(A)    ::= enumitem(B) enumbody(C) .
 {
@@ -122,17 +123,17 @@ enumbody(A)    ::= enumitem(B) enumbody(C) .
   delete B;
 }
 
-%type enumitem {QPair<QString, QString>*}
+%type enumitem {std::pair<QString, QString>*}
 %destructor enumitem {delete $$;}
 enumitem(A)    ::= enumvalue(B) enumsep . { A = B;}
 enumsep     ::= .
 enumsep     ::= LISTSEP.
 
-%type enumvalue {QPair<QString, QString>*}
+%type enumvalue {std::pair<QString, QString>*}
 %destructor enumvalue {delete $$;}
 enumvalue(A)   ::= IDENTIFIER(B) enuminit(C) .
 {
-  A = new QPair<QString, QString>(*B, *C);
+  A = new std::pair<QString, QString>(*B, *C);
   delete B;
   delete C;
 }
@@ -516,9 +517,9 @@ constvaluelist(A) ::= constvalue(B) LISTSEP constvaluelist(C).
   A->prepend(std::shared_ptr<Parser::ConstValue>(B));
 }
 
-%type constmap {QList<QPair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
+%type constmap {QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
 %destructor constmap {delete $$;}
-%type constmapvaluelist {QList<QPair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
+%type constmapvaluelist {QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
 %destructor constmapvaluelist {delete $$;}
 constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 {
@@ -526,18 +527,18 @@ constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 }
 constmapvaluelist(A) ::= .
 {
-  A = new QList<QPair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>;
+  A = new QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>;
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) constmapvaluelist(D).
 {
   A = D;
-  auto p = qMakePair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
+  auto p = std::make_pair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
   A->prepend(p);
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) LISTSEP constmapvaluelist(D).
 {
   A = D;
-  auto p = qMakePair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
+  auto p = std::make_pair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
   A->prepend(p);
 }
 

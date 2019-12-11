@@ -233,7 +233,7 @@ void Parser::addService(
 }
 
 void Parser::addEnumeration(
-    QString name, QList<QPair<QString, QString> > values, QString docComment)
+    QString name, QList<std::pair<QString, QString>> values, QString docComment)
 {
     Enumeration e;
     e.m_fileName = m_fileName;

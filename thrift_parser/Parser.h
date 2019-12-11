@@ -164,7 +164,7 @@ public:
     {
     public:
         using ValuesList =
-            QList<QPair<std::shared_ptr<ConstValue>,std::shared_ptr<ConstValue>>>;
+            QList<std::pair<std::shared_ptr<ConstValue>,std::shared_ptr<ConstValue>>>;
 
         ValuesList m_values;
 
@@ -203,7 +203,7 @@ public:
         QString m_fileName;
         QString m_name;
         QString m_docComment;
-        QList<QPair<QString, QString>> m_values;
+        QList<std::pair<QString, QString>> m_values;
     };
 
     struct Function
@@ -336,7 +336,7 @@ public:
         QString docComment);
 
     void addEnumeration(
-        QString name, QList<QPair<QString, QString>> values,
+        QString name, QList<std::pair<QString, QString>> values,
         QString docComment);
 
 private:

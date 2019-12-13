@@ -1367,7 +1367,10 @@ void Generator::generateTestServerServiceCall(
     ctx.m_out << "    auto " << serviceName
         << " = new" << service.m_name << "(" << endl
         << "        QStringLiteral(\"http://127.0.0.1:\") + "
-        << "QString::number(port));" << endl;
+        << "QString::number(port)," << endl
+        << "        nullptr," << endl
+        << "        nullptr," << endl
+        << "        nullRetryPolicy());" << endl;
 
     QString indent = QStringLiteral("    ");
     if (!exceptionTypeToCatch.isEmpty())
@@ -3086,6 +3089,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("../AsyncResult.h")
+        << QStringLiteral("../DurableService.h")
         << QStringLiteral("../RequestContext.h")
         << QStringLiteral("../Optional.h")
         << QStringLiteral("Constants.h")
@@ -3217,8 +3221,8 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
             ctx.m_out << "    QString " << decapitalize(s.m_name)
                 << "Url = {}," << endl
                 << "    IRequestContextPtr ctx = {}," << endl
-                << "    QObject * parent = nullptr);" << endl
-                << endl;
+                << "    QObject * parent = nullptr," << endl
+                << "    IRetryPolicyPtr retryPolicy = {});" << endl;
         }
     }
 
@@ -3285,10 +3289,26 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
 
         ctx.m_out << "    QString " << serviceName << "Url," << endl
             << "    IRequestContextPtr ctx," << endl
-            << "    QObject * parent)" << endl
+            << "    QObject * parent," << endl
+            << "    IRetryPolicyPtr retryPolicy)" << endl
             << "{" << endl
-            << "    return new " << s.m_name
-            << "(" << serviceName << "Url, ctx, parent);" << endl
+            << "    if (ctx && ctx->maxRequestRetryCount() == 0)" << endl
+            << "    {" << endl
+            << "        return new " << s.m_name << "(" << serviceName
+            << "Url, ctx);" << endl
+            << "    }" << endl
+            << "    else" << endl
+            << "    {" << endl
+            << "        if (!retryPolicy) {" << endl
+            << "            retryPolicy = newRetryPolicy();" << endl
+            << "        }" << endl << endl
+            << "        return new Durable" << s.m_name << "(" << endl
+            << "            std::make_shared<" << s.m_name << ">("
+            << serviceName << "Url, ctx)," << endl
+            << "            ctx," << endl
+            << "            retryPolicy," << endl
+            << "            parent);" << endl
+            << "    }" << endl
             << "}" << endl
             << endl;
     }
@@ -3993,8 +4013,14 @@ void Generator::generateServiceClassDeclaration(
             << endl;
     }
 
-    ctx.m_out << "            IRequestContextPtr ctx = {}," << endl
-        << "            QObject * parent = nullptr) :" << endl
+    ctx.m_out << "            IRequestContextPtr ctx = {}," << endl;
+
+    if (serviceClassType == ServiceClassType::Durable) {
+        ctx.m_out << "            IRetryPolicyPtr retryPolicy = newRetryPolicy(),"
+            << endl;
+    }
+
+    ctx.m_out << "            QObject * parent = nullptr) :" << endl
         << "        I" << service.m_name << "(parent)," << endl;
 
     if (serviceClassType == ServiceClassType::NonDurable) {
@@ -4004,15 +4030,21 @@ void Generator::generateServiceClassDeclaration(
     else {
         ctx.m_out << "        m_service(std::move(service))," << endl
             << "        m_durableService(newDurableService("
-            << "newRetryPolicy(), ctx))," << endl;
+            << "retryPolicy, ctx))," << endl;
     }
 
     ctx.m_out << "        m_ctx(std::move(ctx))" << endl
         << "    {" << endl
         << "        if (!m_ctx) {" << endl
         << "            m_ctx = newRequestContext();" << endl
-        << "        }" << endl
-        << "    }" << endl
+        << "        }" << endl;
+
+    if (serviceClassType == ServiceClassType::Durable) {
+        ctx.m_out << endl
+            << "        m_service->setParent(this);" << endl;
+    }
+
+    ctx.m_out << "    }" << endl
         << endl;
 
     if (serviceClassType == ServiceClassType::NonDurable)
@@ -4041,6 +4073,13 @@ void Generator::generateServiceClassDeclaration(
     }
     else
     {
+        ctx.m_out << "    ~" << className << "()" << endl
+            << "    {" << endl
+            << "        // Don't interfere with std::shared_ptr's lifetime"
+            << " tracking" << endl
+            << "        m_service->setParent(nullptr);" << endl
+            << "    }" << endl << endl;
+
         ctx.m_out << "    virtual void set" << service.m_name
             << "Url(QString " << serviceName << "Url) override" << endl
             << "    {" << endl
@@ -4616,6 +4655,10 @@ void Generator::generateDurableServiceClassDefinition(
         ctx.m_out << "    auto result = m_durableService->executeSyncRequest("
             << endl
             << "        std::move(request), ctx);" << endl << endl;
+
+        ctx.m_out << "    if (result.second) {" << endl
+            << "        result.second->throwException();" << endl
+            << "    }" << endl << endl;
 
         ctx.m_out << "    return";
         if (!isVoidResult)

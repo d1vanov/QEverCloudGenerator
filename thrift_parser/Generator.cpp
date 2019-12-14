@@ -1448,12 +1448,12 @@ void Generator::generateTestServerServiceCall(
                     << endl;
             }
 
-            ctx.m_out << indent << "QVERIFY(!valueFetcher.m_exceptionData);"
+            ctx.m_out << indent << "QVERIFY(valueFetcher.m_exceptionData.get() == nullptr);"
                 << endl;
         }
         else
         {
-            ctx.m_out << indent << "QVERIFY(valueFetcher.m_exceptionData);"
+            ctx.m_out << indent << "QVERIFY(valueFetcher.m_exceptionData.get() != nullptr);"
                 << endl;
             ctx.m_out << indent << "valueFetcher.m_exceptionData->throwException();"
                 << endl;
@@ -2862,6 +2862,34 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         ctx.m_out << "    }" << endl;
 
         ctx.m_out << endl;
+
+        QHash<QString, QString> typeDefs;
+        for(const auto & f: s.m_fields)
+        {
+            auto fieldTypeName = typeToStr(
+                f.m_type,
+                {},
+                MethodType::TypeName);
+
+            if (fieldTypeName.contains(QStringLiteral(","))) {
+                // In earlier versions of Qt Q_PROPERTY macro can't handle type names
+                // containing comma
+                auto typeDef = capitalize(f.m_name);
+                typeDefs[fieldTypeName] = typeDef;
+            }
+        }
+
+	for(auto it = typeDefs.constBegin(), end = typeDefs.constEnd();
+            it != end; ++it)
+        {
+	    ctx.m_out << "    using " << it.value() << " = "
+	        << it.key() << ";" << endl;
+        }
+
+        if (!typeDefs.isEmpty()) {
+            ctx.m_out << endl;
+        }
+
         if (!exceptions.contains(s.m_name)) {
             ctx.m_out << "    Q_PROPERTY(EverCloudLocalData localData MEMBER "
                 << "localData)" << endl;
@@ -2874,15 +2902,18 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 {},
                 MethodType::TypeName);
 
+            auto it = typeDefs.find(fieldTypeName);
+            if (it != typeDefs.end()) {
+                fieldTypeName = it.value();
+            }
+
             if (f.m_required == Parser::Field::RequiredFlag::Optional) {
                 fieldTypeName = QStringLiteral("Optional<") +
                     fieldTypeName + QStringLiteral(">");
             }
 
-            ctx.m_out << "    Q_PROPERTY("
-                << fieldTypeName
-                << " " << f.m_name << " MEMBER " << f.m_name << ")"
-                << endl;
+            ctx.m_out << "    Q_PROPERTY(" << fieldTypeName
+                << " " << f.m_name << " MEMBER " << f.m_name << ")" << endl;
         }
 
         ctx.m_out << "};" << endl << endl;
@@ -3919,8 +3950,9 @@ void Generator::generateLocalDataClassDeclaration(
         << "    Q_PROPERTY(QString id MEMBER id USER true)" << endl
         << "    Q_PROPERTY(bool dirty MEMBER dirty)" << endl
         << "    Q_PROPERTY(bool local MEMBER local)" << endl
-        << "    Q_PROPERTY(bool favorited MEMBER favorited)" << endl
-        << "    Q_PROPERTY(QHash<QString, QVariant> dict MEMBER dict)" << endl;
+        << "    Q_PROPERTY(bool favorited MEMBER favorited)" << endl << endl
+        << "    using Dict = QHash<QString, QVariant>;" << endl
+        << "    Q_PROPERTY(Dict dict MEMBER dict)" << endl;
 
     ctx.m_out << "};" << endl;
 }

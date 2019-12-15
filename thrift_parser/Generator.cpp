@@ -1307,6 +1307,7 @@ void Generator::generateTestServerSocketSetup(
         << "    QObject::connect(" << endl
         << "        &tcpServer," << endl
         << "        &QTcpServer::newConnection," << endl
+        << "        &tcpServer," << endl
         << "        [&] {" << endl
         << "            pSocket = tcpServer.nextPendingConnection();"
         << endl
@@ -1329,6 +1330,7 @@ void Generator::generateTestServerSocketSetup(
         << "        &server," << endl
         << "        &" << service.m_name << "Server::" << func.m_name
         << "RequestReady," << endl
+        << "        &server," << endl
         << "        [&] (QByteArray responseData)" << endl
         << "        {" << endl
         << "            QByteArray buffer;" << endl
@@ -3729,6 +3731,7 @@ void Generator::generateTestRandomDataGeneratorsCpp(
         << QStringLiteral("<QCryptographicHash>")
         << QStringLiteral("<QDateTime>")
         << QStringLiteral("<QEventLoop>")
+        << QStringLiteral("<QGlobalStatic>")
         << QStringLiteral("<QObject>")
         << QStringLiteral("<algorithm>")
         << QStringLiteral("<cstdlib>")
@@ -3749,11 +3752,12 @@ void Generator::generateTestRandomDataGeneratorsCpp(
     ctx.m_out << "namespace {" << endl << endl
         << blockSeparator << endl << endl;
 
-    ctx.m_out << "static const QString randomStringAvailableCharacters = "
-        << "QStringLiteral(" << endl
-        << "    \""
-        << "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-        << "\");" << endl << endl;
+    ctx.m_out << "Q_GLOBAL_STATIC_WITH_ARGS(" << endl
+        << "    QString," << endl
+        << "    randomStringAvailableCharacters," << endl
+        << "    (QString::fromUtf8(" << endl
+        << "        \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        << "0123456789\")))" << endl << endl;
 
     ctx.m_out << "template <typename T>" << endl
         << "T generateRandomIntType()" << endl
@@ -3778,9 +3782,10 @@ void Generator::generateTestRandomDataGeneratorsCpp(
         << "    QString res;" << endl
         << "    res.reserve(len);" << endl
         << "    for(int i = 0; i < len; ++i) {" << endl
-        << "        int index = rand() % randomStringAvailableCharacters."
+        << "        int index = rand() % randomStringAvailableCharacters->"
         << "length();" << endl
-        << "        res.append(randomStringAvailableCharacters.at(index));"
+        << "        res.append(randomStringAvailableCharacters->at(index));"
+        << endl
         << "    }" << endl << endl
         << "    return res;" << endl
         << "}" << endl << endl;

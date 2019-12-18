@@ -3255,7 +3255,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
                 << "Url = {}," << endl
                 << "    IRequestContextPtr ctx = {}," << endl
                 << "    QObject * parent = nullptr," << endl
-                << "    IRetryPolicyPtr retryPolicy = {});" << endl;
+                << "    IRetryPolicyPtr retryPolicy = {});" << endl << endl;
         }
     }
 

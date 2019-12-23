@@ -3983,7 +3983,7 @@ service NoteStore {
    *
    * If the Note is not shared, then this function will do nothing.
    *
-   * This function does not remove invididual shares for the note. To remove
+   * This function does not remove individual shares for the note. To remove
    * individual shares, see stopSharingNoteWithRecipients.
    *
    * @param guid

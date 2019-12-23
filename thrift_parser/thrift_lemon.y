@@ -4,10 +4,11 @@
 %stack_size 2000
 
 %include {
-#include <assert.h>
 #include "Parser.h"
 #include "ParserHelper.h"
-#include <QtDebug>
+#include <QDebug>
+#include <assert.h>
+#include <utility>
 }
 
 %token_prefix TERM_
@@ -19,15 +20,15 @@
 
 %syntax_error
 {
-    pParser->setErrorFlag("Syntax error");
+    pParser->setErrorFlag(QStringLiteral("Syntax error"));
 }
 %parse_failure
 {
-    pParser->setErrorFlag("Parser failure");
+    pParser->setErrorFlag(QStringLiteral("Parser failure"));
 }
 %stack_overflow
 {
-    pParser->setErrorFlag("Stack overflow");
+    pParser->setErrorFlag(QStringLiteral("Stack overflow"));
 }
 
 thrift ::= body END_OF_FILE.
@@ -62,16 +63,16 @@ const      ::= constbody .
 const      ::= constbody LISTSEP .
 constbody  ::= DOC_COMMENT(D) CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 {
-  QSharedPointer<Parser::Type> t = A->type();
-  pParser->addConst(t, *B, QSharedPointer<Parser::ConstValue>(C), *D);
+  std::shared_ptr<Parser::Type> t = A->type();
+  pParser->addConst(t, *B, std::shared_ptr<Parser::ConstValue>(C), *D);
   delete A;
   delete B;
   delete D;
 }
 constbody  ::= CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 {
-  QSharedPointer<Parser::Type> t = A->type();
-  pParser->addConst(t, *B, QSharedPointer<Parser::ConstValue>(C), QString());
+  std::shared_ptr<Parser::Type> t = A->type();
+  pParser->addConst(t, *B, std::shared_ptr<Parser::ConstValue>(C), QString());
   delete A;
   delete B;
 }
@@ -79,7 +80,7 @@ constbody  ::= CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 
 typedef    ::= DOC_COMMENT(D) TYPEDEF definitiontype(B) IDENTIFIER(C).
 {
-  QSharedPointer<Parser::Type> t = B->type();
+  std::shared_ptr<Parser::Type> t = B->type();
   pParser->addTypedef(*C, t, *D);
   delete B;
   delete C;
@@ -88,7 +89,7 @@ typedef    ::= DOC_COMMENT(D) TYPEDEF definitiontype(B) IDENTIFIER(C).
 
 typedef    ::= TYPEDEF definitiontype(B) IDENTIFIER(C).
 {
-  QSharedPointer<Parser::Type> t = B->type();
+  std::shared_ptr<Parser::Type> t = B->type();
   pParser->addTypedef(*C, t, QString());
   delete B;
   delete C;
@@ -109,11 +110,11 @@ enum       ::= DOC_COMMENT(D) ENUM IDENTIFIER(A) CURLY_OPEN enumbody(B) CURLY_CL
   delete D;
 }
 
-%type enumbody {QList<QPair<QString, QString>>*}
+%type enumbody {QList<std::pair<QString, QString>>*}
 %destructor enumbody {delete $$;}
 enumbody(A)    ::= .
 {
-  A = new QList<QPair<QString, QString>>;
+  A = new QList<std::pair<QString, QString>>;
 }
 enumbody(A)    ::= enumitem(B) enumbody(C) .
 {
@@ -122,17 +123,17 @@ enumbody(A)    ::= enumitem(B) enumbody(C) .
   delete B;
 }
 
-%type enumitem {QPair<QString, QString>*}
+%type enumitem {std::pair<QString, QString>*}
 %destructor enumitem {delete $$;}
 enumitem(A)    ::= enumvalue(B) enumsep . { A = B;}
 enumsep     ::= .
 enumsep     ::= LISTSEP.
 
-%type enumvalue {QPair<QString, QString>*}
+%type enumvalue {std::pair<QString, QString>*}
 %destructor enumvalue {delete $$;}
 enumvalue(A)   ::= IDENTIFIER(B) enuminit(C) .
 {
-  A = new QPair<QString, QString>(*B, *C);
+  A = new std::pair<QString, QString>(*B, *C);
   delete B;
   delete C;
 }
@@ -208,11 +209,11 @@ field(A) ::= fieldbody(B) LISTSEP . {A = B;}
 fieldbody(A) ::= fieldidoption(B) fieldreq(C) fieldtype(D) IDENTIFIER(E) fieldinitializer(F) .
 {
   A = new Parser::Field;
-  A->id = B;
-  A->required = C;
-  A->type = QSharedPointer<Parser::Type>(D->type());
-  A->name = *E;
-  A->initializer = QSharedPointer<Parser::ConstValue>(F);
+  A->m_id = B;
+  A->m_required = C;
+  A->m_type = std::shared_ptr<Parser::Type>(D->type());
+  A->m_name = *E;
+  A->m_initializer = std::shared_ptr<Parser::ConstValue>(F);
   delete E;
 }
 
@@ -309,12 +310,12 @@ function(A) ::= functionbody(B) LISTSEP. {A = B;}
 functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist(E) PAREN_CLOSE throws(F).
 {
   A = new Parser::Function;
-  A->isOneway = B;
-  A->type = C->type();
-  A->name = *D;
-  A->params = *E;
-  A->throws = *F;
-  A->docComment = "";
+  A->m_isOneway = B;
+  A->m_type = C->type();
+  A->m_name = *D;
+  A->m_params = *E;
+  A->m_throws = *F;
+  A->m_docComment = QLatin1Literal("");
   delete C;
   delete D;
   delete E;
@@ -323,12 +324,12 @@ functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist
 functionbody(A) ::= DOC_COMMENT(X) oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist(E) PAREN_CLOSE throws(F).
 {
   A = new Parser::Function;
-  A->isOneway = B;
-  A->type = C->type();
-  A->name = *D;
-  A->params = *E;
-  A->throws = *F;
-  A->docComment = *X;
+  A->m_isOneway = B;
+  A->m_type = C->type();
+  A->m_name = *D;
+  A->m_params = *E;
+  A->m_throws = *F;
+  A->m_docComment = *X;
   delete C;
   delete D;
   delete E;
@@ -366,8 +367,8 @@ throws(A)  ::=  THROWS PAREN_OPEN fieldlist(B) PAREN_CLOSE.
 %destructor fieldtype {delete $$; }
 fieldtype(A)    ::=  IDENTIFIER(B).
 {
-  Identifier_Fieldtype* p = new Identifier_Fieldtype();
-  p->identifier = *B;
+  IdentifierFieldType* p = new IdentifierFieldType();
+  p->m_identifier = *B;
   A = p;
   delete B;
 }
@@ -377,34 +378,34 @@ fieldtype(A)    ::=  definitiontype(B) .
 }
 
 
-%type definitiontype {Definitiontype*}
+%type definitiontype {DefinitionType*}
 %destructor definitiontype {delete $$; }
 definitiontype(A)  ::=  basetype(B) .
 {
-  Basename_Definitiontype* p = new Basename_Definitiontype();
-  p->basetype = *B;
+  BasenameDefinitiontype* p = new BasenameDefinitiontype();
+  p->m_baseType = *B;
   A = p;
   delete B;
 }
 definitiontype(A)  ::=  containertype(B) .
 {
-  Containertype_Definitiontype* p = new Containertype_Definitiontype();
-  p->containertype = B;
+  ContainerTypeDefinitionType* p = new ContainerTypeDefinitionType();
+  p->m_containerType = B;
   A = p;
 }
 
 %type basetype {QString*}
 %destructor basetype {delete $$;}
-basetype(A)        ::=  BOOL. {A = new QString("bool");}
-basetype(A)        ::=  BYTE. {A = new QString("byte");}
-basetype(A)        ::=  I16. {A = new QString("i16");}
-basetype(A)        ::=  I32. {A = new QString("i32");}
-basetype(A)        ::=  I64. {A = new QString("i64");}
-basetype(A)        ::=  DOUBLE. {A = new QString("double");}
-basetype(A)        ::=  STRING. {A = new QString("string");}
-basetype(A)        ::=  BINARY. {A = new QString("binary");}
+basetype(A)        ::=  BOOL. {A = new QString(QStringLiteral("bool"));}
+basetype(A)        ::=  BYTE. {A = new QString(QStringLiteral("byte"));}
+basetype(A)        ::=  I16. {A = new QString(QStringLiteral("i16"));}
+basetype(A)        ::=  I32. {A = new QString(QStringLiteral("i32"));}
+basetype(A)        ::=  I64. {A = new QString(QStringLiteral("i64"));}
+basetype(A)        ::=  DOUBLE. {A = new QString(QStringLiteral("double"));}
+basetype(A)        ::=  STRING. {A = new QString(QStringLiteral("string"));}
+basetype(A)        ::=  BINARY. {A = new QString(QStringLiteral("binary"));}
 
-%type containertype {Containertype*}
+%type containertype {ContainerType*}
 //%destructor containertype {delete $$;}
 containertype(A)   ::=  maptype(B) .
 {
@@ -419,32 +420,32 @@ containertype(A)   ::=  listtype(B).
   A = B;
 }
 
-%type maptype {Maptype*}
+%type maptype {MapType*}
 %destructor maptype {delete $$;}
 maptype(A)         ::=  MAP LT fieldtype(B) LISTSEP fieldtype(C) GT.
 {
-  A = new Maptype();
-  A->keyType = B->type();
-  A->valueType = C->type();
+  A = new MapType();
+  A->m_keyType = B->type();
+  A->m_valueType = C->type();
   delete B;
   delete C;
 }
 
-%type settype {Settype*}
+%type settype {SetType*}
 %destructor settype {delete $$;}
 settype(A)         ::=  SET LT fieldtype(B) GT.
 {
-  A = new Settype();
-  A->valueType = B->type();
+  A = new SetType();
+  A->m_valueType = B->type();
   delete B;
 }
 
-%type listtype {Listtype*}
+%type listtype {ListType*}
 %destructor listtype {delete $$;}
 listtype(A)         ::=  LIST LT fieldtype(B) GT.
 {
-  A = new Listtype();
-  A->valueType = B->type();
+  A = new ListType();
+  A->m_valueType = B->type();
   delete B;
 }
 
@@ -453,49 +454,49 @@ listtype(A)         ::=  LIST LT fieldtype(B) GT.
 constvalue(A)    ::=  INTEGER_VALUE(B) .
 {
   Parser::IntegerValue* p = new Parser::IntegerValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  DOUBLE_VALUE(B) .
 {
   Parser::DoubleValue* p = new Parser::DoubleValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  STRING_VALUE(B) .
 {
   Parser::StringValue* p = new Parser::StringValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  IDENTIFIER(B) .
 {
   Parser::IdentifierValue* p = new Parser::IdentifierValue;
-  p->value = *B;
+  p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  constlist(B) .
 {
   Parser::ListValue* p = new Parser::ListValue;
-  p->values = *B;
+  p->m_values = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  constmap(B) .
 {
   Parser::MapValue* p = new Parser::MapValue;
-  p->values = *B;
+  p->m_values = *B;
   A = p;
   delete B;
 }
 
-%type constlist {QList<QSharedPointer<Parser::ConstValue>>*}
+%type constlist {QList<std::shared_ptr<Parser::ConstValue>>*}
 %destructor constvaluelist {delete $$;}
-%type constvaluelist {QList<QSharedPointer<Parser::ConstValue>>*}
+%type constvaluelist {QList<std::shared_ptr<Parser::ConstValue>>*}
 %destructor constvaluelist {delete $$;}
 constlist(A)     ::=  BRACKET_OPEN constvaluelist(B) BRACKET_CLOSE .
 {
@@ -503,22 +504,22 @@ constlist(A)     ::=  BRACKET_OPEN constvaluelist(B) BRACKET_CLOSE .
 }
 constvaluelist(A) ::= .
 {
-  A = new QList<QSharedPointer<Parser::ConstValue>>;
+  A = new QList<std::shared_ptr<Parser::ConstValue>>;
 }
 constvaluelist(A) ::= constvalue(B) constvaluelist(C).
 {
   A = C;
-  A->prepend(QSharedPointer<Parser::ConstValue>(B));
+  A->prepend(std::shared_ptr<Parser::ConstValue>(B));
 }
 constvaluelist(A) ::= constvalue(B) LISTSEP constvaluelist(C).
 {
   A = C;
-  A->prepend(QSharedPointer<Parser::ConstValue>(B));
+  A->prepend(std::shared_ptr<Parser::ConstValue>(B));
 }
 
-%type constmap {QList<QPair<QSharedPointer<Parser::ConstValue>, QSharedPointer<Parser::ConstValue>>>*}
+%type constmap {QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
 %destructor constmap {delete $$;}
-%type constmapvaluelist {QList<QPair<QSharedPointer<Parser::ConstValue>, QSharedPointer<Parser::ConstValue>>>*}
+%type constmapvaluelist {QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
 %destructor constmapvaluelist {delete $$;}
 constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 {
@@ -526,18 +527,18 @@ constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 }
 constmapvaluelist(A) ::= .
 {
-  A = new QList<QPair<QSharedPointer<Parser::ConstValue>, QSharedPointer<Parser::ConstValue>>>;
+  A = new QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>;
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) constmapvaluelist(D).
 {
   A = D;
-  auto p = qMakePair(QSharedPointer<Parser::ConstValue>(B), QSharedPointer<Parser::ConstValue>(C));
+  auto p = std::make_pair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
   A->prepend(p);
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) LISTSEP constmapvaluelist(D).
 {
   A = D;
-  auto p = qMakePair(QSharedPointer<Parser::ConstValue>(B), QSharedPointer<Parser::ConstValue>(C));
+  auto p = std::make_pair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
   A->prepend(p);
 }
 

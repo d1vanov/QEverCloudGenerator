@@ -562,7 +562,9 @@ void Generator::writeEnumeration(
 
     if (ctx.m_type == OutputFileType::Interface) {
         ctx.m_out << "#if QT_VERSION >= QT_VERSION_CHECK(5, 8, 0)" << endl
+            << "#if QEVERCLOUD_USES_Q_NAMESPACE" << endl
             << "Q_ENUM_NS(" << e.m_name << ")" << endl
+            << "#endif" << endl
             << "#endif" << endl << endl;
     }
 

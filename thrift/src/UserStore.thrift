@@ -141,7 +141,7 @@ struct PublicUserInfo {
  * <dt>userWebSocketUrl:</dt>
  *   <dd>
  *   This field will contain the full URL that clients should use when opening a
- *   persistent web socket to recieve notification of events for the authenticated user.
+ *   persistent web socket to receive notification of events for the authenticated user.
  *   </dd>
  * </dl>
  */
@@ -637,7 +637,7 @@ service UserStore {
    * <p>Returns the URLs that should be used when sending requests to the service on
    * behalf of the account represented by the provided authenticationToken.</p>
    *
-   * <p>This method isn't needed by most clients, who can retreive the correct set of
+   * <p>This method isn't needed by most clients, who can retrieve the correct set of
    * UserUrls from the AuthenticationResult returned from
    * UserStore#authenticateLongSession(). This method is typically only needed to look up
    * the correct URLs for an existing long-lived authentication token.</p>

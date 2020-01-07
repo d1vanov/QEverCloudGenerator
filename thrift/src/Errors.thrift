@@ -110,13 +110,13 @@ namespace go edam
  *		   using a different email address.</dd>
  *	 <dt>ACCOUNT_CLEAR</dt>
  *     <dd>The user's account has been disabled. Clients should deal with this errorCode
- *       by logging the user out and purging all locally saved content, including local
- *       edits not yet pushed to the server.</dd>
+ *         by logging the user out and purging all locally saved content, including local
+ *         edits not yet pushed to the server.</dd>
  *	 <dt>SSO_AUTHENTICATION_REQUIRED</dt>
-  *     <dd>SSO authentication is the only type of authentication allowed for the user's
-  *     account. This error is thrown when the user attempts to authenticate by another
-   *     method (password, OpenId, etc).</dd>
-  * </dl>
+ *     <dd>SSO authentication is the only type of authentication allowed for the user's
+ *         account. This error is thrown when the user attempts to authenticate by another
+ *         method (password, OpenId, etc).</dd>
+ * </dl>
  */
 enum EDAMErrorCode {
   UNKNOWN = 1,

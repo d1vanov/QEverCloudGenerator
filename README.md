@@ -17,7 +17,7 @@ Note that QEverCloudGenerator is **not** a general purpose Thrift parser & code 
 
 ## How to build
 
-The only dependency is QtCore module for Qt4 or Qt5Core module for Qt5, the project can be built with Qt framework of either major version.
+The only dependency is Qt5Core module for Qt5.
 
 The project uses CMake build system which can be used as simply as follows (example for Unix platforms):
 ```
@@ -44,8 +44,7 @@ This repository is a fork of original [mgsxx's](https://github.com/mgsxx/QEverCl
 
 The change of the build system was only the first difference between this fork and the original project. Other differences include:
 * Simplification and minimization of the project; the QEverCloud library is no longer a subproject of the generator.
-* Support for using either Qt 4 or Qt 5 to build the parser and generate QEverCloud sources.
-* Upgrade of the generator for the handling of most recent Evernote API version - 1.28.
+* Upgrade of the generator for the handling of most recent Evernote API version - 1.29.
 
 ## Project structure
 

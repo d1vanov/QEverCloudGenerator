@@ -71,7 +71,7 @@ build_script:
   - if %platform%==mingw cmake .. -G %makefiles% -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="c:/dev/qevercloud_generator/build/installdir" -DCMAKE_PREFIX_PATH="C:/Qt/5.5/%qt%"
   - if not %platform%==mingw cmake .. -G %makefiles% -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="c:/dev/qevercloud_generator/build/installdir" -DCMAKE_PREFIX_PATH="C:/Qt/5.13/%cd%"
   - cmake --build . --parallel 4 --target all
-  - cmake --build . --parallel 4 --target install
+  - cmake --build . --target install
   - if %platform%==mingw set PATH=%ORIGPATH%
 
 after_build:

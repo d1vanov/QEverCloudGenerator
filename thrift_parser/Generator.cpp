@@ -3775,7 +3775,7 @@ void Generator::generateTestRandomDataGeneratorsCpp(
         << "{" << endl
         << "    T min = std::numeric_limits<T>::min() / 4;" << endl
         << "    T max = std::numeric_limits<T>::max() / 4;" << endl
-        << "    return min + (rand() \% static_cast<T>(max - min + 1));"
+        << "    return min + (rand() % static_cast<T>(max - min + 1));"
         << endl
         << "}" << endl << endl;
 

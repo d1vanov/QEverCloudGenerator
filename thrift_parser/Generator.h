@@ -152,6 +152,9 @@ private:
         const Parser::Function & func,
         OutputFileContext & ctx);
 
+    void generateTestServerSocketClose(
+        OutputFileContext & ctx);
+
     enum class ServiceCallKind
     {
         Sync,

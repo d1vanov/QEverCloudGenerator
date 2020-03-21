@@ -52,7 +52,7 @@ void Lexer::feedFile(QString fileName)
 
 void Lexer::lex(QString fileName, const QString & text)
 {
-    QString data = QLatin1Literal("");
+    QString data = QLatin1String("");
     LexContext ctx(fileName, text);
 
     for(ctx.m_pos = 0; ctx.m_pos < text.length(); ++ctx.m_pos) {
@@ -156,7 +156,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
             m_terminals << TerminalSymbol(
                 TerminalSymbolType::DocComment, data, ctx.m_fileName,
                 ctx.m_savedLineNum);
-            data = QLatin1Literal("");
+            data = QLatin1String("");
             ctx.m_state = TerminalSymbolType::NoState;
         }
         break;
@@ -185,7 +185,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
             m_terminals << TerminalSymbol(
                 TerminalSymbolType::Identifier, data, ctx.m_fileName,
                 ctx.m_savedLineNum);
-            data = QLatin1Literal("");
+            data = QLatin1String("");
             ctx.m_state = TerminalSymbolType::NoState;
             break;
         }
@@ -199,7 +199,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                 QChar::fromLatin1('\"') + data + QChar::fromLatin1('\"'),
                 ctx.m_fileName, ctx.m_savedLineNum);
 
-            data = QLatin1Literal("");
+            data = QLatin1String("");
             ctx.m_state = TerminalSymbolType::NoState;
             break;
         }
@@ -212,7 +212,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                 TerminalSymbolType::String,
                 QChar::fromLatin1('\"') + data + QChar::fromLatin1('\"'),
                 ctx.m_fileName, ctx.m_savedLineNum);
-            data = QLatin1Literal("");
+            data = QLatin1String("");
             ctx.m_state = TerminalSymbolType::NoState;
             break;
         }
@@ -246,7 +246,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                 m_terminals << TerminalSymbol(
                     TerminalSymbolType::IntegerNumber, data, ctx.m_fileName,
                     ctx.m_savedLineNum);
-                data = QLatin1Literal("");
+                data = QLatin1String("");
                 ctx.m_state = TerminalSymbolType::NoState;
             }
             break;
@@ -277,7 +277,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
                 m_terminals << TerminalSymbol(
                     TerminalSymbolType::FloatNumber, data, ctx.m_fileName,
                     ctx.m_savedLineNum);
-                data = QLatin1Literal("");
+                data = QLatin1String("");
                 ctx.m_state = TerminalSymbolType::NoState;
             }
             break;
@@ -295,7 +295,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
             m_terminals << TerminalSymbol(
                 TerminalSymbolType::FloatNumber, data, ctx.m_fileName,
                 ctx.m_savedLineNum);
-            data = QLatin1Literal("");
+            data = QLatin1String("");
             ctx.m_state = TerminalSymbolType::NoState;
             break;
         }

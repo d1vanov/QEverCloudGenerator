@@ -315,7 +315,7 @@ functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist
   A->m_name = *D;
   A->m_params = *E;
   A->m_throws = *F;
-  A->m_docComment = QLatin1Literal("");
+  A->m_docComment = QLatin1String("");
   delete C;
   delete D;
   delete E;

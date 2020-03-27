@@ -1353,12 +1353,6 @@ void Generator::generateTestServerSocketSetup(
         << "        });" << endl << endl;
 }
 
-void Generator::generateTestServerSocketClose(
-    OutputFileContext & ctx)
-{
-    ctx.m_out << "    pSocket->close();" << endl;
-}
-
 void Generator::generateTestServerServiceCall(
     const Parser::Service & service,
     const Parser::Function & func,
@@ -3565,7 +3559,6 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             generateTestServerHelperLambda(s, func, *parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
             generateTestServerServiceCall(s, func, ServiceCallKind::Sync, ctx);
-            generateTestServerSocketClose(ctx);
 
             ctx.m_out << "}" << endl << endl;
 
@@ -3592,7 +3585,6 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                     s, func, ServiceCallKind::Sync, ctx, exceptionTypeName,
                     e.m_name);
 
-                generateTestServerSocketClose(ctx);
                 ctx.m_out << "}" << endl << endl;
             }
 
@@ -3626,7 +3618,6 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 s, func, ServiceCallKind::Sync, ctx,
                 QStringLiteral("ThriftException"), exceptionField.m_name);
 
-            generateTestServerSocketClose(ctx);
             ctx.m_out << "}" << endl << endl;
 
             // Should deliver request and response for successful asynchonous
@@ -3642,7 +3633,6 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
             generateTestServerHelperLambda(s, func, *parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
             generateTestServerServiceCall(s, func, ServiceCallKind::Async, ctx);
-            generateTestServerSocketClose(ctx);
 
             ctx.m_out << "}" << endl << endl;
 
@@ -3669,7 +3659,6 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                     s, func, ServiceCallKind::Async, ctx, exceptionTypeName,
                     e.m_name);
 
-                generateTestServerSocketClose(ctx);
                 ctx.m_out << "}" << endl << endl;
             }
 
@@ -3695,7 +3684,6 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 s, func, ServiceCallKind::Async, ctx,
                 QStringLiteral("ThriftException"), exceptionField.m_name);
 
-            generateTestServerSocketClose(ctx);
             ctx.m_out << "}" << endl << endl;
         }
 

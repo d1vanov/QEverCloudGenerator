@@ -4501,7 +4501,8 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << "    QByteArray reply = askEvernote(" << endl
             << "        m_url," << endl
             << "        params," << endl
-            << "        ctx->requestTimeout());" << endl << endl;
+            << "        ctx->requestTimeout()," << endl
+            << "        ctx->cookies());" << endl << endl;
 
         ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""
             << "received reply for request with id = \"" << endl

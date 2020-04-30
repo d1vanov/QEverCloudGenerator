@@ -1633,7 +1633,7 @@ QString Generator::typeToStr(
             case MethodType::FuncParamType:
                 result = typeName;
                 break;
-            default: result = QLatin1Literal("");
+            default: result = QLatin1String("");
             }
         }
         else if (baseType->m_baseType == QStringLiteral("string"))
@@ -1657,7 +1657,7 @@ QString Generator::typeToStr(
                 result = typeName;
                 break;
             default:
-                result = QLatin1Literal("");
+                result = QLatin1String("");
             }
         }
         else if (baseType->m_baseType == QStringLiteral("double"))
@@ -1681,7 +1681,7 @@ QString Generator::typeToStr(
                 result = typeName;
                 break;
             default:
-                result = QLatin1Literal("");
+                result = QLatin1String("");
             }
         }
         else if (baseType->m_baseType == QStringLiteral("binary"))
@@ -1705,7 +1705,7 @@ QString Generator::typeToStr(
                 result = typeName;
                 break;
             default:
-                result = QLatin1Literal("");
+                result = QLatin1String("");
             }
         }
         else if (baseType->m_baseType == QStringLiteral("byte"))
@@ -1729,7 +1729,7 @@ QString Generator::typeToStr(
                 result = typeName;
                 break;
             default:
-                result = QLatin1Literal("");
+                result = QLatin1String("");
             }
         }
         else if (baseType->m_baseType == QStringLiteral("i16"))
@@ -1753,7 +1753,7 @@ QString Generator::typeToStr(
                 result = typeName;
                 break;
             default:
-                result = QLatin1Literal("");
+                result = QLatin1String("");
             }
         }
         else if (baseType->m_baseType == QStringLiteral("i32"))
@@ -1777,7 +1777,7 @@ QString Generator::typeToStr(
                 result = typeName;
                 break;
             default:
-                result = QLatin1Literal("");
+                result = QLatin1String("");
             }
         }
         else if (baseType->m_baseType == QStringLiteral("i64"))
@@ -1801,7 +1801,7 @@ QString Generator::typeToStr(
                 result = typeName;
                 break;
             default:
-                result = QLatin1Literal("");
+                result = QLatin1String("");
             }
         }
     }
@@ -1813,7 +1813,7 @@ QString Generator::typeToStr(
         case MethodType::ReadTypeName:
             result = QStringLiteral("void");
             break;
-        default: result = QLatin1Literal("");
+        default: result = QLatin1String("");
         }
     }
     else if (identifierType)
@@ -1884,7 +1884,7 @@ QString Generator::typeToStr(
                         result = QStringLiteral("ThriftFieldType::T_STRUCT");
                         break;
                     default:
-                        result = QLatin1Literal("");
+                        result = QLatin1String("");
                     }
                 }
                 else if (m_allEnums.contains(nameOfType))
@@ -1904,7 +1904,7 @@ QString Generator::typeToStr(
                         result = QStringLiteral("ThriftFieldType::T_I32");
                         break;
                     default:
-                        result = QLatin1Literal("");
+                        result = QLatin1String("");
                     }
                 }
             }
@@ -1936,7 +1936,7 @@ QString Generator::typeToStr(
             result = typeName;
             break;
         default:
-            result = QLatin1Literal("");
+            result = QLatin1String("");
         }
     }
     else if (setType)
@@ -1964,7 +1964,7 @@ QString Generator::typeToStr(
             result = typeName;
             break;
         default:
-            result = QLatin1Literal("");
+            result = QLatin1String("");
         }
     }
     else if (listType)
@@ -1999,7 +1999,7 @@ QString Generator::typeToStr(
             result = typeName;
             break;
         default:
-            result = QLatin1Literal("");
+            result = QLatin1String("");
         }
     }
 
@@ -2172,7 +2172,7 @@ void Generator::writeThriftWriteFields(
 {
     for(const auto & field: fields)
     {
-        QString ident = QLatin1Literal("");
+        QString ident = QLatin1String("");
 
         bool isOptional =
             (field.m_required == Parser::Field::RequiredFlag::Optional);
@@ -2195,7 +2195,7 @@ void Generator::writeThriftWriteFields(
         {
             QTextStream strm(&fieldMoniker);
             strm << fieldPrefix << field.m_name
-                << (isOptional ? QStringLiteral(".ref()") : QLatin1Literal(""));
+                << (isOptional ? QStringLiteral(".ref()") : QLatin1String(""));
         }
 
         QString writeMethod = typeToStr(
@@ -2224,7 +2224,7 @@ void Generator::writeThriftWriteFields(
             out << ident << "        " << writeMethod << "value"
                 << (writeMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
-                    : QLatin1Literal(""))
+                    : QLatin1String(""))
                 << ");" << endl;
 
             out << ident << "    }" << endl;
@@ -2253,7 +2253,7 @@ void Generator::writeThriftWriteFields(
                 << "value"
                 << (writeMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
-                    : QLatin1Literal(""))
+                    : QLatin1String(""))
                 << ");" << endl;
 
             out << ident << "    }" << endl;
@@ -2294,12 +2294,12 @@ void Generator::writeThriftWriteFields(
                 << "it.key()"
                 << (keyWriteMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
-                    : QLatin1Literal(""))
+                    : QLatin1String(""))
                 << ");" << endl;
             out << ident << "        " << valueWriteMethod << "it.value()"
                 << (valueWriteMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
-                    : QLatin1Literal(""))
+                    : QLatin1String(""))
                 << ");" << endl;
 
             out << ident << "    }" << endl;
@@ -2310,7 +2310,7 @@ void Generator::writeThriftWriteFields(
             out << ident << "    " << writeMethod << fieldMoniker
                 << (writeMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
-                    : QLatin1Literal(""))
+                    : QLatin1String(""))
                 << ");" << endl;
         }
 
@@ -4273,7 +4273,7 @@ void Generator::generateServiceClassDefinition(
             << "_" << f.m_name << "_pargs\"));" << endl;
 
         writeThriftWriteFields(
-            ctx.m_out, f.m_params, f.m_name, QLatin1Literal(""));
+            ctx.m_out, f.m_params, f.m_name, QLatin1String(""));
 
         ctx.m_out << "    writer.writeFieldStop();" << endl;
         ctx.m_out << "    writer.writeStructEnd();" << endl;
@@ -4346,7 +4346,7 @@ void Generator::generateServiceClassDefinition(
 
             writeThriftReadField(
                 ctx.m_out, result, f.m_name + QStringLiteral("."),
-                QLatin1Literal(""));
+                QLatin1String(""));
 
             ctx.m_out << "            }" << endl
                 << "            else {" << endl
@@ -5385,7 +5385,7 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
     const auto & includes = parser->includes();
     for(const auto & include: includes) {
         QString s = include.m_name;
-        s.replace(QStringLiteral("\""), QLatin1Literal(""));
+        s.replace(QStringLiteral("\""), QLatin1String(""));
         s.chop(QStringLiteral("thrift").length());
         m_includeList << s;
     }

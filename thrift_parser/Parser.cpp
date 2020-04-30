@@ -281,7 +281,7 @@ void Parser::Structure::parseStructComment(QString rawComment)
 
         if (pos < 0) {
             fieldComment = rawComment.trimmed();
-            rawComment = QLatin1Literal("");
+            rawComment = QLatin1String("");
         }
         else {
             fieldComment = rawComment.left(pos);

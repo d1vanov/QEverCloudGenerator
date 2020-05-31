@@ -2144,7 +2144,8 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
 
 QString Generator::fieldDeclarationToStr(const Parser::Field & field)
 {
-    QString s = typeToStr(field.m_type, field.m_name);
+    QString typeName = typeToStr(field.m_type, field.m_name);
+    QString s = typeName;
     if (field.m_required == Parser::Field::RequiredFlag::Optional) {
         s = QStringLiteral("Optional<") + s + QStringLiteral(">");
     }
@@ -2153,6 +2154,34 @@ QString Generator::fieldDeclarationToStr(const Parser::Field & field)
     if (field.m_initializer) {
         s += QStringLiteral(" = ") +
             valueToStr(field.m_initializer, field.m_type, field.m_name);
+        return s;
+    }
+
+    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+        return s;
+    }
+
+    auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(
+        field.m_type);
+    if (baseType) {
+        typeName = baseType->m_baseType;
+    }
+    else {
+        typeName = clearTypedef(typeName);
+    }
+
+    if ( (typeName == QStringLiteral("byte")) ||
+         (typeName == QStringLiteral("i16")) ||
+         (typeName == QStringLiteral("i32")) ||
+         (typeName == QStringLiteral("i64")) )
+    {
+        s += QStringLiteral(" = 0");
+        return s;
+    }
+    else if (typeName == QStringLiteral("double"))
+    {
+        s += QStringLiteral(" = 0.0");
+        return s;
     }
 
     return s;
@@ -2892,11 +2921,11 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             }
         }
 
-	for(auto it = typeDefs.constBegin(), end = typeDefs.constEnd();
+        for(auto it = typeDefs.constBegin(), end = typeDefs.constEnd();
             it != end; ++it)
         {
-	    ctx.m_out << "    using " << it.value() << " = "
-	        << it.key() << ";" << endl;
+            ctx.m_out << "    using " << it.value() << " = "
+                << it.key() << ";" << endl;
         }
 
         if (!typeDefs.isEmpty()) {

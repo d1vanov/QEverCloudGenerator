@@ -3943,7 +3943,7 @@ void Generator::generateLocalDataClassDeclaration(
     ctx.m_out << "    bool operator==(const EverCloudLocalData & other) const;"
         << ln
         << "    bool operator!=(const EverCloudLocalData & other) const;"
-        << ln;
+        << ln << ln;
 
     ctx.m_out << "    /**" << ln
         << "     * @brief id property can be used as a local unique identifier"
@@ -3959,6 +3959,23 @@ void Generator::generateLocalDataClassDeclaration(
         << ln
         << "     */" << ln
         << "    QString id;" << ln << ln;
+
+    ctx.m_out << "    /**" << ln
+        << "     * @brief parentId property can be used as a local unique "
+        << "identifier"
+        << ln
+        << "     * of the data item being a parent to this data item."
+        << ln
+        << "     * For example, a note is a parent to a resource, a notebook"
+        << ln
+        << "     * is a parent to a note. So note's id is a parentId for a"
+        << ln
+        << "     * resource's, notebook's id is a parentId for a note."
+        << ln
+        << "     * By default the parentId property is empty"
+        << ln
+        << "     */" << ln
+        << "    QString parentId;" << ln << ln;
 
     ctx.m_out << "    /**" << ln
         << "     * @brief dirty property can be used to keep track which"

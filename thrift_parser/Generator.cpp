@@ -4015,6 +4015,7 @@ void Generator::generateLocalDataClassDeclaration(
 
     ctx.m_out << "    // Properties declaration for meta-object system" << ln
         << "    Q_PROPERTY(QString id MEMBER id USER true)" << ln
+        << "    Q_PROPERTY(QString parentId MEMBER parentId)" << ln
         << "    Q_PROPERTY(bool dirty MEMBER dirty)" << ln
         << "    Q_PROPERTY(bool local MEMBER local)" << ln
         << "    Q_PROPERTY(bool favorited MEMBER favorited)" << ln << ln
@@ -4042,6 +4043,7 @@ void Generator::generateLocalDataClassDefinition(
         << ln
         << "{" << ln
         << "    strm << \"    localData.id = \" << id << \"\\n\"" << ln
+        << "        << \"    localData.parentId = \" << parentId << \"\\n\"" << ln
         << "        << \"    localData.dirty = \" << (dirty ? \"true\" : \"false\")"
         << " << \"\\n\"" << ln
         << "        << \"    localData.local = \" << (local ? \"true\" : \"false\")"

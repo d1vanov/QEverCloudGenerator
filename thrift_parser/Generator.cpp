@@ -5025,11 +5025,39 @@ void Generator::generateServerClassDefinition(
                 continue;
             }
 
-            ctx.m_out << "        " << typeToStr(
+            const QString paramTypeName = typeToStr(
                 param.m_type,
                 func.m_name + QStringLiteral(", ") + param.m_name,
                 MethodType::TypeName);
-            ctx.m_out << " " << param.m_name << ";" << ln;
+
+            ctx.m_out << "        " << paramTypeName;
+            ctx.m_out << " " << param.m_name;
+
+            if (paramTypeName == QStringLiteral("bool"))
+            {
+                ctx.m_out << " = false";
+            }
+            else if ( (paramTypeName == QStringLiteral("quint8")) ||
+                      (paramTypeName == QStringLiteral("qint8")) ||
+                      (paramTypeName == QStringLiteral("char")) ||
+                      (paramTypeName == QStringLiteral("quint16")) ||
+                      (paramTypeName == QStringLiteral("qint16")) ||
+                      (paramTypeName == QStringLiteral("quint32")) ||
+                      (paramTypeName == QStringLiteral("qint32")) ||
+                      (paramTypeName == QStringLiteral("quint64")) ||
+                      (paramTypeName == QStringLiteral("qint64")) ||
+                      (paramTypeName == QStringLiteral("int")) ||
+                      (paramTypeName == QStringLiteral("unsigned")) )
+            {
+                ctx.m_out << " = 0";
+            }
+            else if ( (paramTypeName == QStringLiteral("double")) ||
+                      (paramTypeName == QStringLiteral("float")) )
+            {
+                ctx.m_out << " = 0.0";
+            }
+
+            ctx.m_out << ";" << ln;
 
             ++paramCount;
         }

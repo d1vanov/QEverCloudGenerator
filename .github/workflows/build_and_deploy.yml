@@ -63,7 +63,6 @@ jobs:
           sudo apt-add-repository -y ppa:beineri/opt-qt-5.12.3-xenial
           sudo apt-get -qq update
           sudo apt-get -qq install qt512tools qt512base mesa-common-dev libgl1-mesa-dev
-          source /opt/qt512/bin/qt512-env.sh
           export CMAKE_PREFIX_PATH=/opt/qt512
         if: ${{ matrix.qt_version == '5.12.3' }}
 
@@ -199,14 +198,16 @@ jobs:
       - name: Setup Visual Studio for x86 target build
         id: setup_visual_studio_x86
         run: |
-          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
         if: ${{ matrix.target_arch == 'x86' }}
+        shell: cmd
 
       - name: Setup Visual Studio for x64 target build
         id: setup_visual_studio_x64
         run: |
-          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
         if: ${{ matrix.target_arch  == 'x64' }}
+        shell: cmd
 
       - name: Build and install
         id: build_and_install

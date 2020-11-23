@@ -43,19 +43,19 @@ jobs:
         id: install_gcc
         run: |
           sudo apt-get -qq install gcc g++
-        if: ${{ env.compiler_cpp == "gpp" }}
+        if: ${{ env.compiler_cpp == gpp }}
 
       - name: Install clang
         id: install_clang
         run: |
           sudo apt-get -qq install clang clang++
-        if: ${{ env.compiler_cpp == "clangpp" }}
+        if: ${{ env.compiler_cpp == clangpp }}
 
       - name: Install Qt 5.5.1
         id: install_qt_old
         run: |
           sudo apt-get -qq install qtbase5-dev qttools5-dev qttools5-dev-tools
-        if: ${{ env.qt_version == "5.5.1" }}
+        if: ${{ env.qt_version == 5.5.1 }}
 
       - name: Cache Qt 5.12.9
         id: cache_qt
@@ -63,7 +63,7 @@ jobs:
         with:
           path: ../Qt
           key: ${{ runner.os }}-QtCache
-        if: ${{ env.qt_version == "5.12.9" }}
+        if: ${{ env.qt_version == 5.12.9 }}
 
       - name: Install Qt 5.12.9
         id: install_qt_modern
@@ -74,27 +74,27 @@ jobs:
           host: linux
           target: desktop
           install-deps: true
-        if: ${{ env.qt_version == "5.12.9" }}
+        if: ${{ env.qt_version == 5.12.9 }}
 
       - name: Export Qt 5.12.9 to CMake
         id: export_qt_modern_to_cmake
         run: |
           export CMAKE_PREFIX_PATH=$(pwd)/../Qt/5.12.9/x86_64
-        if: ${{ env.qt_version == "5.12.9" }}
+        if: ${{ env.qt_version == 5.12.9 }}
 
       - name: Export g++ compiler to env
         id: export_gpp_compiler
         run: |
           export CMAKE_C_COMPILER=$(which gcc)
           export CMAKE_CXX_COMPILER=$(which g++)
-        if: ${{ env.compiler_cpp == "gpp" }}
+        if: ${{ env.compiler_cpp == gpp }}
  
       - name: Export clang++ compiler to env
         id: export_clangpp_compiler
         run: |
           export CMAKE_C_COMPILER=$(which clang)
           export CMAKE_CXX_COMPILER=$(which clang++)
-        if: ${{ env.compiler_cpp == "clangpp" }}
+        if: ${{ env.compiler_cpp == clangpp }}
 
       - name: Build and install
         id: build_and_install
@@ -111,7 +111,7 @@ jobs:
         with:
           name: QEverCloudGenerator_linux
           path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
-        if: ${{ env.qt_version == "5.12.9" && env.compiler_cpp == "gpp" }}
+        if: ${{ env.qt_version == 5.12.9 && env.compiler_cpp == gpp }}
 
   build_macos:
     runs-on: macos-10.15
@@ -161,7 +161,7 @@ jobs:
         with:
           path: ../Qt_x86/Qt
           key: ${{ runner.os }}-QtCache-x86
-        if: ${{ matrix.target_arch == "x86" }}
+        if: ${{ matrix.target_arch == x86 }}
 
       - name: Install Qt 5.12.9 x86
         id: install_qt_modern_x86
@@ -174,7 +174,7 @@ jobs:
           install-deps: true
           arch: win32_msvc2017
           dir: ${{ github.workspace }}/../Qt_x86
-        if: ${{ matrix.target_arch == "x86" }}
+        if: ${{ matrix.target_arch == x86 }}
 
       - name: Cache Qt 5.12.9 x64
         id: cache_qt_x64
@@ -182,7 +182,7 @@ jobs:
         with:
           path: ../Qt_x64/Qt
           key: ${{ runner.os }}-QtCache-x64
-        if: ${{ matrix.target_arch == "x64" }}
+        if: ${{ matrix.target_arch == x64 }}
 
       - name: Install Qt 5.12.9 x64
         id: install_qt_modern_x64
@@ -195,31 +195,31 @@ jobs:
           install-deps: true
           arch: win64_msvc2017_64
           dir: ${{ github.workspace }}/../Qt_x64
-        if: ${{ matrix.target_arch == "x64" }}
+        if: ${{ matrix.target_arch == x64 }}
 
       - name: Export Qt 5.12.9 x86 to CMake
         id: export_qt_x86_to_cmake
         run: |
           export CMAKE_PREFIX_PATH=$(pwd)/../Qt_x86/Qt/5.12.9/win32_msvc2017
-        if: ${{ matrix.target_arch == "x86" }}
+        if: ${{ matrix.target_arch == x86 }}
 
       - name: Export Qt 5.12.9 x64 to CMake
         id: export_qt_x64_to_cmake
         run: |
           export CMAKE_PREFIX_PATH=$(pwd)/../Qt_x64/Qt/5.12.9/win64_msvc2017_x64
-        if: ${{ matrix.target_arch == "x64" }}
+        if: ${{ matrix.target_arch == x64 }}
 
       - name: Setup Visual Studio for x86 target build
         id: setup_visual_studio_x86
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
-        if: ${{ matrix.target_arch == "x86" }}
+        if: ${{ matrix.target_arch == x86 }}
 
       - name: Setup Visual Studio for x64 target build
         id: setup_visual_studio_x64
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        if: ${{ matrix.target_arch  == "x64" }}
+        if: ${{ matrix.target_arch  == x64 }}
 
       - name: Build and install
         id: build_and_install
@@ -236,7 +236,7 @@ jobs:
         with:
           name: QEverCloudGenerator_windows_x86
           path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
-        if: ${{ matrix.target_arch == "x86" }}
+        if: ${{ matrix.target_arch == x86 }}
 
       - name: Upload x64 QEverCloudGenerator
         id: upload_artifact_x64
@@ -244,12 +244,12 @@ jobs:
         with:
           name: QEverCloudGenerator_windows_x64
           path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
-        if: ${{ matrix.target_arch == "x64" }}
+        if: ${{ matrix.target_arch == x64 }}
 
   create_new_release:
     runs-on: ubuntu-latest
     needs: [build_linux, build_macos, build_windows]
-    if: ${{ github.event_name == "push" }}
+    if: ${{ github.event_name == push }}
     steps:
       - name: Install dependencies
         id: install_deps
@@ -263,7 +263,7 @@ jobs:
 
       - name: Fetch previous release commit
         id: fetch_previous_release_commit
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -273,14 +273,14 @@ jobs:
 
       - name: Delete previous continuous release
         id: delete_previous_continuous_release
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         run: |
           if ! [[ "${COMMIT_SHA}" = "${GITHUB_SHA}" ]]; then gh release delete continuous-${BRANCH_NAME} -y -R d1vanov/QEverCloudGenerator; fi
         shell: bash
 
       - name: Create new continuous release draft
         id: create_new_continuous_release_draft
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -292,7 +292,7 @@ jobs:
 
       - name: Create new tagged release draft
         id: create_new_tagged_release_draft
-        if: ${{ github.ref != "refs/heads/master" &&  github.ref != "refs/heads/development" }}
+        if: ${{ github.ref != refs/heads/master &&  github.ref != refs/heads/development }}
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -352,7 +352,7 @@ jobs:
 
       - name: Upload Linux artifact to continuous release
         id: upload_linux_artifact_to_continuous_release
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
@@ -362,7 +362,7 @@ jobs:
 
       - name: Upload macOS artifact to continuous release
         id: upload_macos_artifact_to_continuous_release
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
@@ -372,7 +372,7 @@ jobs:
 
       - name: Upload Windows x86 artifact to continuous release
         id: upload_windows_x86_artifact_to_continuous_release
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
@@ -382,7 +382,7 @@ jobs:
 
       - name: Upload Windows x64 artifact to continuous release
         id: upload_windows_x64_artifact_to_continuous_release
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
@@ -392,7 +392,7 @@ jobs:
 
       - name: Upload Linux artifact to tagged release
         id: upload_linux_artifact_to_tagged_release
-        if: ${{ github.ref != "refs/heads/master" && github.ref != "refs/heads/development" }}
+        if: ${{ github.ref != refs/heads/master && github.ref != refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
@@ -402,7 +402,7 @@ jobs:
 
       - name: Upload macOS artifact to tagged release
         id: upload_macos_artifact_to_tagged_release
-        if: ${{ github.ref != "refs/heads/master" && github.ref != "refs/heads/development" }}
+        if: ${{ github.ref != refs/heads/master && github.ref != refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
@@ -412,7 +412,7 @@ jobs:
 
       - name: Upload Windows x86 artifact to tagged release
         id: upload_windows_x86_artifact_to_tagged_release
-        if: ${{ github.ref != "refs/heads/master" && github.ref != "refs/heads/development" }}
+        if: ${{ github.ref != refs/heads/master && github.ref != refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
@@ -422,7 +422,7 @@ jobs:
 
       - name: Upload Windows x64 artifact to tagged release
         id: upload_windows_x64_artifact_to_tagged_release
-        if: ${{ github.ref != "refs/heads/master" && github.ref != "refs/heads/development" }}
+        if: ${{ github.ref != refs/heads/master && github.ref != refs/heads/development }}
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
@@ -432,14 +432,14 @@ jobs:
 
       - name: Find created continuous release's id
         id: find_created_continuous_release_id
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         run: |
           export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} | jq '.id')
         shell: bash
 
       - name: Find created tagged release's id
         id: find_created_tagged_release_id
-        if: ${{ github.ref != "refs/heads/master" && github.ref != "refs/heads/development" }}
+        if: ${{ github.ref != refs/heads/master && github.ref != refs/heads/development }}
         run: |
           export TAG_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
           export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/${TAG_NAME} | jq '.id')
@@ -447,14 +447,14 @@ jobs:
 
       - name: Publish continuous release
         id: publish_continuous_release
-        if: ${{ github.ref == "refs/heads/master" || github.ref == "refs/heads/development" }}
+        if: ${{ github.ref == refs/heads/master || github.ref == refs/heads/development }}
         run: |
           gh api --silent -X PATCH -F tag_name="continuous-${BRANCH_NAME}" -F name="Continuous build (continuous-${BRANCH_NAME})" -F draft='false' -F prerelease='true' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
         shell: bash
 
       - name: Publish tagged release
         id: publish_tagged_release
-        if: ${{ github.ref != "refs/heads/master" && github.ref != "refs/heads/development" }}
+        if: ${{ github.ref != refs/heads/master && github.ref != refs/heads/development }}
         run: |
           gh api --silent -X PATCH -F tag_name="${TAG_NAME}" -F name="Release build (${TAG_NAME})" -F draft='false' -F prerelease='false' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
         shell: bash

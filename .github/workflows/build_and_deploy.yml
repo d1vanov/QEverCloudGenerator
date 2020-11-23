@@ -230,7 +230,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x86
-          path: '${{ githib.workspace }}\build\installdir\bin\QEverCloudGenerator'
+          path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator'
         if: ${{ matrix.target_arch == 'x86' }}
 
       - name: Upload x64 QEverCloudGenerator

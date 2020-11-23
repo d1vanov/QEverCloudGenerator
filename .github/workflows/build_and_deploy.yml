@@ -191,12 +191,14 @@ jobs:
         run: |
           set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x86\Qt\5.12.9\win32_msvc2017"
         if: ${{ matrix.target_arch == 'x86' }}
+        shell: cmd
 
       - name: Export Qt 5.12.9 x64 to CMake
         id: export_qt_x64_to_cmake
         run: |
           set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x64\Qt\5.12.9\win64_msvc2017_x64"
         if: ${{ matrix.target_arch == 'x64' }}
+        shell: cmd
 
       - name: Setup Visual Studio for x86 target build
         id: setup_visual_studio_x86
@@ -221,13 +223,14 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="%GITHUB_WORKSPACE%\build\installdir" -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
           cmake --build . --target all
           cmake --build . --target install
+        shell: cmd
 
       - name: Upload x86 QEverCloudGenerator
         id: upload_artifact_x86
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x86
-          path: '%GITHUB_WORKSPACE%\build\installdir\bin\QEverCloudGenerator'
+          path: '${{ githib.workspace }}\build\installdir\bin\QEverCloudGenerator'
         if: ${{ matrix.target_arch == 'x86' }}
 
       - name: Upload x64 QEverCloudGenerator
@@ -235,8 +238,8 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x64
-          path: '%GITHUB_WORKSPACE%\build\installdir\bin\QEverCloudGenerator'
-        if: ${{ matrix.target_arch == 'x64' }}
+          path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator'
+        if: ${{ matrix.target_arch == 'x64' }}  
 
   create_new_release:
     runs-on: ubuntu-latest

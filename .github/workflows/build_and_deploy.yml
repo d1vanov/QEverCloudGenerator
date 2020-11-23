@@ -43,19 +43,19 @@ jobs:
         id: install_gcc
         run: |
           sudo apt-get -qq install gcc g++
-        if: ${{ env.compiler_cpp == 'g++' }}
+        if: ${{ matrix.compiler_cpp == 'g++' }}
 
       - name: Install clang
         id: install_clang
         run: |
           sudo apt-get -qq install clang clang++
-        if: ${{ env.compiler_cpp == 'clang++' }}
+        if: ${{ matrix.compiler_cpp == 'clang++' }}
 
       - name: Install Qt 5.5.1
         id: install_qt_old
         run: |
           sudo apt-get -qq install qtbase5-dev qttools5-dev qttools5-dev-tools
-        if: ${{ env.qt_version == '5.5.1' }}
+        if: ${{ matrix.qt_version == '5.5.1' }}
 
       - name: Cache Qt 5.12.9
         id: cache_qt
@@ -63,7 +63,7 @@ jobs:
         with:
           path: ../Qt
           key: ${{ runner.os }}-QtCache
-        if: ${{ env.qt_version == '5.12.9' }}
+        if: ${{ matrix.qt_version == '5.12.9' }}
 
       - name: Install Qt 5.12.9
         id: install_qt_modern
@@ -74,20 +74,34 @@ jobs:
           host: linux
           target: desktop
           install-deps: true
-        if: ${{ env.qt_version == '5.12.9' }}
+        if: ${{ matrix.qt_version == '5.12.9' }}
 
       - name: Export Qt 5.12.9 to CMake
         id: export_qt_modern_to_cmake
         run: |
           export CMAKE_PREFIX_PATH=$(pwd)/../Qt/5.12.9/x86_64
-        if: ${{ env.qt_version == '5.12.9' }}
+        if: ${{ matrix.qt_version == '5.12.9' }}
+
+      - name: Export gcc compilers to env
+        id: export_gcc_to_env
+        run: |
+          export CMAKE_C_COMPILER=$(which gcc)
+          export CMAKE_CXX_COMPILER=$(which g++)
+        if: ${{ matrix.compiler_cpp == 'g++' }}
+
+      - name: Export clang compilers to env
+        id: export_clang_to_env
+        run: |
+          export CMAKE_C_COMPILER=$(which clang)
+          export CMAKE_CXX_COMPILER=$(which clang++)
+        if: ${{ matrix.compiler_cpp == 'clang++' }}
 
       - name: Build and install
         id: build_and_install
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=$compiler_c -DCMAKE_CXX_COMPILER=$compiler_cpp -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
           cmake --build . --target all
           cmake --build . --target install
 
@@ -97,7 +111,7 @@ jobs:
         with:
           name: QEverCloudGenerator_linux
           path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
-        if: ${{ env.qt_version == '5.12.9' && env.compiler_cpp == 'g++' }}
+        if: ${{ matrix.qt_version == '5.12.9' && matrix.compiler_cpp == 'g++' }}
 
   build_macos:
     runs-on: macos-10.15
@@ -109,7 +123,9 @@ jobs:
         id: install_deps
         run: |
           brew update
+          brew unlink cmake
           brew install cmake --force-bottle
+          brew link cmake
           brew install ninja --force-bottle
           brew install p7zip --force-bottle
           brew install qt5 --force-bottle
@@ -145,7 +161,7 @@ jobs:
         id: cache_qt_x86
         uses: actions/cache@v1
         with:
-          path: ../Qt_x86/Qt
+          path: '${{ runner.workspace }}/Qt_x86'
           key: ${{ runner.os }}-QtCache-x86
         if: ${{ matrix.target_arch == 'x86' }}
 
@@ -159,14 +175,14 @@ jobs:
           target: desktop
           install-deps: true
           arch: win32_msvc2017
-          dir: ${{ github.workspace }}/../Qt_x86
+          dir: '${{ runner.workspace }}/Qt_x86'
         if: ${{ matrix.target_arch == 'x86' }}
 
       - name: Cache Qt 5.12.9 x64
         id: cache_qt_x64
         uses: actions/cache@v1
         with:
-          path: ../Qt_x64/Qt
+          path: '${{ runner.workspace }}/Qt_x64'
           key: ${{ runner.os }}-QtCache-x64
         if: ${{ matrix.target_arch == 'x64' }}
 
@@ -180,19 +196,19 @@ jobs:
           target: desktop
           install-deps: true
           arch: win64_msvc2017_64
-          dir: ${{ github.workspace }}/../Qt_x64
+          dir: '${{ runner.workspace }}/Qt_x64'
         if: ${{ matrix.target_arch == 'x64' }}
 
       - name: Export Qt 5.12.9 x86 to CMake
         id: export_qt_x86_to_cmake
         run: |
-          export CMAKE_PREFIX_PATH=$(pwd)/../Qt_x86/Qt/5.12.9/win32_msvc2017
+          export CMAKE_PREFIX_PATH=$RUNNER_WORKSPACE/Qt_x86/Qt/5.12.9/win32_msvc2017
         if: ${{ matrix.target_arch == 'x86' }}
 
       - name: Export Qt 5.12.9 x64 to CMake
         id: export_qt_x64_to_cmake
         run: |
-          export CMAKE_PREFIX_PATH=$(pwd)/../Qt_x64/Qt/5.12.9/win64_msvc2017_x64
+          export CMAKE_PREFIX_PATH=$RUNNER_WORKSPACE/Qt_x64/Qt/5.12.9/win64_msvc2017_x64
         if: ${{ matrix.target_arch == 'x64' }}
 
       - name: Setup Visual Studio for x86 target build

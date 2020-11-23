@@ -20,16 +20,16 @@ jobs:
         include:
           - qt_version: 5.5.1
             compiler_c: gcc
-            compiler_cpp: g++
+            compiler_cpp: gpp
           - qt_version: 5.5.1
             compiler_c: clang
-            compiler_cpp: clang++
+            compiler_cpp: clangpp
           - qt_version: 5.12.9
             compiler_c: gcc
-            compiler_cpp: g++
+            compiler_cpp: gpp
           - qt_version: 5.12.9
             compiler_c: clang
-            compiler_cpp: clang++
+            compiler_cpp: clangpp
 
     steps:
       - uses: actions/checkout@v2
@@ -43,13 +43,13 @@ jobs:
         id: install_gcc
         run: |
           sudo apt-get -qq install gcc g++
-        if: ${{ env.compiler_cpp == "g++" }}
+        if: ${{ env.compiler_cpp == "gpp" }}
 
       - name: Install clang
         id: install_clang
         run: |
           sudo apt-get -qq install clang clang++
-        if: ${{ env.compiler_cpp == "clang++" }}
+        if: ${{ env.compiler_cpp == "clangpp" }}
 
       - name: Install Qt 5.5.1
         id: install_qt_old
@@ -82,12 +82,26 @@ jobs:
           export CMAKE_PREFIX_PATH=$(pwd)/../Qt/5.12.9/x86_64
         if: ${{ env.qt_version == "5.12.9" }}
 
+      - name: Export g++ compiler to env
+        id: export_gpp_compiler
+        run: |
+          export CMAKE_C_COMPILER=$(which gcc)
+          export CMAKE_CXX_COMPILER=$(which g++)
+        if: ${{ env.compiler_cpp == "gpp" }}
+ 
+      - name: Export clang++ compiler to env
+        id: export_clangpp_compiler
+        run: |
+          export CMAKE_C_COMPILER=$(which clang)
+          export CMAKE_CXX_COMPILER=$(which clang++)
+        if: ${{ env.compiler_cpp == "clangpp" }}
+
       - name: Build and install
         id: build_and_install
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=$compiler_c -DCMAKE_CXX_COMPILER=$compiler_cpp -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
           cmake --build . --target all
           cmake --build . --target install
 
@@ -97,7 +111,7 @@ jobs:
         with:
           name: QEverCloudGenerator_linux
           path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
-        if: ${{ env.qt_version == "5.12.9" && env.compiler_cpp == "g++" }}
+        if: ${{ env.qt_version == "5.12.9" && env.compiler_cpp == "gpp" }}
 
   build_macos:
     runs-on: macos-10.15

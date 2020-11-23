@@ -37,7 +37,7 @@ jobs:
       - name: Install non-Qt dependencies
         id: install_non_qt_deps
         run: |
-          sudo apt-get -qq install cmake ninja-build
+          sudo apt-get -qq install cmake ninja-build p7zip-full coreutils curl
 
       - name: Install gcc
         id: install_gcc
@@ -63,9 +63,7 @@ jobs:
           sudo apt-add-repository -y ppa:beineri/opt-qt-5.12.3-xenial
           sudo apt-get -qq update
           sudo apt-get -qq install qt512tools qt512base mesa-common-dev libgl1-mesa-dev
-          ls -la /opt/qt512
-          ls -la /opt/qt512/bin
-          source /opt/qt512/bin/qt512-env.sh
+          source <(echo "set -x"; cat /opt/qt512/bin/qt512-env.sh; echo "set +x")
           export CMAKE_PREFIX_PATH=/opt/qt512
         if: ${{ matrix.qt_version == '5.12.3' }}
 

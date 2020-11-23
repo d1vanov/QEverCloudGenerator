@@ -82,26 +82,26 @@ jobs:
           export CMAKE_PREFIX_PATH=$(pwd)/../Qt/5.12.9/x86_64
         if: ${{ matrix.qt_version == '5.12.9' }}
 
-      - name: Export gcc compilers to env
-        id: export_gcc_to_env
+      - name: Configure for gcc
+        id: configure_for_gcc
         run: |
-          export CMAKE_C_COMPILER=$(which gcc)
-          export CMAKE_CXX_COMPILER=$(which g++)
+          mkdir $GITHUB_WORKSPACE/build
+          cd $GITHUB_WORKSPACE/build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
         if: ${{ matrix.compiler_cpp == 'g++' }}
 
-      - name: Export clang compilers to env
-        id: export_clang_to_env
+      - name: Configure for clang
+        id: configure_for_clang
         run: |
-          export CMAKE_C_COMPILER=$(which clang)
-          export CMAKE_CXX_COMPILER=$(which clang++)
+          mkdir $GITHUB_WORKSPACE/build
+          cd $GITHUB_WORKSPACE/build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
         if: ${{ matrix.compiler_cpp == 'clang++' }}
 
       - name: Build and install
         id: build_and_install
         run: |
-          mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=$CMAKE_C_COMPILER -DCMAKE_CXX_COMPILER=$CMAKE_CXX_COMPILER -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
           cmake --build . --target all
           cmake --build . --target install
 
@@ -214,13 +214,13 @@ jobs:
       - name: Setup Visual Studio for x86 target build
         id: setup_visual_studio_x86
         run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
         if: ${{ matrix.target_arch == 'x86' }}
 
       - name: Setup Visual Studio for x64 target build
         id: setup_visual_studio_x64
         run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
         if: ${{ matrix.target_arch  == 'x64' }}
 
       - name: Build and install

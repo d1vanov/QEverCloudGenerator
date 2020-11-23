@@ -460,3 +460,5 @@ jobs:
         run: |
           gh api --silent -X PATCH -F tag_name="${TAG_NAME}" -F name="Release build (${TAG_NAME})" -F draft='false' -F prerelease='false' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
         shell: bash
+
+# dummy change to trigger rebuild

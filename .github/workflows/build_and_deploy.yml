@@ -43,13 +43,13 @@ jobs:
         id: install_gcc
         run: |
           sudo apt-get -qq install gcc g++
-        if: env.compiler-cpp == "g++"
+        if: env.compiler_cpp == "g++"
 
       - name: Install clang
         id: install_clang
         run: |
           sudo apt-get -qq install clang clang++
-        if: env.compiler-cpp == "clang++"
+        if: env.compiler_cpp == "clang++"
 
       - name: Install Qt 5.5.1
         id: install_qt_old
@@ -97,7 +97,7 @@ jobs:
         with:
           name: QEverCloudGenerator_linux
           path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
-        if: env.qt_version == "5.12.9" && env.compiler-cpp == "g++"
+        if: env.qt_version == "5.12.9" && env.compiler_cpp == "g++"
 
   build_macos:
     runs-on: macos-10.15

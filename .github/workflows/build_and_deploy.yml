@@ -24,10 +24,10 @@ jobs:
           - qt_version: '5.5.1'
             compiler_c: 'clang'
             compiler_cpp: 'clang++'
-          - qt_version: '5.12.9'
+          - qt_version: '5.12.3'
             compiler_c: 'gcc'
             compiler_cpp: 'g++'
-          - qt_version: '5.12.9'
+          - qt_version: '5.12.3'
             compiler_c: 'clang'
             compiler_cpp: 'clang++'
 
@@ -57,30 +57,15 @@ jobs:
           sudo apt-get -qq install qtbase5-dev qttools5-dev qttools5-dev-tools
         if: ${{ matrix.qt_version == '5.5.1' }}
 
-      - name: Cache Qt 5.12.9
-        id: cache_qt
-        uses: actions/cache@v1
-        with:
-          path: ../Qt
-          key: ${{ runner.os }}-QtCache
-        if: ${{ matrix.qt_version == '5.12.9' }}
-
-      - name: Install Qt 5.12.9
+      - name: Install Qt 5.12.3
         id: install_qt_modern
-        uses: jurplel/install-qt-action@v2
-        with:
-          cached: ${{ steps.cache-qt.outputs.cache-hit }}
-          version: 5.12.9
-          host: linux
-          target: desktop
-          install-deps: true
-        if: ${{ matrix.qt_version == '5.12.9' }}
-
-      - name: Export Qt 5.12.9 to CMake
-        id: export_qt_modern_to_cmake
         run: |
-          export CMAKE_PREFIX_PATH=$(pwd)/../Qt/5.12.9/x86_64
-        if: ${{ matrix.qt_version == '5.12.9' }}
+          sudo apt-add-repository -y ppa:beineri/opt-qt-5.12.3-xenial
+          sudo apt-get -qq update
+          sudo apt-get -qq install qt512tools qt512base mesa-common-dev libgl1-mesa-dev
+          source /opt/qt512/bin/qt512-env.sh
+          export CMAKE_PREFIX_PATH=/opt/qt512
+        if: ${{ matrix.qt_version == '5.12.3' }}
 
       - name: Configure for gcc
         id: configure_for_gcc
@@ -111,7 +96,7 @@ jobs:
         with:
           name: QEverCloudGenerator_linux
           path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
-        if: ${{ matrix.qt_version == '5.12.9' && matrix.compiler_cpp == 'g++' }}
+        if: ${{ matrix.qt_version == '5.12.3' && matrix.compiler_cpp == 'g++' }}
 
   build_macos:
     runs-on: macos-10.15
@@ -226,9 +211,9 @@ jobs:
       - name: Build and install
         id: build_and_install
         run: |
-          mkdir $GITHUB_WORKSPACE/build
-          cd $GITHUB_WORKSPACE/build
-          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
+          md %GITHUB_WORKSPACE%\build
+          cd %GITHUB_WORKSPACE%\build
+          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="%GITHUB_WORKSPACE%\build\installdir" -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
           cmake --build . --target all
           cmake --build . --target install
 
@@ -237,7 +222,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x86
-          path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
+          path: '%GITHUB_WORKSPACE%\build\installdir\bin\QEverCloudGenerator'
         if: ${{ matrix.target_arch == 'x86' }}
 
       - name: Upload x64 QEverCloudGenerator
@@ -245,7 +230,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x64
-          path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
+          path: '%GITHUB_WORKSPACE%\build\installdir\bin\QEverCloudGenerator'
         if: ${{ matrix.target_arch == 'x64' }}
 
   create_new_release:

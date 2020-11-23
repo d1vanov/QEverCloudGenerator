@@ -63,7 +63,8 @@ jobs:
           sudo apt-add-repository -y ppa:beineri/opt-qt-5.12.3-xenial
           sudo apt-get -qq update
           sudo apt-get -qq install qt512tools qt512base mesa-common-dev libgl1-mesa-dev
-          sudo chmod 755 /opt/qt512/bin/qt512-env.sh
+          ls -la /opt/qt512
+          ls -la /opt/qt512/bin
           source /opt/qt512/bin/qt512-env.sh
           export CMAKE_PREFIX_PATH=/opt/qt512
         if: ${{ matrix.qt_version == '5.12.3' }}

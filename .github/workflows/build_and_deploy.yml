@@ -1,0 +1,446 @@
+name: Build and deploy QEverCloudGenerator
+
+on:
+  push:
+    branches:
+      - master
+      - development
+    tags:
+      - v[0-9].[0-9].[0-9]*
+  pull_request:
+    branches:
+      - master
+      - development
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-16.04
+    strategy:
+      matrix:
+        include:
+          - qt_version: 5.5.1
+            compiler_c: gcc
+            compiler_cpp: g++
+          - qt_version: 5.5.1
+            compiler_c: clang
+            compiler_cpp: clang++
+          - qt_version: 5.12.9
+            compiler_c: gcc
+            compiler_cpp: g++
+          - qt_version: 5.12.9
+            compiler_c: clang
+            compiler_cpp: clang++
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install non-Qt dependencies
+        id: install_non_qt_deps
+        run: |
+          sudo apt-get -qq install cmake ninja-build
+
+      - name: Install gcc
+        id: install_gcc
+        run: |
+          sudo apt-get -qq install gcc g++
+        if: env.compiler-cpp == "g++"
+
+      - name: Install clang
+        id: install_clang
+        run: |
+          sudo apt-get -qq install clang clang++
+        if: env.compiler-cpp == "clang++"
+
+      - name: Install Qt 5.5.1
+        id: install_qt_old
+        run: |
+          sudo apt-get -qq install qtbase5-dev qttools5-dev qttools5-dev-tools
+        if: env.qt_version == "5.5.1"
+
+      - name: Cache Qt 5.12.9
+        id: cache_qt
+        uses: actions/cache@v1
+        with:
+          path: ../Qt
+          key: ${{ runner.os }}-QtCache
+        if: env.qt_version == "5.12.9"
+
+      - name: Install Qt 5.12.9
+        id: install_qt_modern
+        uses: jurplel/install-qt-action@v2
+        with:
+          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+          version: 5.12.9
+          host: linux
+          target: desktop
+          install-deps: true
+        if: env.qt_version == "5.12.9"
+
+      - name: Export Qt 5.12.9 to CMake
+        id: export_qt_modern_to_cmake
+        run: |
+          export CMAKE_PREFIX_PATH=$(pwd)/../Qt/5.12.9/x86_64
+        if: env.qt_version == "5.12.9"
+
+      - name: Build and install
+        id: build_and_install
+        run: |
+          mkdir $GITHUB_WORKSPACE/build
+          cd $GITHUB_WORKSPACE/build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=$compiler_c -DCMAKE_CXX_COMPILER=$compiler_cpp -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
+          cmake --build . --target all
+          cmake --build . --target install
+
+      - name: Upload QEverCloudGenerator artifact
+        id: upload_artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: QEverCloudGenerator_linux
+          path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
+        if: env.qt_version == "5.12.9" && env.compiler-cpp == "g++"
+
+  build_macos:
+    runs-on: macos-10.15
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies
+        id: install_deps
+        run: |
+          brew update
+          brew install cmake --force-bottle
+          brew install ninja --force-bottle
+          brew install p7zip --force-bottle
+          brew install qt5 --force-bottle
+
+      - name: Build and install
+        id: build_and_install
+        run: |
+          mkdir $GITHUB_WORKSPACE/build
+          cd $GITHUB_WORKSPACE/build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_PREFIX_PATH=/usr/local/opt/qt5 ..
+          cmake --build . --target all
+          cmake --build . --target install
+
+      - name: Upload QEverCloudGenerator artifact
+        id: upload_artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: QEverCloudGenerator_macos
+          path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
+
+  build_windows:
+    runs-on: windows-2019
+    strategy:
+      matrix:
+        include:
+          - target_arch: x86
+          - target_arch: x64
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache Qt 5.12.9 x86
+        id: cache_qt_x86
+        uses: actions/cache@v1
+        with:
+          path: ../Qt_x86/Qt
+          key: ${{ runner.os }}-QtCache-x86
+        if: ${{ matrix.target_arch }} == "x86"
+
+      - name: Install Qt 5.12.9 x86
+        id: install_qt_modern_x86
+        uses: jurplel/install-qt-action@v2
+        with:
+          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+          version: 5.12.9
+          host: windows
+          target: desktop
+          install-deps: true
+          arch: win32_msvc2017
+          dir: ${{ github.workspace }}/../Qt_x86
+        if: ${{ matrix.target_arch }} == "x86"
+
+      - name: Cache Qt 5.12.9 x64
+        id: cache_qt_x64
+        uses: actions/cache@v1
+        with:
+          path: ../Qt_x64/Qt
+          key: ${{ runner.os }}-QtCache-x64
+        if: ${{ matrix.target_arch }} == "x64"
+
+      - name: Install Qt 5.12.9 x64
+        id: install_qt_modern_x64
+        uses: jurplel/install-qt-action@v2
+        with:
+          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+          version: 5.12.9
+          host: windows
+          target: desktop
+          install-deps: true
+          arch: win64_msvc2017_64
+          dir: ${{ github.workspace }}/../Qt_x64
+        if: ${{ matrix.target_arch }} == "x64"
+
+      - name: Export Qt 5.12.9 x86 to CMake
+        id: export_qt_x86_to_cmake
+        run: |
+          export CMAKE_PREFIX_PATH=$(pwd)/../Qt_x86/Qt/5.12.9/win32_msvc2017
+        if: ${{ matrix.target_arch }} == "x86"
+
+      - name: Export Qt 5.12.9 x64 to CMake
+        id: export_qt_x64_to_cmake
+        run: |
+          export CMAKE_PREFIX_PATH=$(pwd)/../Qt_x64/Qt/5.12.9/win64_msvc2017_x64
+        if: ${{ matrix.target_arch }} == "x64"
+
+      - name: Setup Visual Studio for x86 target build
+        id: setup_visual_studio_x86
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
+        if: ${{ matrix.target_arch }} == "x86"
+
+      - name: Setup Visual Studio for x64 target build
+        id: setup_visual_studio_x64
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        if: ${{ matrix.target_arch }} == "x64"
+
+      - name: Build and install
+        id: build_and_install
+        run: |
+          mkdir $GITHUB_WORKSPACE/build
+          cd $GITHUB_WORKSPACE/build
+          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
+          cmake --build . --target all
+          cmake --build . --target install
+
+      - name: Upload x86 QEverCloudGenerator
+        id: upload_artifact_x86
+        uses: actions/upload-artifact@v2
+        with:
+          name: QEverCloudGenerator_windows_x86
+          path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
+        if: ${{ matrix.target_arch }} == "x86"
+
+      - name: Upload x64 QEverCloudGenerator
+        id: upload_artifact_x64
+        uses: actions/upload-artifact@v2
+        with:
+          name: QEverCloudGenerator_windows_x64
+          path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
+        if: ${{ matrix.target_arch }} == "x64"
+
+  create_new_release:
+    runs-on: ubuntu-latest
+    needs: [build_linux, build_macos, build_windows]
+    if: ${{ github.event_name }} == "push"
+    steps:
+      - name: Install dependencies
+        id: install_deps
+        run: |
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt update
+          sudo apt install -qq gh
+          sudo apt install -qq jq
+          sudo apt install -qq p7zip
+
+      - name: Fetch previous release commit
+        id: fetch_previous_release_commit
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export BRANCH_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
+          export COMMIT_SHA=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} | jq '.target_commitish')
+        shell: bash
+
+      - name: Delete previous continuous release
+        id: delete_previous_continuous_release
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        run: |
+          if ! [[ "${COMMIT_SHA}" = "${GITHUB_SHA}" ]]; then gh release delete continuous-${BRANCH_NAME} -y -R d1vanov/QEverCloudGenerator; fi
+        shell: bash
+
+      - name: Create new continuous release draft
+        id: create_new_continuous_release_draft
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: continuous-${{ env.BRANCH_NAME }}
+          release_name: Continuous build (continuous-${{ env.BRANCH_NAME }})
+          draft: true
+          prerelease: true
+
+      - name: Create new tagged release draft
+        id: create_new_tagged_release_draft
+        if: ${{ github.ref }} != "refs/heads/master" && ${{ github.ref }} != "refs/heads/development"
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release build (${{ github.ref }})
+          draft: true
+          prerelease: false
+
+      - name: Download linux artifact
+        id: download_linux_artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: QEverCloudGenerator_linux
+          path: $GITHUB_WORKSPACE/artifacts/linux/QEverCloudGenerator
+
+      - name: Download macOS artifact
+        id: download_macos_artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: QEverCloudGenerator_macos
+          path: $GITHUB_WORKSPACE/artifacts/macos/QEverCloudGenerator
+
+      - name: Download Windows x86 artifact
+        id: download_windows_x86_artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: QEverCloudGenerator_windows_x86
+          path: $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator
+
+      - name: Download Windows x64 artifact
+        id: download_windows_x64_artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: QEverCloudGenerator_windows_x64
+          path: $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator
+
+      - name: Compress Linux artifact
+        id: compress_linux_artifact
+        run: |
+          7z a $GITHUB_WORKSPACE/artifacts/linux/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/linux/QEverCloudGenerator
+
+      - name: Compress macOS artifact
+        id: compress_macos_artifact
+        run: |
+          7z a $GITHUB_WORKSPACE/artifacts/macos/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/macos/QEverCloudGenerator
+
+      - name: Compress Windows x86 artifact
+        id: compress_windows_x86_artifact
+        run: |
+          7z a $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator
+
+      - name: Compress Windows x64 artifact
+        id: compress_windows_x64_artifact
+        run: |
+          7z a $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator
+
+      - name: Upload Linux artifact to continuous release
+        id: upload_linux_artifact_to_continuous_release
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/linux/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_linux_x86_64.zip
+          asset_content_type: application/zip
+
+      - name: Upload macOS artifact to continuous release
+        id: upload_macos_artifact_to_continuous_release
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/macos/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_macos_x86_64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows x86 artifact to continuous release
+        id: upload_windows_x86_artifact_to_continuous_release
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_windows_x86.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows x64 artifact to continuous release
+        id: upload_windows_x64_artifact_to_continuous_release
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_windows_x64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Linux artifact to tagged release
+        id: upload_linux_artifact_to_tagged_release
+        if: ${{ github.ref }} != "refs/heads/master" && ${{ github.ref }} != "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/linux/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_linux_x86_64.zip
+          asset_content_type: application/zip
+
+      - name: Upload macOS artifact to tagged release
+        id: upload_macos_artifact_to_tagged_release
+        if: ${{ github.ref }} != "refs/heads/master" && ${{ github.ref }} != "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/macos/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_macos_x86_64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows x86 artifact to tagged release
+        id: upload_windows_x86_artifact_to_tagged_release
+        if: ${{ github.ref }} != "refs/heads/master" && ${{ github.ref }} != "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_windows_x86.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows x64 artifact to tagged release
+        id: upload_windows_x64_artifact_to_tagged_release
+        if: ${{ github.ref }} != "refs/heads/master" && ${{ github.ref }} != "refs/heads/development"
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_tagged_release_draft.outputs.upload_url }}
+          asset_path: $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.zip
+          asset_name: QEverCloudGenerator_windows_x64.zip
+          asset_content_type: application/zip
+
+      - name: Find created continuous release's id
+        id: find_created_continuous_release_id
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        run: |
+          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} | jq '.id')
+        shell: bash
+
+      - name: Find created tagged release's id
+        id: find_created_tagged_release_id
+        if: ${{ github.ref }} != "refs/heads/master" && ${{ github.ref }} != "refs/heads/development"
+        run: |
+          export TAG_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
+          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/${TAG_NAME} | jq '.id')
+        shell: bash
+
+      - name: Publish continuous release
+        id: publish_continuous_release
+        if: ${{ github.ref }} == "refs/heads/master" || ${{ github.ref }} == "refs/heads/development"
+        run: |
+          gh api --silent -X PATCH -F tag_name="continuous-${BRANCH_NAME}" -F name="Continuous build (continuous-${BRANCH_NAME})" -F draft='false' -F prerelease='true' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
+        shell: bash
+
+      - name: Publish tagged release
+        id: publish_tagged_release
+        if: ${{ github.ref }} != "refs/heads/master" && ${{ github.ref }} != "refs/heads/development"
+        run: |
+          gh api --silent -X PATCH -F tag_name="${TAG_NAME}" -F name="Release build (${TAG_NAME})" -F draft='false' -F prerelease='false' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
+        shell: bash

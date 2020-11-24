@@ -258,40 +258,44 @@ jobs:
           sudo apt install -qq jq
           sudo apt install -qq p7zip
 
-      - name: Fetch previous release commit
-        id: fetch_previous_release_commit
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          export BRANCH_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
-          export COMMIT_SHA=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} | jq '.target_commitish')
-        shell: bash
-
       - name: Delete previous continuous release
         id: delete_previous_continuous_release
         if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          export BRANCH_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
+          export COMMIT_SHA=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} | jq '.target_commitish')
           if ! [[ "${COMMIT_SHA}" = "${GITHUB_SHA}" ]]; then gh release delete continuous-${BRANCH_NAME} -y -R d1vanov/QEverCloudGenerator; fi
         shell: bash
 
-      - name: Create new continuous release draft
-        id: create_new_continuous_release_draft
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+      - name: Create new continuous master release draft
+        id: create_new_continuous_master_release_draft
+        if: ${{ github.ref == 'refs/heads/master' }}
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: continuous-${{ env.BRANCH_NAME }}
-          release_name: Continuous build (continuous-${{ env.BRANCH_NAME }})
+          tag_name: continuous-master
+          release_name: Continuous build (continuous-master)
+          draft: true
+          prerelease: true
+
+      - name: Create new continuous development release draft
+        id: create_new_continuous_development_release_draft
+        if: ${{ github.ref == 'refs/heads/development' }}
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: continuous-development
+          release_name: Continuous build (continuous-development)
           draft: true
           prerelease: true
 
       - name: Create new tagged release draft
         id: create_new_tagged_release_draft
-        if: ${{ github.ref != 'refs/heads/master' &&  github.ref != 'refs/heads/development' }}
+        if: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/development' }}
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -349,42 +353,82 @@ jobs:
         run: |
           7z a $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.exe
 
-      - name: Upload Linux artifact to continuous release
-        id: upload_linux_artifact_to_continuous_release
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+      - name: Upload Linux artifact to continuous master release
+        id: upload_linux_artifact_to_continuous_master_release
+        if: ${{ github.ref == 'refs/heads/master' }}
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          upload_url: ${{ steps.create_new_continuous_master_release_draft.outputs.upload_url }}
           asset_path: '${{ github.workspace }}/artifacts/linux/QEverCloudGenerator.zip'
           asset_name: QEverCloudGenerator_linux_x86_64.zip
           asset_content_type: application/zip
 
-      - name: Upload macOS artifact to continuous release
-        id: upload_macos_artifact_to_continuous_release
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+      - name: Upload Linux artifact to continuous development release
+        id: upload_linux_artifact_to_continuous_development_release
+        if: ${{ github.ref == 'refs/heads/development' }}
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          upload_url: ${{ steps.create_new_continuous_development_release_draft.outputs.upload_url }}
+          asset_path: '${{ github.workspace }}/artifacts/linux/QEverCloudGenerator.zip'
+          asset_name: QEverCloudGenerator_linux_x86_64.zip
+          asset_content_type: application/zip
+
+      - name: Upload macOS artifact to continuous master release
+        id: upload_macos_artifact_to_continuous_master_release
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_master_release_draft.outputs.upload_url }}
           asset_path: '${{ github.workspace }}/artifacts/macos/QEverCloudGenerator.zip'
           asset_name: QEverCloudGenerator_macos_x86_64.zip
           asset_content_type: application/zip
 
-      - name: Upload Windows x86 artifact to continuous release
-        id: upload_windows_x86_artifact_to_continuous_release
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+      - name: Upload macOS artifact to continuous development release
+        id: upload_macos_artifact_to_continuous_development_release
+        if: ${{ github.ref == 'refs/heads/development' }}
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          upload_url: ${{ steps.create_new_continuous_development_release_draft.outputs.upload_url }}
+          asset_path: '${{ github.workspace }}/artifacts/macos/QEverCloudGenerator.zip'
+          asset_name: QEverCloudGenerator_macos_x86_64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows x86 artifact to continuous master release
+        id: upload_windows_x86_artifact_to_continuous_master_release
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_master_release_draft.outputs.upload_url }}
           asset_path: '${{ github.workspace }}/artifacts/windows/x86/QEverCloudGenerator.zip'
           asset_name: QEverCloudGenerator_windows_x86.zip
           asset_content_type: application/zip
 
-      - name: Upload Windows x64 artifact to continuous release
-        id: upload_windows_x64_artifact_to_continuous_release
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+      - name: Upload Windows x86 artifact to continuous development release
+        id: upload_windows_x86_artifact_to_continuous_development_release
+        if: ${{ github.ref == 'refs/heads/development' }}
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_new_continuous_release_draft.outputs.upload_url }}
+          upload_url: ${{ steps.create_new_continuous_development_release_draft.outputs.upload_url }}
+          asset_path: '${{ github.workspace }}/artifacts/windows/x86/QEverCloudGenerator.zip'
+          asset_name: QEverCloudGenerator_windows_x86.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows x64 artifact to continuous master release
+        id: upload_windows_x64_artifact_to_continuous_master_release
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_master_release_draft.outputs.upload_url }}
+          asset_path: '${{ github.workspace }}/artifacts/windows/x64/QEverCloudGenerator.zip'
+          asset_name: QEverCloudGenerator_windows_x64.zip
+          asset_content_type: application/zip
+
+      - name: Upload Windows x64 artifact to continuous development release
+        id: upload_windows_x64_artifact_to_continuous_development_release
+        if: ${{ github.ref == 'refs/heads/development' }}
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_new_continuous_development_release_draft.outputs.upload_url }}
           asset_path: '${{ github.workspace }}/artifacts/windows/x64/QEverCloudGenerator.zip'
           asset_name: QEverCloudGenerator_windows_x64.zip
           asset_content_type: application/zip
@@ -429,32 +473,24 @@ jobs:
           asset_name: QEverCloudGenerator_windows_x64.zip
           asset_content_type: application/zip
 
-      - name: Find created continuous release's id
-        id: find_created_continuous_release_id
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+      - name: Publish continuous master release
+        id: publish_continuous_master_release
+        if: ${{ github.ref == 'refs/heads/master' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} | jq '.id')
+          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-master | jq '.id')
+          gh api --silent -X PATCH -F tag_name="continuous-master" -F name="Continuous build (continuous-master)" -F draft='false' -F prerelease='true' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
         shell: bash
 
-      - name: Find created tagged release's id
-        id: find_created_tagged_release_id
-        if: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/development' }}
+      - name: Publish continuous development release
+        id: publish_continuous_development_release
+        if: ${{ github.ref == 'refs/heads/development' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          export TAG_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
-          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/${TAG_NAME} | jq '.id')
-        shell: bash
-
-      - name: Publish continuous release
-        id: publish_continuous_release
-        if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api --silent -X PATCH -F tag_name="continuous-${BRANCH_NAME}" -F name="Continuous build (continuous-${BRANCH_NAME})" -F draft='false' -F prerelease='true' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
+          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-development | jq '.id')
+          gh api --silent -X PATCH -F tag_name="continuous-development" -F name="Continuous build (continuous-development)" -F draft='false' -F prerelease='true' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
         shell: bash
 
       - name: Publish tagged release
@@ -463,5 +499,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          export TAG_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
+          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/${TAG_NAME} | jq '.id')
           gh api --silent -X PATCH -F tag_name="${TAG_NAME}" -F name="Release build (${TAG_NAME})" -F draft='false' -F prerelease='false' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
         shell: bash

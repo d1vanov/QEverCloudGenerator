@@ -3,9 +3,7 @@ QEverCloudGenerator
 
 **Generator of unofficial Qt-friendly Evernote SDK**
 
-Travis CI (Linux, OS X): [![Build Status](https://travis-ci.org/d1vanov/QEverCloudGenerator.svg?branch=master)](https://travis-ci.org/d1vanov/QEverCloudGenerator)
-
-AppVeyor CI (Windows): [![Build status](https://ci.appveyor.com/api/projects/status/lx8t6mql7vywcgfm/branch/master?svg=true)](https://ci.appveyor.com/project/d1vanov/qevercloudgenerator/branch/master)
+![master](https://github.com/d1vanov/QEverCloudGenerator/workflows/Build/badge.svg?branch=master)
 
 ## What's this
 

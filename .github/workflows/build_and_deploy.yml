@@ -295,7 +295,7 @@ jobs:
         with:
           tag_name: continuous-development
           release_name: Continuous build (continuous-development)
-          draft: true
+          draft: false
           prerelease: true
 
       - name: Create new tagged release draft
@@ -307,7 +307,7 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Release build (${{ github.ref }})
-          draft: true
+          draft: false
           prerelease: false
 
       - name: Download linux artifact
@@ -469,34 +469,3 @@ jobs:
           mv $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.zip /tmp/QEverCloudGenerator_windows_x64.zip
           gh release upload --clobber ${TAG_NAME} /tmp/QEverCloudGenerator_windows_x64.zip -R d1vanov/QEverCloudGenerator
         if: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/development' }}
-
-      - name: Publish continuous master release
-        id: publish_continuous_master_release
-        if: ${{ github.ref == 'refs/heads/master' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-master | jq '.id')
-          gh api --silent -X PATCH -F tag_name="continuous-master" -F name="Continuous build (continuous-master)" -F draft='false' -F prerelease='true' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
-        shell: bash
-
-      - name: Publish continuous development release
-        id: publish_continuous_development_release
-        if: ${{ github.ref == 'refs/heads/development' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-development | jq '.id')
-          gh api --silent -X PATCH -F tag_name="continuous-development" -F name="Continuous build (continuous-development)" -F draft='false' -F prerelease='true' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
-        shell: bash
-
-      - name: Publish tagged release
-        id: publish_tagged_release
-        if: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/development' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          export TAG_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
-          export RELEASE_ID=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/${TAG_NAME} | jq '.id')
-          gh api --silent -X PATCH -F tag_name="${TAG_NAME}" -F name="Release build (${TAG_NAME})" -F draft='false' -F prerelease='false' /repos/d1vanov/QEverCloudGenerator/releases/${RELEASE_ID}
-        shell: bash

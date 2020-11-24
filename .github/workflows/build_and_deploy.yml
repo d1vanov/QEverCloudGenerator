@@ -232,7 +232,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x86
-          path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator'
+          path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator.exe'
         if: ${{ matrix.target_arch == 'x86' }}
 
       - name: Upload x64 QEverCloudGenerator
@@ -240,7 +240,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x64
-          path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator'
+          path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator.exe'
         if: ${{ matrix.target_arch == 'x64' }}  
 
   create_new_release:
@@ -320,14 +320,14 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x86
-          path: '${{ github.workspace }}/artifacts/windows/x86/QEverCloudGenerator'
+          path: '${{ github.workspace }}/artifacts/windows/x86/QEverCloudGenerator.exe'
 
       - name: Download Windows x64 artifact
         id: download_windows_x64_artifact
         uses: actions/download-artifact@v2
         with:
           name: QEverCloudGenerator_windows_x64
-          path: '${{ github.workspace }}/artifacts/windows/x64/QEverCloudGenerator'
+          path: '${{ github.workspace }}/artifacts/windows/x64/QEverCloudGenerator.exe'
 
       - name: Compress Linux artifact
         id: compress_linux_artifact
@@ -342,12 +342,12 @@ jobs:
       - name: Compress Windows x86 artifact
         id: compress_windows_x86_artifact
         run: |
-          7z a $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator
+          7z a $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/windows/x86/QEverCloudGenerator.exe
 
       - name: Compress Windows x64 artifact
         id: compress_windows_x64_artifact
         run: |
-          7z a $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator
+          7z a $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.zip $GITHUB_WORKSPACE/artifacts/windows/x64/QEverCloudGenerator.exe
 
       - name: Upload Linux artifact to continuous release
         id: upload_linux_artifact_to_continuous_release

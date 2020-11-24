@@ -66,6 +66,7 @@ jobs:
           source <(echo "set -x"; cat /opt/qt512/bin/qt512-env.sh; echo "set +x")
           export CMAKE_PREFIX_PATH=/opt/qt512
         if: ${{ matrix.qt_version == '5.12.3' }}
+        shell: bash
 
       - name: Configure for gcc
         id: configure_for_gcc
@@ -218,7 +219,7 @@ jobs:
           cd %GITHUB_WORKSPACE%
           md build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="%GITHUB_WORKSPACE%\build\installdir" -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
+          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="%GITHUB_WORKSPACE%\build\installdir" -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
           cmake --build . --target all
           cmake --build . --target install
         shell: cmd

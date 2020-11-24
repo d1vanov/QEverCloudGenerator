@@ -279,8 +279,8 @@ jobs:
           fi
         shell: bash
 
-      - name: Create new continuous master release draft
-        id: create_new_continuous_master_release_draft
+      - name: Create new continuous master release
+        id: create_new_continuous_master_release
         if: ${{ github.ref == 'refs/heads/master' }}
         uses: actions/create-release@v1
         env:
@@ -291,8 +291,8 @@ jobs:
           draft: false
           prerelease: true
 
-      - name: Create new continuous development release draft
-        id: create_new_continuous_development_release_draft
+      - name: Create new continuous development release
+        id: create_new_continuous_development_release
         if: ${{ github.ref == 'refs/heads/development' }}
         uses: actions/create-release@v1
         env:
@@ -303,8 +303,8 @@ jobs:
           draft: false
           prerelease: true
 
-      - name: Create new tagged release draft
-        id: create_new_tagged_release_draft
+      - name: Create new tagged release
+        id: create_new_tagged_release
         if: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/development' }}
         uses: actions/create-release@v1
         env:

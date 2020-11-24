@@ -63,26 +63,40 @@ jobs:
           sudo apt-add-repository -y ppa:beineri/opt-qt-5.12.3-xenial
           sudo apt-get -qq update
           sudo apt-get -qq install qt512tools qt512base mesa-common-dev libgl1-mesa-dev
-          source <(echo "set -x"; cat /opt/qt512/bin/qt512-env.sh; echo "set +x")
-          export CMAKE_PREFIX_PATH=/opt/qt512
         if: ${{ matrix.qt_version == '5.12.3' }}
         shell: bash
 
-      - name: Configure for gcc
-        id: configure_for_gcc
+      - name: Configure for gcc and Qt 5.5.1
+        id: configure_for_gcc_and_qt_old
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
-        if: ${{ matrix.compiler_cpp == 'g++' }}
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ ..
+        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.5.1' }}
+      
+      - name: Configure for gcc and Qt 5.12.3
+        id: configure_for_gcc_and_qt_modern
+        run: |
+          mkdir $GITHUB_WORKSPACE/build
+          cd $GITHUB_WORKSPACE/build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_PREFIX_PATH=/opt/qt512 ..
+        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.12.3' }}
 
-      - name: Configure for clang
-        id: configure_for_clang
+      - name: Configure for clang and Qt 5.5.1
+        id: configure_for_clang_and_qt_old
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH ..
-        if: ${{ matrix.compiler_cpp == 'clang++' }}
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ ..
+        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.5.1' }}
+
+      - name: Configure for clang and Qt 5.12.3
+        id: configure_for_clang_and_qt_modern
+        run: |
+          mkdir $GITHUB_WORKSPACE/build
+          cd $GITHUB_WORKSPACE/build
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=/opt/qt512 ..
+        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.12.3' }}
 
       - name: Build and install
         id: build_and_install
@@ -185,43 +199,32 @@ jobs:
           dir: '${{ runner.workspace }}/Qt_x64'
         if: ${{ matrix.target_arch == 'x64' }}
 
-      - name: Export Qt 5.12.9 x86 to CMake
-        id: export_qt_x86_to_cmake
+      - name: Build and install x86
+        id: build_and_install_x86
         run: |
           set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x86\Qt\5.12.9\win32_msvc2017"
-        if: ${{ matrix.target_arch == 'x86' }}
-        shell: cmd
-
-      - name: Export Qt 5.12.9 x64 to CMake
-        id: export_qt_x64_to_cmake
-        run: |
-          set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x64\Qt\5.12.9\win64_msvc2017_x64"
-        if: ${{ matrix.target_arch == 'x64' }}
-        shell: cmd
-
-      - name: Setup Visual Studio for x86 target build
-        id: setup_visual_studio_x86
-        run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
-        if: ${{ matrix.target_arch == 'x86' }}
-        shell: cmd
-
-      - name: Setup Visual Studio for x64 target build
-        id: setup_visual_studio_x64
-        run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-        if: ${{ matrix.target_arch  == 'x64' }}
-        shell: cmd
-
-      - name: Build and install
-        id: build_and_install
-        run: |
           cd %GITHUB_WORKSPACE%
           md build
           cd build
           cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="%GITHUB_WORKSPACE%\build\installdir" -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
           cmake --build . --target all
           cmake --build . --target install
+        if: ${{ matrix.target_arch == 'x86' }}
+        shell: cmd
+
+      - name: Build and install x64
+        id: build_and_install_x64
+        run: |
+          set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x64\Qt\5.12.9\win64_msvc2017_x64"
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd %GITHUB_WORKSPACE%
+          md build
+          cd build
+          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="%GITHUB_WORKSPACE%\build\installdir" -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
+          cmake --build . --target all
+          cmake --build . --target install
+        if: ${{ matrix.target_arch == 'x64' }}
         shell: cmd
 
       - name: Upload x86 QEverCloudGenerator

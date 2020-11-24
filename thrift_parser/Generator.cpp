@@ -33,6 +33,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <stdexcept>
 
 using namespace qevercloud;
 

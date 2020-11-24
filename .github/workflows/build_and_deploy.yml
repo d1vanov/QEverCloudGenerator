@@ -144,7 +144,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: QEverCloudGenerator_macos
-          path: $GITHUB_WORKSPACE/build/installdir/bin/QEverCloudGenerator
+          path: ${{ github.workspace }}/build/installdir/bin/QEverCloudGenerator
 
   build_windows:
     runs-on: windows-2019

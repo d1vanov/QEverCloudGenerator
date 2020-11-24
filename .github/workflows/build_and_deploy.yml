@@ -265,8 +265,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           export BRANCH_NAME=$(echo $GITHUB_REF | sed 's/.*\/\(.*\)$/\1/')
-          export COMMIT_SHA=$(gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} | jq '.target_commitish') && exit_status=$? || exit_status=$?
-          if [ "${exit_status}" = 0 ] && ! [ "${COMMIT_SHA}" = "${GITHUB_SHA}" ]; then gh release delete continuous-${BRANCH_NAME} -y -R d1vanov/QEverCloudGenerator; fi
+          gh api /repos/d1vanov/QEverCloudGenerator/releases/tags/continuous-${BRANCH_NAME} > /tmp/gh_get_release.json && exit_status=$? || exit_status=$?
+          if [ "${exit_status}" = 0 ]; then
+            export COMMIT_SHA=$(cat /tmp/gh_get_release.json | jq '.target_commitish');
+            if ! [ "${COMMIT_SHA}" = "${GITHUB_SHA}" ]; then
+              gh release delete continuous-${BRANCH_NAME} -y -R d1vanov/QEverCloudGenerator;
+            fi
+          fi
         shell: bash
 
       - name: Create new continuous master release draft

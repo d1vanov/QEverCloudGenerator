@@ -2,6 +2,9 @@ name: Build
 
 on:
   push:
+    paths-ignore:
+      - 'README.md'
+      - 'LICENSE'
     branches:
       - master
       - development

@@ -2697,7 +2697,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         << QStringLiteral("<QMap>") << QStringLiteral("<QSet>")
         << QStringLiteral("<QStringList>") << QStringLiteral("<QByteArray>")
         << QStringLiteral("<QDateTime>") << QStringLiteral("<QMetaType>")
-        << QStringLiteral("<QVariant>");
+        << QStringLiteral("<QVariant>") << QStringLiteral("<optional>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx, fileName, additionalIncludes);
@@ -2805,36 +2805,43 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             ctx.m_out << "/** NO DOC COMMENT ID FOUND */" << ln;
         }
 
+        const QString indent = QStringLiteral("    ");
+
         if (exceptions.contains(s.m_name))
         {
             ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
                 << ": public EvernoteException, public Printable"
                 << ln << "{" << ln
-                << "    Q_GADGET" << ln
+                << indent << "Q_GADGET" << ln
                 << "public:" << ln;
 
             for(const auto & f : s.m_fields) {
-                ctx.m_out << "    " << fieldDeclarationToStr(f) << ";" << ln;
+                generateClassAccessoryMethodsForFields(
+                    f, ctx,  QStringLiteral("    "));
+
+                ctx.m_out << ln;
             }
 
-            ctx.m_out << ln;
-            ctx.m_out << "    " << s.m_name
+            ctx.m_out << indent << s.m_name
                 << "();" << ln;
-            ctx.m_out << "    virtual ~" << s.m_name
+            ctx.m_out << indent << "~" << s.m_name
                 << "() noexcept override;" << ln;
 
             if (!s.m_fields.isEmpty()) {
                 ctx.m_out << ln;
-                ctx.m_out << "    " << s.m_name
-                    << "(const " << s.m_name
-                    << " & other);" << ln;
+                ctx.m_out << indent << s.m_name
+                    << "(const " << s.m_name << " & other);" << ln;
             }
 
-            ctx.m_out << "    const char * what() const noexcept override;"
-                << ln;
-            ctx.m_out << "    virtual EverCloudExceptionDataPtr "
-                << "exceptionData() const override;" << ln << ln;
-            ctx.m_out << "    virtual void print(QTextStream & strm) const override;"
+            ctx.m_out << indent
+                << "const char * what() const noexcept override;" << ln;
+
+            ctx.m_out << indent
+                << "EverCloudExceptionDataPtr exceptionData() const override;"
+                << ln << ln;
+
+            ctx.m_out << indent
+                << "void print(QTextStream & strm) const override;"
                 << ln;
         }
         else
@@ -2843,14 +2850,10 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 << s.m_name << ": public Printable" << ln
                 << "{" << ln
                 << "private:" << ln
-                << "    Q_GADGET" << ln
+                << indent << "Q_GADGET" << ln
                 << "public:" << ln;
 
-            ctx.m_out << "    /**" << ln
-                << "     * See the declaration of EverCloudLocalData for details"
-                << ln
-                << "     */" << ln
-                << "    EverCloudLocalData localData;" << ln << ln;
+            generateClassLocalDataAccessoryMethods(s.m_name, ctx, indent);
 
             for(const auto & f: qAsConst(s.m_fields))
             {
@@ -2858,41 +2861,43 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 {
                     auto lines =
                         s.m_fieldComments[f.m_name].split(QStringLiteral("\n"));
+
                     for(const auto & line: qAsConst(lines)) {
-                        ctx.m_out << "    " << line << ln;
+                        ctx.m_out << indent << line << ln;
                     }
                 }
                 else
                 {
-                    ctx.m_out << "    /** NOT DOCUMENTED */" << ln;
+                    ctx.m_out << indent << "/** NOT DOCUMENTED */" << ln;
                 }
 
-                ctx.m_out << "    " << fieldDeclarationToStr(f) << ";" << ln;
+                generateClassAccessoryMethodsForFields(f, ctx, indent);
+                ctx.m_out << ln;
             }
 
-            ctx.m_out << ln;
-            ctx.m_out << "    virtual void print(QTextStream & strm) const override;"
-                << ln;
+            ctx.m_out << indent
+                << "void print(QTextStream & strm) const override;" << ln;
         }
 
         ctx.m_out << ln;
-        ctx.m_out << QString::fromUtf8(
-            "    bool operator==(const %1 & other) const").arg(s.m_name) << ln;
-        ctx.m_out << "    {" << ln;
+        ctx.m_out << indent << QString::fromUtf8(
+            "bool operator==(const %1 & other) const").arg(s.m_name) << ln;
+        ctx.m_out << indent << "{" << ln;
 
         bool first = true;
         for(const auto & f : s.m_fields)
         {
             if (first) {
                 first = false;
-                ctx.m_out << "        return ";
+                ctx.m_out << indent << indent << "return ";
             }
             else {
-                ctx.m_out << "            && ";
+                ctx.m_out << indent << indent << indent << "&& ";
             }
 
             if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                ctx.m_out << QString::fromUtf8("%1.isEqual(other.%1)").arg(f.m_name)
+                ctx.m_out
+                    << QString::fromUtf8("%1.isEqual(other.%1)").arg(f.m_name)
                     << ln;
             }
             else {
@@ -2901,13 +2906,13 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             }
         }
 
-        ctx.m_out << "        ;" << ln << "    }" << ln << ln;
-        ctx.m_out << QString::fromUtf8(
-            "    bool operator!=(const %1 & other) const").arg(s.m_name)
-            << ln;
-        ctx.m_out << "    {" << ln;
-        ctx.m_out << "        return !(*this == other);" << ln;
-        ctx.m_out << "    }" << ln;
+        ctx.m_out << indent << indent << ";" << ln << indent << "}" << ln << ln;
+        ctx.m_out << indent << QString::fromUtf8(
+            "bool operator!=(const %1 & other) const").arg(s.m_name) << ln;
+
+        ctx.m_out << indent << "{" << ln;
+        ctx.m_out << indent << indent << "return !(*this == other);" << ln;
+        ctx.m_out << indent << "}" << ln;
 
         ctx.m_out << ln;
 
@@ -2920,8 +2925,8 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 MethodType::TypeName);
 
             if (fieldTypeName.contains(QStringLiteral(","))) {
-                // In earlier versions of Qt Q_PROPERTY macro can't handle type names
-                // containing comma
+                // In earlier versions of Qt Q_PROPERTY macro can't handle type
+                // names containing comma
                 auto typeDef = capitalize(f.m_name);
                 typeDefs[fieldTypeName] = typeDef;
             }
@@ -2930,7 +2935,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         for(auto it = typeDefs.constBegin(), end = typeDefs.constEnd();
             it != end; ++it)
         {
-            ctx.m_out << "    using " << it.value() << " = "
+            ctx.m_out << indent << "using " << it.value() << " = "
                 << it.key() << ";" << ln;
         }
 
@@ -2939,8 +2944,21 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         }
 
         if (!exceptions.contains(s.m_name)) {
-            ctx.m_out << "    Q_PROPERTY(EverCloudLocalData localData MEMBER "
-                << "localData)" << ln;
+            ctx.m_out << indent
+                << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)"
+                << ln << indent
+                << "Q_PROPERTY(QString parentLocalId READ parentLocalId "
+                << "WRITE setParentLocalId)"
+                << ln << indent
+                << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
+                << "WRITE setLocallyModified)"
+                << ln << indent
+                << "Q_PROPERTY(bool localOnly READ isLocalOnly "
+                << "WRITE setLocalOnly)"
+                << ln << indent
+                << "Q_PROPERTY(bool favorited READ isFavorited "
+                << "WRITE setFavorited)"
+                << ln;
         }
 
         for(const auto & f: s.m_fields)
@@ -2956,12 +2974,13 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             }
 
             if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                fieldTypeName = QStringLiteral("Optional<") +
+                fieldTypeName = QStringLiteral("std::optional<") +
                     fieldTypeName + QStringLiteral(">");
             }
 
-            ctx.m_out << "    Q_PROPERTY(" << fieldTypeName
-                << " " << f.m_name << " MEMBER " << f.m_name << ")" << ln;
+            ctx.m_out << indent << "Q_PROPERTY(" << fieldTypeName
+                << " " << f.m_name << " READ " << f.m_name
+                << "WRITE set" << capitalize(f.m_name) << ")" << ln;
         }
 
         ctx.m_out << "};" << ln << ln;
@@ -4089,6 +4108,135 @@ void Generator::generateLocalDataClassDefinition(
         << "{" << ln
         << "    return !operator==(other);" << ln
         << "}" << ln;
+}
+
+void Generator::generateClassLocalDataAccessoryMethods(
+    const QString & className, OutputFileContext & ctx, QString indent)
+{
+    ctx.m_out << indent << "/**" << ln
+        << indent
+        << " * @brief localId can be used as a local unique identifier" << ln
+        << indent
+        << " * for any data item before it has been synchronized with" << ln
+        << indent
+        << " * Evernote and thus before it can be identified using its guid."
+        << ln
+        << indent << " *" << ln
+        << indent << " * localId is generated automatically on" << ln
+        << indent << " * construction for convenience but can be overridden "
+        << "manually" << ln
+        << indent << " */" << ln;
+
+    ctx.m_out << indent << "QString localId() const;" << ln
+        << indent << "void setLocalId(QString id);" << ln << ln;
+
+    ctx.m_out << indent << "/**" << ln
+        << indent
+        << " * @brief localParentId can be used as a local unique identifier"
+        << ln << indent
+        << " * of the data item being a parent to this data item." << ln
+        << indent << " *" << ln
+        << indent << " * For example, a note is a parent to a resource, a "
+        << "notebook" << ln << indent
+        << " * is a parent to a note. So note's localId is a parentLocalId "
+        << "for a" << ln << indent
+        << " * resource, notebook's localId is a parentLocalId for a note,"
+        << ln << indent << " * tag's localId is a parentLocalId to a child tag."
+        << ln
+        << indent << " *" << ln
+        << indent << " * By default the parentLocalId property is empty" << ln
+        << indent << " */" << ln;
+
+    ctx.m_out << indent << "QString parentLocalId() const;" << ln
+        << indent << "void setParentLocalId(QString id);" << ln << ln;
+
+    ctx.m_out << indent << "/**" << ln
+        << indent
+        << " * @brief locallyModified flag can be used to keep track which"
+        << ln
+        << indent
+        << " * objects have been modified locally and thus need to be "
+        << "synchronized" << ln
+        << indent << " * with Evernote service" << ln
+        << indent << " */" << ln;
+
+    ctx.m_out << indent << "bool isLocallyModified() const;" << ln
+        << indent << "void setLocallyModified(bool modified = true);"
+        << ln << ln;
+
+    ctx.m_out << indent << "/**" << ln
+        << indent << " * @brief localOnly flag can be used to keep track which"
+        << ln
+        << indent << " * data items are meant to be local only and thus never "
+        << "be synchronized" << ln
+        << indent << " * with Evernote service" << ln
+        << indent << " */" << ln;
+
+    ctx.m_out << indent << "bool isLocalOnly() const;" << ln
+        << indent << "void setLocalOnly(bool localOnly = true);" << ln << ln;
+
+    ctx.m_out << indent << "/**" << ln
+        << indent
+        << " * @brief favorited property can be used to keep track which" << ln
+        << indent
+        << " * data items were favorited in the client. Unfortunately," << ln
+        << indent
+        << " * Evernote has never provided a way to synchronize such" << ln
+        << indent << " * a property between different clients" << ln
+        << indent << " */" << ln;
+
+    ctx.m_out << indent << "bool isFavorited() const;" << ln
+        << indent << "void setFavorited(bool favorited = true);" << ln << ln;
+}
+
+void Generator::generateClassAccessoryMethodsForFields(
+    const Parser::Field & field, OutputFileContext & ctx, QString indent)
+{
+    QString fieldTypeName = typeToStr(field.m_type, field.m_name);
+    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+        fieldTypeName = QStringLiteral("std::optional<") + fieldTypeName +
+            QStringLiteral(">");
+    }
+
+    bool isPrimitiveType = false;
+    if (field.m_required != Parser::Field::RequiredFlag::Optional)
+    {
+        const auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(
+            field.m_type);
+
+        if (baseType) {
+            isPrimitiveType = true;
+        }
+        else if (m_allEnums.contains(fieldTypeName)) {
+            isPrimitiveType = true;
+        }
+        else if (m_typedefMap.contains(fieldTypeName)) {
+            // currently only primitive types are typedefed
+            isPrimitiveType = true;
+        }
+    }
+
+    // Const getter
+    ctx.m_out << indent;
+
+    if (isPrimitiveType) {
+        ctx.m_out << fieldTypeName << " ";
+    }
+    else {
+        ctx.m_out << "const " << fieldTypeName << " & ";
+    }
+
+    ctx.m_out << field.m_name << "() const;" << ln;
+
+    // For non-primitive types will also provide a non-const getter
+    if (!isPrimitiveType) {
+        ctx.m_out << indent << fieldTypeName << " & " << field.m_name
+            << "();" << ln;
+    }
+
+    // Setter
+    ctx.m_out << indent << "void set" << capitalize(field.m_name) << "("
+        << fieldTypeName << " " << field.m_name << ");" << ln;
 }
 
 void Generator::generateServiceClassDeclaration(

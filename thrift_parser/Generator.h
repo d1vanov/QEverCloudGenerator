@@ -93,6 +93,14 @@ private:
     void generateLocalDataClassDefinition(
         OutputFileContext & ctx);
 
+    void generateClassLocalDataAccessoryMethods(
+        const QString & className, OutputFileContext & ctx,
+        QString indent = QString());
+
+    void generateClassAccessoryMethodsForFields(
+        const Parser::Field & field, OutputFileContext & ctx,
+        QString indent = QString());
+
     enum class ServiceClassType
     {
         NonDurable,

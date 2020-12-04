@@ -138,10 +138,31 @@ QString Generator::clearInclude(const QString & s) const
     return s;
 }
 
-QString Generator::clearTypedef(const QString & s) const
+std::optional<Parser::PrimitiveType::Type> Generator::aliasedPrimitiveType(
+    const QString & primitiveTypeAlias) const
 {
-    if (m_typedefMap.contains(s)) {
-        return m_typedefMap.value(s);
+    const auto it = m_primitiveTypeAliases.find(primitiveTypeAlias);
+    if (it != m_primitiveTypeAliases.end()) {
+        return std::make_optional(it.value());
+    }
+
+    return std::nullopt;
+}
+
+QString Generator::aliasedTypeName(const QString & s) const
+{
+    if (const auto it = m_primitiveTypeAliases.find(s);
+        it != m_primitiveTypeAliases.end())
+    {
+        return Parser::PrimitiveType::nativeTypeName(it.value());
+    }
+
+    if (m_stringTypeAliases.contains(s)) {
+        return QStringLiteral("QString");
+    }
+
+    if (m_byteArrayTypeAliases.contains(s)) {
+        return QStringLiteral("QByteArray");
     }
 
     return s;
@@ -226,15 +247,18 @@ void Generator::generateGetRandomValueExpression(
     QTextStream & out,
     const QString & end)
 {
-    auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(field.m_type);
-    if (baseType)
+    if (dynamic_cast<Parser::PrimitiveType*>(field.m_type.get()) ||
+        dynamic_cast<Parser::StringType*>(field.m_type.get()) ||
+        dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()))
     {
         out << prefix;
         if (!field.m_name.isEmpty()) {
             out << field.m_name << " = ";
         }
 
-        out << getGenerateRandomValueFunction(baseType->m_baseType) << end;
+        out << getGenerateRandomValueFunction(
+            typeToStr(field.m_type, {}, MethodType::TypeName)) << end;
+
         return;
     }
 
@@ -248,7 +272,7 @@ void Generator::generateGetRandomValueExpression(
         }
 
         auto actualType = clearInclude(identifierType->m_identifier);
-        actualType = clearTypedef(actualType);
+        actualType = aliasedTypeName(actualType);
 
         const auto & exceptions = parser.exceptions();
         auto exceptionIt = std::find_if(
@@ -296,20 +320,17 @@ void Generator::generateGetRandomValueExpression(
     auto listType = std::dynamic_pointer_cast<Parser::ListType>(field.m_type);
     if (listType)
     {
-        verifyTypeIsBaseOrIdentifier(listType->m_valueType);
-
-        auto valueType = typeToStr(
-            listType->m_valueType,
-            {},
-            MethodType::TypeName);
+        verifyTypeIsValueOrIdentifier(listType->m_valueType);
 
         if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            const auto valueType = typeToStr(
+                listType->m_valueType,
+                {},
+                MethodType::TypeName);
+
             out << prefix << field.m_name << " = QList<"
                 << valueType << ">();" << ln;
         }
-
-        valueType = clearInclude(valueType);
-        valueType = clearTypedef(valueType);
 
         for(size_t i = 0; i < 3; ++i)
         {
@@ -334,20 +355,17 @@ void Generator::generateGetRandomValueExpression(
     auto setType = std::dynamic_pointer_cast<Parser::SetType>(field.m_type);
     if (setType)
     {
-        verifyTypeIsBaseOrIdentifier(setType->m_valueType);
-
-        auto valueType = typeToStr(
-            setType->m_valueType,
-            {},
-            MethodType::TypeName);
+        verifyTypeIsValueOrIdentifier(setType->m_valueType);
 
         if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            const auto valueType = typeToStr(
+                setType->m_valueType,
+                {},
+                MethodType::TypeName);
+
             out << prefix << field.m_name << " = QSet<"
                 << valueType << ">();" << ln;
         }
-
-        valueType = clearInclude(valueType);
-        valueType = clearTypedef(valueType);
 
         for(size_t i = 0; i < 3; ++i)
         {
@@ -381,29 +399,23 @@ void Generator::generateGetRandomValueExpression(
     auto mapType = std::dynamic_pointer_cast<Parser::MapType>(field.m_type);
     if (mapType)
     {
-        verifyTypeIsBaseOrIdentifier(mapType->m_keyType);
-        verifyTypeIsBaseOrIdentifier(mapType->m_valueType);
-
-        auto keyType = typeToStr(
-            mapType->m_keyType,
-            {},
-            MethodType::TypeName);
-
-        auto valueType = typeToStr(
-            mapType->m_valueType,
-            {},
-            MethodType::TypeName);
+        verifyTypeIsValueOrIdentifier(mapType->m_keyType);
+        verifyTypeIsValueOrIdentifier(mapType->m_valueType);
 
         if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            const auto keyType = typeToStr(
+                mapType->m_keyType,
+                {},
+                MethodType::TypeName);
+
+            const auto valueType = typeToStr(
+                mapType->m_valueType,
+                {},
+                MethodType::TypeName);
+
             out << prefix << field.m_name << " = QMap<"
                 << keyType << ", " << valueType << ">();" << ln;
         }
-
-        keyType = clearInclude(keyType);
-        keyType = clearTypedef(keyType);
-
-        valueType = clearInclude(valueType);
-        valueType = clearTypedef(valueType);
 
         for(size_t i = 0; i < 3; ++i)
         {
@@ -438,11 +450,13 @@ void Generator::generateGetRandomValueExpression(
         typeToStr(field.m_type, {}, MethodType::TypeName).toStdString());
 }
 
-void Generator::verifyTypeIsBaseOrIdentifier(
+void Generator::verifyTypeIsValueOrIdentifier(
     const std::shared_ptr<Parser::Type> & type) const
 {
-    if (std::dynamic_pointer_cast<Parser::BaseType>(type) != nullptr &&
-        std::dynamic_pointer_cast<Parser::IdentifierType>(type) != nullptr)
+    if (!dynamic_cast<Parser::PrimitiveType*>(type.get()) &&
+        !dynamic_cast<Parser::StringType*>(type.get()) &&
+        !dynamic_cast<Parser::ByteArrayType*>(type.get()) &&
+        !dynamic_cast<Parser::IdentifierType*>(type.get()))
     {
         auto typeName = typeToStr(type, {}, MethodType::TypeName);
         throw std::runtime_error(
@@ -487,8 +501,7 @@ QString Generator::getGenerateRandomValueFunction(const QString & typeName) cons
     {
         return QStringLiteral("generateRandomBool()");
     }
-    else if ( (typeName == QStringLiteral("QString")) ||
-              (typeName == QStringLiteral("string")) )
+    else if (typeName == QStringLiteral("QString"))
     {
         return QStringLiteral("generateRandomString()");
     }
@@ -496,29 +509,23 @@ QString Generator::getGenerateRandomValueFunction(const QString & typeName) cons
     {
         return QStringLiteral("generateRandomDouble()");
     }
-    else if ( (typeName == QStringLiteral("QByteArray")) ||
-              (typeName == QStringLiteral("binary")) )
+    else if (typeName == QStringLiteral("QByteArray"))
     {
         return QStringLiteral("generateRandomString().toUtf8()");
     }
-    else if ( (typeName == QStringLiteral("quint8")) ||
-              (typeName == QStringLiteral("byte")) ||
-              (typeName == QStringLiteral("char")) )
+    else if (typeName == QStringLiteral("char"))
     {
         return QStringLiteral("generateRandomUint8()");
     }
-    else if ( (typeName == QStringLiteral("qint16")) ||
-              (typeName == QStringLiteral("i16")) )
+    else if (typeName == QStringLiteral("qint16"))
     {
         return QStringLiteral("generateRandomInt16()");
     }
-    else if ( (typeName == QStringLiteral("qint32")) ||
-              (typeName == QStringLiteral("i32")) )
+    else if (typeName == QStringLiteral("qint32"))
     {
         return QStringLiteral("generateRandomInt32()");
     }
-    else if ( (typeName == QStringLiteral("qint64")) ||
-              (typeName == QStringLiteral("i64")) )
+    else if (typeName == QStringLiteral("qint64"))
     {
         return QStringLiteral("generateRandomInt64()");
     }
@@ -964,23 +971,24 @@ void Generator::generateTestServerPrepareRequestParams(
             continue;
         }
 
-        auto paramTypeName = typeToStr(
+        const auto paramTypeName = typeToStr(
             param.m_type,
             {},
             MethodType::TypeName);
 
-        auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(param.m_type);
-        auto identifierType = std::dynamic_pointer_cast<Parser::IdentifierType>(
-            param.m_type);
-
         QString actualParamTypeName;
 
-        if (baseType) {
-            actualParamTypeName = baseType->m_baseType;
+        if (dynamic_cast<Parser::PrimitiveType*>(param.m_type.get()) ||
+            dynamic_cast<Parser::StringType*>(param.m_type.get()) ||
+            dynamic_cast<Parser::ByteArrayType*>(param.m_type.get()))
+        {
+            actualParamTypeName = paramTypeName;
         }
-        else if (identifierType) {
+        else if (const auto * identifierType =
+                 dynamic_cast<Parser::IdentifierType*>(param.m_type.get()))
+        {
             actualParamTypeName = clearInclude(identifierType->m_identifier);
-            actualParamTypeName = clearTypedef(actualParamTypeName);
+            actualParamTypeName = aliasedTypeName(actualParamTypeName);
         }
         else {
             throw std::runtime_error("Unsupported parameter type: " +
@@ -990,7 +998,7 @@ void Generator::generateTestServerPrepareRequestParams(
         ctx.m_out << "    " << paramTypeName << " " << param.m_name
             << " = ";
 
-        auto enumIt = std::find_if(
+        const auto enumIt = std::find_if(
             enumerations.begin(),
             enumerations.end(),
             [&] (const Parser::Enumeration & e)
@@ -1049,7 +1057,7 @@ void Generator::generateTestServerPrepareRequestResponse(
             MethodType::TypeName);
 
         auto actualValueType = clearInclude(valueType);
-        actualValueType = clearTypedef(actualValueType);
+        actualValueType = aliasedTypeName(actualValueType);
 
         ctx.m_out << ";" << ln;
         for(size_t i = 0; i < 3; ++i) {
@@ -1071,7 +1079,7 @@ void Generator::generateTestServerPrepareRequestResponse(
             MethodType::TypeName);
 
         auto actualValueType = clearInclude(valueType);
-        actualValueType = clearTypedef(actualValueType);
+        actualValueType = aliasedTypeName(actualValueType);
 
         ctx.m_out << ";" << ln;
         for(size_t i = 0; i < 3; ++i) {
@@ -1097,10 +1105,10 @@ void Generator::generateTestServerPrepareRequestResponse(
             MethodType::TypeName);
 
         auto actualKeyType = clearInclude(keyType);
-        actualKeyType = clearTypedef(actualKeyType);
+        actualKeyType = aliasedTypeName(actualKeyType);
 
         auto actualValueType = clearInclude(valueType);
-        actualValueType = clearTypedef(actualValueType);
+        actualValueType = aliasedTypeName(actualValueType);
 
         ctx.m_out << ";" << ln;
         for(size_t i = 0; i < 3; ++i) {
@@ -1116,7 +1124,7 @@ void Generator::generateTestServerPrepareRequestResponse(
     else if (!responseTypeIsVoid)
     {
         QString actualResponseTypeName = clearInclude(responseTypeName);
-        actualResponseTypeName = clearTypedef(actualResponseTypeName);
+        actualResponseTypeName = aliasedTypeName(actualResponseTypeName);
 
         auto enumIt = std::find_if(
             enumerations.begin(),
@@ -1219,9 +1227,8 @@ void Generator::generateTestServerHelperLambda(
             {},
             MethodType::TypeName);
 
-        auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(param.m_type);
-        if (!baseType ||
-            baseType->m_baseType == QStringLiteral("string"))
+        if (!dynamic_cast<Parser::PrimitiveType*>(param.m_type.get()) &&
+            !dynamic_cast<Parser::ByteArrayType*>(param.m_type.get()))
         {
             paramTypeName.prepend(QStringLiteral("const "));
             paramTypeName.append(QStringLiteral(" &"));
@@ -1603,12 +1610,23 @@ QString Generator::typeToStr(
     std::shared_ptr<Parser::Type> type, const QString & identifier,
     const MethodType methodType) const
 {
-    auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(type);
-    auto voidType = std::dynamic_pointer_cast<Parser::VoidType>(type);
-    auto identifierType = std::dynamic_pointer_cast<Parser::IdentifierType>(type);
-    auto mapType = std::dynamic_pointer_cast<Parser::MapType>(type);
-    auto setType = std::dynamic_pointer_cast<Parser::SetType>(type);
-    auto listType = std::dynamic_pointer_cast<Parser::ListType>(type);
+    const auto primitiveType =
+        std::dynamic_pointer_cast<Parser::PrimitiveType>(type);
+
+    const auto stringType =
+        std::dynamic_pointer_cast<Parser::StringType>(type);
+
+    const auto byteArrayType =
+        std::dynamic_pointer_cast<Parser::ByteArrayType>(type);
+
+    const auto voidType = std::dynamic_pointer_cast<Parser::VoidType>(type);
+
+    const auto identifierType =
+        std::dynamic_pointer_cast<Parser::IdentifierType>(type);
+
+    const auto mapType = std::dynamic_pointer_cast<Parser::MapType>(type);
+    const auto setType = std::dynamic_pointer_cast<Parser::SetType>(type);
+    const auto listType = std::dynamic_pointer_cast<Parser::ListType>(type);
 
     QString result;
 
@@ -1617,198 +1635,211 @@ QString Generator::typeToStr(
         typeName = typeToStr(type, identifier, MethodType::TypeName);
     }
 
-    if (baseType)
+    if (primitiveType)
     {
-        if (baseType->m_baseType == QStringLiteral("bool"))
+        switch (primitiveType->m_type)
         {
-            switch(methodType)
+        case Parser::PrimitiveType::Type::Bool:
             {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("bool");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeBool(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readBool(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_BOOL");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default: result = QLatin1String("");
+                switch(methodType)
+                {
+                case MethodType::TypeName:
+                case MethodType::ReadTypeName:
+                    result = QStringLiteral("bool");
+                    break;
+                case MethodType::WriteMethod:
+                    result = QStringLiteral("writer.writeBool(");
+                    break;
+                case MethodType::ReadMethod:
+                    result = QStringLiteral("reader.readBool(");
+                    break;
+                case MethodType::ThriftFieldType:
+                    result = QStringLiteral("ThriftFieldType::T_BOOL");
+                    break;
+                case MethodType::FuncParamType:
+                    result = typeName;
+                    break;
+                default: result = QLatin1String("");
+                }
             }
+            break;
+        case Parser::PrimitiveType::Type::Double:
+            {
+                switch(methodType)
+                {
+                case MethodType::TypeName:
+                case MethodType::ReadTypeName:
+                    result = QStringLiteral("double");
+                    break;
+                case MethodType::WriteMethod:
+                    result = QStringLiteral("writer.writeDouble(");
+                    break;
+                case MethodType::ReadMethod:
+                    result = QStringLiteral("reader.readDouble(");
+                    break;
+                case MethodType::ThriftFieldType:
+                    result = QStringLiteral("ThriftFieldType::T_DOUBLE");
+                    break;
+                case MethodType::FuncParamType:
+                    result = typeName;
+                    break;
+                default:
+                    result = QLatin1String("");
+                }
+            }
+            break;
+        case Parser::PrimitiveType::Type::Byte:
+            {
+                switch(methodType)
+                {
+                case MethodType::TypeName:
+                case MethodType::ReadTypeName:
+                    result = QStringLiteral("quint8");
+                    break;
+                case MethodType::WriteMethod:
+                    result = QStringLiteral("writer.writeByte(");
+                    break;
+                case MethodType::ReadMethod:
+                    result = QStringLiteral("reader.readByte(");
+                    break;
+                case MethodType::ThriftFieldType:
+                    result = QStringLiteral("ThriftFieldType::T_BYTE");
+                    break;
+                case MethodType::FuncParamType:
+                    result = typeName;
+                    break;
+                default:
+                    result = QLatin1String("");
+                }
+            }
+            break;
+        case Parser::PrimitiveType::Type::Int16:
+            {
+                switch(methodType)
+                {
+                case MethodType::TypeName:
+                case MethodType::ReadTypeName:
+                    result = QStringLiteral("qint16");
+                    break;
+                case MethodType::WriteMethod:
+                    result = QStringLiteral("writer.writeI16(");
+                    break;
+                case MethodType::ReadMethod:
+                    result = QStringLiteral("reader.readI16(");
+                    break;
+                case MethodType::ThriftFieldType:
+                    result = QStringLiteral("ThriftFieldType::T_I16");
+                    break;
+                case MethodType::FuncParamType:
+                    result = typeName;
+                    break;
+                default:
+                    result = QLatin1String("");
+                }
+            }
+            break;
+        case Parser::PrimitiveType::Type::Int32:
+            {
+                switch(methodType)
+                {
+                case MethodType::TypeName:
+                case MethodType::ReadTypeName:
+                    result = QStringLiteral("qint32");
+                    break;
+                case MethodType::WriteMethod:
+                    result = QStringLiteral("writer.writeI32(");
+                    break;
+                case MethodType::ReadMethod:
+                    result = QStringLiteral("reader.readI32(");
+                    break;
+                case MethodType::ThriftFieldType:
+                    result = QStringLiteral("ThriftFieldType::T_I32");
+                    break;
+                case MethodType::FuncParamType:
+                    result = typeName;
+                    break;
+                default:
+                    result = QLatin1String("");
+                }
+            }
+            break;
+        case Parser::PrimitiveType::Type::Int64:
+            {
+                switch(methodType)
+                {
+                case MethodType::TypeName:
+                case MethodType::ReadTypeName:
+                    result = QStringLiteral("qint64");
+                    break;
+                case MethodType::WriteMethod:
+                    result = QStringLiteral("writer.writeI64(");
+                    break;
+                case MethodType::ReadMethod:
+                    result = QStringLiteral("reader.readI64(");
+                    break;
+                case MethodType::ThriftFieldType:
+                    result = QStringLiteral("ThriftFieldType::T_I64");
+                    break;
+                case MethodType::FuncParamType:
+                    result = typeName;
+                    break;
+                default:
+                    result = QLatin1String("");
+                }
+            }
+            break;
+        default:
+            throw std::runtime_error{
+                "Unexpected primitive type: " +
+                QString::number(static_cast<qint64>(primitiveType->m_type)).toStdString()};
         }
-        else if (baseType->m_baseType == QStringLiteral("string"))
+    }
+    else if (stringType)
+    {
+        switch(methodType)
         {
-            switch(methodType)
-            {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("QString");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeString(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readString(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_STRING");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default:
-                result = QLatin1String("");
-            }
+        case MethodType::TypeName:
+        case MethodType::ReadTypeName:
+            result = QStringLiteral("QString");
+            break;
+        case MethodType::WriteMethod:
+            result = QStringLiteral("writer.writeString(");
+            break;
+        case MethodType::ReadMethod:
+            result = QStringLiteral("reader.readString(");
+            break;
+        case MethodType::ThriftFieldType:
+            result = QStringLiteral("ThriftFieldType::T_STRING");
+            break;
+        case MethodType::FuncParamType:
+            result = typeName;
+            break;
+        default:
+            result = QLatin1String("");
         }
-        else if (baseType->m_baseType == QStringLiteral("double"))
+    }
+    else if (byteArrayType)
+    {
+        switch(methodType)
         {
-            switch(methodType)
-            {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("double");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeDouble(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readDouble(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_DOUBLE");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default:
-                result = QLatin1String("");
-            }
-        }
-        else if (baseType->m_baseType == QStringLiteral("binary"))
-        {
-            switch(methodType)
-            {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("QByteArray");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeBinary(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readBinary(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_STRING");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default:
-                result = QLatin1String("");
-            }
-        }
-        else if (baseType->m_baseType == QStringLiteral("byte"))
-        {
-            switch(methodType)
-            {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("quint8");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeByte(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readByte(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_BYTE");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default:
-                result = QLatin1String("");
-            }
-        }
-        else if (baseType->m_baseType == QStringLiteral("i16"))
-        {
-            switch(methodType)
-            {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("qint16");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeI16(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readI16(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_I16");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default:
-                result = QLatin1String("");
-            }
-        }
-        else if (baseType->m_baseType == QStringLiteral("i32"))
-        {
-            switch(methodType)
-            {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("qint32");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeI32(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readI32(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_I32");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default:
-                result = QLatin1String("");
-            }
-        }
-        else if (baseType->m_baseType == QStringLiteral("i64"))
-        {
-            switch(methodType)
-            {
-            case MethodType::TypeName:
-            case MethodType::ReadTypeName:
-                result = QStringLiteral("qint64");
-                break;
-            case MethodType::WriteMethod:
-                result = QStringLiteral("writer.writeI64(");
-                break;
-            case MethodType::ReadMethod:
-                result = QStringLiteral("reader.readI64(");
-                break;
-            case MethodType::ThriftFieldType:
-                result = QStringLiteral("ThriftFieldType::T_I64");
-                break;
-            case MethodType::FuncParamType:
-                result = typeName;
-                break;
-            default:
-                result = QLatin1String("");
-            }
+        case MethodType::TypeName:
+        case MethodType::ReadTypeName:
+            result = QStringLiteral("QByteArray");
+            break;
+        case MethodType::WriteMethod:
+            result = QStringLiteral("writer.writeBinary(");
+            break;
+        case MethodType::ReadMethod:
+            result = QStringLiteral("reader.readBinary(");
+            break;
+        case MethodType::ThriftFieldType:
+            result = QStringLiteral("ThriftFieldType::T_STRING");
+            break;
+        case MethodType::FuncParamType:
+            result = typeName;
+            break;
+        default:
+            result = QLatin1String("");
         }
     }
     else if (voidType)
@@ -1824,17 +1855,17 @@ QString Generator::typeToStr(
     }
     else if (identifierType)
     {
-        QString nameOfType = clearInclude(identifierType->m_identifier);
+        QString identifierTypeName = clearInclude(identifierType->m_identifier);
         if (methodType == MethodType::FuncParamType)
         {
-            if (m_allEnums.contains(nameOfType))
+            if (m_allEnums.contains(identifierTypeName))
             {
                 result = typeName;
             }
             else
             {
-                QString nameOfType2 = clearTypedef(nameOfType);
-                if (nameOfType2 != nameOfType) {
+                QString underlyingTypeName = aliasedTypeName(identifierTypeName);
+                if (underlyingTypeName != identifierTypeName) {
                     result = typeName;
                 }
                 else {
@@ -1845,45 +1876,50 @@ QString Generator::typeToStr(
         }
         else if (methodType == MethodType::TypeName)
         {
-            result = nameOfType;
+            result = identifierTypeName;
         }
         else if (methodType == MethodType::ReadTypeName)
         {
-            result = (nameOfType == QStringLiteral("Timestamp")
+            result = (identifierTypeName == QStringLiteral("Timestamp")
                       ? QStringLiteral("qint64")
-                      : nameOfType);
+                      : identifierTypeName);
         }
         else
         {
-            QString nameOfType2 = clearTypedef(nameOfType);
-            if (nameOfType2 != nameOfType)
+            if (const auto primitiveType = aliasedPrimitiveType(identifierTypeName))
             {
-                if (!m_baseTypes.contains(nameOfType2)) {
-                    throw std::runtime_error(
-                        "typedefs are supported for base types only");
-                }
-
-                std::shared_ptr<Parser::BaseType> type2(new Parser::BaseType);
-                type2->m_baseType = nameOfType2;
-                result = typeToStr(type2, identifier, methodType);
+                const auto p = std::make_shared<Parser::PrimitiveType>(*primitiveType);
+                result = typeToStr(p, identifier, methodType);
+            }
+            else if (m_stringTypeAliases.contains(identifierTypeName))
+            {
+                result = typeToStr(
+                    std::make_shared<Parser::StringType>(), identifier,
+                    methodType);
+            }
+            else if (m_byteArrayTypeAliases.contains(identifierTypeName))
+            {
+                result = typeToStr(
+                    std::make_shared<Parser::ByteArrayType>(), identifier,
+                    methodType);
             }
             else
             {
-                if (m_allStructs.contains(nameOfType) ||
-                    m_allExceptions.contains(nameOfType))
+                if (m_allStructs.contains(identifierTypeName) ||
+                    m_allExceptions.contains(identifierTypeName))
                 {
                     switch(methodType)
                     {
                     case MethodType::WriteMethod:
                         {
                             QTextStream strm(&result);
-                            strm << "write" << nameOfType << "(writer, ";
+                            strm << "write" << identifierTypeName << "(writer, ";
                         }
                         break;
                     case MethodType::ReadMethod:
                         {
                             QTextStream strm(&result);
-                            strm << "read" << nameOfType << "(reader, ";
+                            strm << "read" << identifierTypeName << "(reader, ";
                         }
                         break;
                     case MethodType::ThriftFieldType:
@@ -1893,7 +1929,7 @@ QString Generator::typeToStr(
                         result = QLatin1String("");
                     }
                 }
-                else if (m_allEnums.contains(nameOfType))
+                else if (m_allEnums.contains(identifierTypeName))
                 {
                     switch(methodType)
                     {
@@ -1903,7 +1939,7 @@ QString Generator::typeToStr(
                     case MethodType::ReadMethod:
                         {
                             QTextStream strm(&result);
-                            strm << "readEnum" << nameOfType << "(reader, ";
+                            strm << "readEnum" << identifierTypeName << "(reader, ";
                         }
                         break;
                     case MethodType::ThriftFieldType:
@@ -2012,7 +2048,8 @@ QString Generator::typeToStr(
     if (result.isEmpty() &&
         (methodType == MethodType::TypeName ||
          methodType == MethodType::ReadTypeName ||
-         methodType == MethodType::FuncParamType))
+         methodType == MethodType::FuncParamType ||
+         methodType == MethodType::ThriftFieldType))
     {
         throw std::runtime_error(
             QString::fromUtf8("Error! unrecognized type (%1)")
@@ -2167,27 +2204,35 @@ QString Generator::fieldDeclarationToStr(const Parser::Field & field)
         return s;
     }
 
-    auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(
-        field.m_type);
-    if (baseType) {
-        typeName = baseType->m_baseType;
+    std::optional<Parser::PrimitiveType::Type> primitiveType;
+    if (const auto it = m_primitiveTypeAliases.find(typeName);
+        it != m_primitiveTypeAliases.end())
+    {
+        primitiveType = it.value();
     }
-    else {
-        typeName = clearTypedef(typeName);
+    else if (const auto * p = dynamic_cast<Parser::PrimitiveType*>(field.m_type.get()))
+    {
+        primitiveType = p->m_type;
     }
 
-    if ( (typeName == QStringLiteral("byte")) ||
-         (typeName == QStringLiteral("i16")) ||
-         (typeName == QStringLiteral("i32")) ||
-         (typeName == QStringLiteral("i64")) )
-    {
-        s += QStringLiteral(" = 0");
+    if (!primitiveType) {
         return s;
     }
-    else if (typeName == QStringLiteral("double"))
+
+    switch(*primitiveType)
     {
+    case Parser::PrimitiveType::Type::Bool:
+        s += QStringLiteral(" = false");
+        break;
+    case Parser::PrimitiveType::Type::Byte:
+    case Parser::PrimitiveType::Type::Int16:
+    case Parser::PrimitiveType::Type::Int32:
+    case Parser::PrimitiveType::Type::Int64:
+        s += QStringLiteral(" = 0");
+        break;
+    case Parser::PrimitiveType::Type::Double:
         s += QStringLiteral(" = 0.0");
-        return s;
+        break;
     }
 
     return s;
@@ -2702,8 +2747,8 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
     writeHeaderHeader(ctx, fileName, additionalIncludes);
 
-    const auto & typedefs = parser->typedefs();
-    for(const auto & t: typedefs)
+    const auto & typeAliases = parser->typeAliases();
+    for(const auto & t: typeAliases)
     {
         if (!t.m_docComment.isEmpty()) {
             ctx.m_out << t.m_docComment << ln;
@@ -2916,7 +2961,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
 
         ctx.m_out << ln;
 
-        QHash<QString, QString> typeDefs;
+        QHash<QString, QString> typeAliases;
         for(const auto & f: s.m_fields)
         {
             auto fieldTypeName = typeToStr(
@@ -2927,19 +2972,18 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
             if (fieldTypeName.contains(QStringLiteral(","))) {
                 // In earlier versions of Qt Q_PROPERTY macro can't handle type
                 // names containing comma
-                auto typeDef = capitalize(f.m_name);
-                typeDefs[fieldTypeName] = typeDef;
+                typeAliases[fieldTypeName] = capitalize(f.m_name);
             }
         }
 
-        for(auto it = typeDefs.constBegin(), end = typeDefs.constEnd();
+        for(auto it = typeAliases.constBegin(), end = typeAliases.constEnd();
             it != end; ++it)
         {
             ctx.m_out << indent << "using " << it.value() << " = "
                 << it.key() << ";" << ln;
         }
 
-        if (!typeDefs.isEmpty()) {
+        if (!typeAliases.isEmpty()) {
             ctx.m_out << ln;
         }
 
@@ -2968,8 +3012,8 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 {},
                 MethodType::TypeName);
 
-            auto it = typeDefs.find(fieldTypeName);
-            if (it != typeDefs.end()) {
+            auto it = typeAliases.find(fieldTypeName);
+            if (it != typeAliases.end()) {
                 fieldTypeName = it.value();
             }
 
@@ -4201,17 +4245,13 @@ void Generator::generateClassAccessoryMethodsForFields(
     bool isPrimitiveType = false;
     if (field.m_required != Parser::Field::RequiredFlag::Optional)
     {
-        const auto baseType = std::dynamic_pointer_cast<Parser::BaseType>(
-            field.m_type);
-
-        if (baseType) {
+        if (m_allEnums.contains(fieldTypeName)) {
             isPrimitiveType = true;
         }
-        else if (m_allEnums.contains(fieldTypeName)) {
+        else if (m_primitiveTypeAliases.contains(fieldTypeName)) {
             isPrimitiveType = true;
         }
-        else if (m_typedefMap.contains(fieldTypeName)) {
-            // currently only primitive types are typedefed
+        else if (dynamic_cast<Parser::PrimitiveType*>(field.m_type.get())) {
             isPrimitiveType = true;
         }
     }
@@ -5627,12 +5667,20 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
         m_includeList << s;
     }
 
-    const auto & typedefs = parser->typedefs();
-    for(const auto & t: typedefs)
+    const auto & typeAliases = parser->typeAliases();
+    for(const auto & t: typeAliases)
     {
-        auto casted = std::dynamic_pointer_cast<Parser::BaseType>(t.m_type);
-        if (casted) {
-            m_typedefMap[t.m_name] = casted->m_baseType;
+        if (const auto * p = dynamic_cast<Parser::PrimitiveType*>(t.m_type.get()))
+        {
+            m_primitiveTypeAliases[t.m_name] = p->m_type;
+        }
+        else if (dynamic_cast<Parser::StringType*>(t.m_type.get()))
+        {
+            m_stringTypeAliases.insert(t.m_name);
+        }
+        else if (dynamic_cast<Parser::ByteArrayType*>(t.m_type.get()))
+        {
+            m_byteArrayTypeAliases.insert(t.m_name);
         }
     }
 

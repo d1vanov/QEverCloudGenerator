@@ -61,18 +61,43 @@ public:
         virtual ~Type() = 0;
     };
 
-    class VoidType: public Type
+    class VoidType final: public Type
     {
     public:
-        ~VoidType() override {}
+        ~VoidType() override {};
     };
 
-    class BaseType: public Type
+    class PrimitiveType final: public Type
     {
     public:
-        QString m_baseType;
+        enum class Type
+        {
+            Bool,
+            Byte,
+            Int16,
+            Int32,
+            Int64,
+            Double
+        };
 
-        ~BaseType() override {}
+        PrimitiveType(Type type) : m_type(type) {}
+        ~PrimitiveType() override {};
+
+        static QString nativeTypeName(Type type);
+
+        Type m_type;
+    };
+
+    class StringType final: public Type
+    {
+    public:
+        ~StringType() override {}
+    };
+
+    class ByteArrayType final: public Type
+    {
+    public:
+        ~ByteArrayType() override {}
     };
 
     class IdentifierType: public Type
@@ -108,7 +133,7 @@ public:
         ~ListType() override {}
     };
 
-    struct TypeDefinition
+    struct TypeAlias
     {
         QString m_fileName;
         QString m_name;
@@ -266,9 +291,9 @@ public:
         return m_includes;
     }
 
-    const QList<TypeDefinition> & typedefs() const
+    const QList<TypeAlias> & typeAliases() const
     {
-        return m_typedefs;
+        return m_typeAliases;
     }
 
     const QList<Structure> & structures() const
@@ -350,7 +375,7 @@ private:
 
     QList<Namespace> m_namespaces;
     QList<Include> m_includes;
-    QList<TypeDefinition> m_typedefs;
+    QList<TypeAlias> m_typeAliases;
     QList<Structure> m_structures;
     QList<Enumeration> m_enumerations;
     QList<Structure> m_exceptions;

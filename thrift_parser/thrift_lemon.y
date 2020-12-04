@@ -380,12 +380,21 @@ fieldtype(A)    ::=  definitiontype(B) .
 
 %type definitiontype {DefinitionType*}
 %destructor definitiontype {delete $$; }
-definitiontype(A)  ::=  basetype(B) .
+definitiontype(A)  ::=  primitivetype(B) .
 {
-  BasenameDefinitiontype* p = new BasenameDefinitiontype();
-  p->m_baseType = *B;
+  PrimitiveTypeDefinitionType* p = new PrimitiveTypeDefinitionType();
+  p->m_type = B;
   A = p;
-  delete B;
+}
+definitiontype(A)  ::=  stringtype(B) .
+{
+  A = new StringTypeDefinitionType;
+  (void)B;
+}
+definitiontype(A)  ::=  bytearraytype(B) .
+{
+  A = new ByteArrayDefinitionType();
+  (void)B;
 }
 definitiontype(A)  ::=  containertype(B) .
 {
@@ -394,19 +403,21 @@ definitiontype(A)  ::=  containertype(B) .
   A = p;
 }
 
-%type basetype {QString*}
-%destructor basetype {delete $$;}
-basetype(A)        ::=  BOOL. {A = new QString(QStringLiteral("bool"));}
-basetype(A)        ::=  BYTE. {A = new QString(QStringLiteral("byte"));}
-basetype(A)        ::=  I16. {A = new QString(QStringLiteral("i16"));}
-basetype(A)        ::=  I32. {A = new QString(QStringLiteral("i32"));}
-basetype(A)        ::=  I64. {A = new QString(QStringLiteral("i64"));}
-basetype(A)        ::=  DOUBLE. {A = new QString(QStringLiteral("double"));}
-basetype(A)        ::=  STRING. {A = new QString(QStringLiteral("string"));}
-basetype(A)        ::=  BINARY. {A = new QString(QStringLiteral("binary"));}
+%type primitivetype {Parser::PrimitiveType::Type}
+primitivetype(A)   ::=  BOOL. {A = Parser::PrimitiveType::Type::Bool;}
+primitivetype(A)   ::=  BYTE. {A = Parser::PrimitiveType::Type::Byte;}
+primitivetype(A)   ::=  I16. {A = Parser::PrimitiveType::Type::Int16;}
+primitivetype(A)   ::=  I32. {A = Parser::PrimitiveType::Type::Int32;}
+primitivetype(A)   ::=  I64. {A = Parser::PrimitiveType::Type::Int64;}
+primitivetype(A)   ::=  DOUBLE. {A = Parser::PrimitiveType::Type::Double;}
+
+%type stringtype {void*}
+stringtype(A)      ::=  STRING. {A = nullptr;}
+
+%type bytearraytype {void*}
+bytearraytype(A)   ::=  BINARY. {A = nullptr;}
 
 %type containertype {ContainerType*}
-//%destructor containertype {delete $$;}
 containertype(A)   ::=  maptype(B) .
 {
   A = B;

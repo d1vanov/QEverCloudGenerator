@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2019 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2020 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +29,11 @@
 #include "Parser.h"
 
 #include <QFile>
+#include <QHash>
+#include <QSet>
 
 #include <memory>
+#include <optional>
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -181,7 +184,7 @@ private:
         QTextStream & out,
         const QString & end = QStringLiteral(";\n"));
 
-    void verifyTypeIsBaseOrIdentifier(
+    void verifyTypeIsValueOrIdentifier(
         const std::shared_ptr<Parser::Type> & type) const;
 
     void generateGetRandomExceptionExpression(
@@ -260,7 +263,11 @@ private:
     QString getIdentifier(const std::shared_ptr<Parser::Type> & type);
 
     QString clearInclude(const QString & s) const;
-    QString clearTypedef(const QString & s) const;
+
+    std::optional<Parser::PrimitiveType::Type> aliasedPrimitiveType(
+        const QString & primitiveTypeAlias) const;
+
+    QString aliasedTypeName(const QString & s) const;
 
     /**
      * @brief loggableFields - filters out fields like authentication token,
@@ -299,7 +306,11 @@ private:
 
 private:
     QStringList m_includeList;
-    QMap<QString, QString> m_typedefMap;
+
+    QHash<QString, Parser::PrimitiveType::Type> m_primitiveTypeAliases;
+    QSet<QString> m_stringTypeAliases;
+    QSet<QString> m_byteArrayTypeAliases;
+
     QStringList m_baseTypes;
     QSet<QString> m_allStructs;
     QSet<QString> m_allExceptions;

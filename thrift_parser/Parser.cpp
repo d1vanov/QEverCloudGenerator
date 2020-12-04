@@ -152,12 +152,12 @@ void Parser::complete()
 void Parser::addTypedef(
     QString name, std::shared_ptr<Type> type, QString docComment)
 {
-    TypeDefinition td;
-    td.m_fileName = m_fileName;
-    td.m_name = name;
-    td.m_type = type;
-    td.m_docComment = docComment;
-    m_typedefs.append(td);
+    TypeAlias ta;
+    ta.m_fileName = m_fileName;
+    ta.m_name = name;
+    ta.m_type = type;
+    ta.m_docComment = docComment;
+    m_typeAliases.append(ta);
 }
 
 void Parser::addNamespace(QString scope, QString name)
@@ -241,6 +241,30 @@ void Parser::addEnumeration(
     e.m_values = values;
     e.m_docComment = docComment;
     m_enumerations.append(e);
+}
+
+QString Parser::PrimitiveType::nativeTypeName(
+    const Parser::PrimitiveType::Type type)
+{
+    using Type = Parser::PrimitiveType::Type;
+
+    switch (type)
+    {
+    case Type::Bool:
+        return QStringLiteral("bool");
+    case Type::Byte:
+        return QStringLiteral("char");
+    case Type::Double:
+        return QStringLiteral("double");
+    case Type::Int16:
+        return QStringLiteral("qint16");
+    case Type::Int32:
+        return QStringLiteral("qint32");
+    case Type::Int64:
+        return QStringLiteral("qint64");
+    default:
+        return {};
+    }
 }
 
 void Parser::Structure::parseStructComment(QString rawComment)

@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2019 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2020 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -88,20 +88,40 @@ class DefinitionType: public Fieldtype
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class BasenameDefinitiontype: public DefinitionType
+class PrimitiveTypeDefinitionType final: public DefinitionType
 {
 public:
-    ~BasenameDefinitiontype() override {}
+    ~PrimitiveTypeDefinitionType() override {}
 
     std::shared_ptr<Parser::Type> type() override
     {
-        std::shared_ptr<Parser::BaseType> p(new Parser::BaseType);
-        p->m_baseType = m_baseType;
-        return p;
+        return std::make_shared<Parser::PrimitiveType>(m_type);
     }
 
 public:
-    QString m_baseType;
+    Parser::PrimitiveType::Type m_type;
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+class StringTypeDefinitionType final: public DefinitionType
+{
+public:
+    std::shared_ptr<Parser::Type> type() override
+    {
+        return std::make_shared<Parser::StringType>();
+    }
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+class ByteArrayDefinitionType final: public DefinitionType
+{
+public:
+    std::shared_ptr<Parser::Type> type() override
+    {
+        return std::make_shared<Parser::ByteArrayType>();
+    }
 };
 
 ////////////////////////////////////////////////////////////////////////////////

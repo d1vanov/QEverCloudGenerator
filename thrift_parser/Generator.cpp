@@ -3000,8 +3000,8 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 << "Q_PROPERTY(bool localOnly READ isLocalOnly "
                 << "WRITE setLocalOnly)"
                 << ln << indent
-                << "Q_PROPERTY(bool favorited READ isFavorited "
-                << "WRITE setFavorited)"
+                << "Q_PROPERTY(bool favorited READ isLocallyFavorited "
+                << "WRITE setLocallyFavorited)"
                 << ln;
         }
 
@@ -4221,16 +4221,17 @@ void Generator::generateClassLocalDataAccessoryMethods(
 
     ctx.m_out << indent << "/**" << ln
         << indent
-        << " * @brief favorited property can be used to keep track which" << ln
-        << indent
+        << " * @brief locallyFavorited property can be used to keep track which"
+        << ln << indent
         << " * data items were favorited in the client. Unfortunately," << ln
         << indent
         << " * Evernote has never provided a way to synchronize such" << ln
         << indent << " * a property between different clients" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "bool isFavorited() const;" << ln
-        << indent << "void setFavorited(bool favorited = true);" << ln << ln;
+    ctx.m_out << indent << "bool isLocallyFavorited() const;" << ln
+        << indent << "void setLocallyFavorited(bool favorited = true);"
+        << ln << ln;
 }
 
 void Generator::generateClassAccessoryMethodsForFields(

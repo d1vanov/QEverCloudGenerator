@@ -4269,10 +4269,15 @@ void Generator::generateClassAccessoryMethodsForFields(
 
     ctx.m_out << field.m_name << "() const;" << ln;
 
-    // For non-primitive types will also provide a non-const getter
-    if (!isPrimitiveType) {
-        ctx.m_out << indent << fieldTypeName << " & " << field.m_name
-            << "();" << ln;
+    // For non-primitive and non-string or byte array types will also provide
+    // a non-const mutable value getter with name explicitly reflecting its
+    // nature
+    if (!isPrimitiveType &&
+        !dynamic_cast<Parser::StringType*>(field.m_type.get()) &&
+        !dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()))
+    {
+        ctx.m_out << indent << fieldTypeName << " & " << "mutable"
+            << capitalize(field.m_name) << "();" << ln;
     }
 
     // Setter

@@ -3277,8 +3277,7 @@ void Generator::generateTypeAliasesHeader(
 }
 
 void Generator::generateTypeHeader(
-    Parser & parser, const Parser::Structure & s,
-    const QString & outPath)
+    const Parser::Structure & s, const QString & outPath)
 {
     const QString fileName = s.m_name + QStringLiteral(".h");
     const QString fileSection = QStringLiteral("types");
@@ -3457,7 +3456,7 @@ void Generator::generateTypeHeader(
 
         ctx.m_out << indent << "Q_PROPERTY(" << fieldTypeName
             << " " << f.m_name << " READ " << f.m_name
-            << "WRITE set" << capitalize(f.m_name) << ")" << ln;
+            << " WRITE set" << capitalize(f.m_name) << ")" << ln;
     }
 
     ctx.m_out << ln;
@@ -5954,7 +5953,7 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     generateTypeAliasesHeader(parser.typeAliases(), outPath);
 
     for (const auto & s: parser.structures()) {
-        generateTypeHeader(parser, s, outPath);
+        generateTypeHeader(s, outPath);
     }
 
     generateServicesHeader(parser, outPath);

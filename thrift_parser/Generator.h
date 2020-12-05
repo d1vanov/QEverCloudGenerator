@@ -80,7 +80,7 @@ private:
         const Parser::TypeAliases & typeAliases, const QString & outPath);
 
     void generateTypeHeader(
-        Parser & parser, const Parser::Structure & s, const QString & outPath);
+        const Parser::Structure & s, const QString & outPath);
 
     void generateServicesHeader(Parser & parser, const QString & outPath);
     void generateServicesCpp(Parser & parser, const QString & outPath);

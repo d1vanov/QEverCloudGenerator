@@ -49,7 +49,7 @@ enum class OutputFileType
 class Generator
 {
 public:
-    void generateSources(Parser * parser, const QString & outPath);
+    void generateSources(Parser & parser, const QString & outPath);
 
 private:
     struct OutputFileContext
@@ -57,38 +57,42 @@ private:
         OutputFileContext(
             const QString & fileName,
             const QString & outPath,
-            const OutputFileType type);
+            const OutputFileType type,
+            const QString & section = {});
 
         QFile m_file;
         OutputFileType m_type;
         QTextStream m_out;
     };
 
-    void generateConstantsHeader(Parser * parser, const QString & outPath);
-    void generateConstantsCpp(Parser * parser, const QString & outPath);
+    void generateConstantsHeader(Parser & parser, const QString & outPath);
+    void generateConstantsCpp(Parser & parser, const QString & outPath);
 
-    void generateErrorsHeader(Parser * parser, const QString & outPath);
-    void generateErrorsCpp(Parser * parser, const QString & outPath);
+    void generateErrorsHeader(Parser & parser, const QString & outPath);
+    void generateErrorsCpp(Parser & parser, const QString & outPath);
 
-    void generateTypesIOHeader(Parser * parser, const QString & outPath);
+    void generateTypesIOHeader(Parser & parser, const QString & outPath);
 
-    void generateTypesHeader(Parser * parser, const QString & outPath);
-    void generateTypesCpp(Parser * parser, const QString & outPath);
+    void generateTypesHeader(Parser & parser, const QString & outPath);
+    void generateTypesCpp(Parser & parser, const QString & outPath);
 
-    void generateServicesHeader(Parser * parser, const QString & outPath);
-    void generateServicesCpp(Parser * parser, const QString & outPath);
+    void generateTypeHeader(
+        Parser & parser, const Parser::Structure & s, const QString & outPath);
 
-    void generateServerHeader(Parser * parser, const QString & outPath);
-    void generateServerCpp(Parser * parser, const QString & outPath);
+    void generateServicesHeader(Parser & parser, const QString & outPath);
+    void generateServicesCpp(Parser & parser, const QString & outPath);
 
-    void generateTestServerHeaders(Parser * parser, const QString & outPath);
-    void generateTestServerCpps(Parser * parser, const QString & outPath);
+    void generateServerHeader(Parser & parser, const QString & outPath);
+    void generateServerCpp(Parser & parser, const QString & outPath);
+
+    void generateTestServerHeaders(Parser & parser, const QString & outPath);
+    void generateTestServerCpps(Parser & parser, const QString & outPath);
 
     void generateTestRandomDataGeneratorsHeader(
-        Parser * parser, const QString & outPath);
+        Parser & parser, const QString & outPath);
 
     void generateTestRandomDataGeneratorsCpp(
-        Parser * parser, const QString & outPath);
+        Parser & parser, const QString & outPath);
 
     void generateLocalDataClassDeclaration(
         OutputFileContext & ctx);
@@ -211,7 +215,8 @@ private:
     void writeHeaderHeader(
         OutputFileContext & ctx, const QString & fileName,
         const QStringList & additionalIncludes = QStringList(),
-        const HeaderKind headerKind = HeaderKind::Public);
+        const HeaderKind headerKind = HeaderKind::Public,
+        const QString & section = {});
 
     void writeHeaderBody(
         OutputFileContext & ctx, const QString & headerFileName,

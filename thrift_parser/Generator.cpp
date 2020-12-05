@@ -29,6 +29,7 @@
 #include <QDir>
 #include <QFile>
 #include <QMap>
+#include <QStack>
 #include <QString>
 #include <QTextStream>
 
@@ -65,7 +66,7 @@ static const char * blockSeparator = "/////////////////////////////////////////"
 ////////////////////////////////////////////////////////////////////////////////
 
 QString generatedFileOutputPath(
-    const QString & outPath, const OutputFileType type)
+    const QString & outPath, const QString & section, const OutputFileType type)
 {
     QString path = outPath;
     if (type == OutputFileType::Interface) {
@@ -83,10 +84,14 @@ QString generatedFileOutputPath(
             .arg(static_cast<qint64>(type)).toStdString());
     }
 
+    if (!section.isEmpty()) {
+        path += QStringLiteral("/") + section;
+    }
+
     return path;
 }
 
-void ensureFileDirExists(const QString & path)
+void ensureDirExists(const QString & path)
 {
     QDir dir(path);
     if (!dir.exists())
@@ -107,10 +112,11 @@ void ensureFileDirExists(const QString & path)
 Generator::OutputFileContext::OutputFileContext(
     const QString & fileName,
     const QString & outPath,
-    const OutputFileType type)
+    const OutputFileType type,
+    const QString & section)
 {
-    QString path = generatedFileOutputPath(outPath, type);
-    ensureFileDirExists(path);
+    QString path = generatedFileOutputPath(outPath, section, type);
+    ensureDirExists(path);
 
     m_file.setFileName(path + QStringLiteral("/") + fileName);
     if (!m_file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -1507,7 +1513,8 @@ void Generator::generateTestServerServiceCall(
 void Generator::writeHeaderHeader(
     OutputFileContext & ctx, const QString & fileName,
     const QStringList & additionalIncludes,
-    const HeaderKind headerKind)
+    const HeaderKind headerKind,
+    const QString & section)
 {
     ctx.m_out << disclaimer << ln;
 
@@ -1519,7 +1526,12 @@ void Generator::writeHeaderHeader(
     ctx.m_out << ln;
 
     if (headerKind == HeaderKind::Public) {
-        ctx.m_out << "#include \"../Export.h\"" << ln;
+        QStringList sectionParts = section.split(QStringLiteral("/"), Qt::SkipEmptyParts);
+        ctx.m_out << "#include \"../";
+        for(int i = 0; i < sectionParts.size(); ++i) {
+            ctx.m_out << "../";
+        }
+        ctx.m_out << "Export.h\"" << ln;
         ctx.m_out << ln;
     }
 
@@ -2122,7 +2134,7 @@ QString Generator::valueToStr(
 }
 
 void Generator::generateConstantsHeader(
-    Parser * parser, const QString & outPath)
+    Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Constants.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
@@ -2131,7 +2143,7 @@ void Generator::generateConstantsHeader(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    const auto & constants = parser->constants();
+    const auto & constants = parser.constants();
     for(const auto & c: constants)
     {
         if (c.m_fileName != fileName) {
@@ -2150,7 +2162,7 @@ void Generator::generateConstantsHeader(
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
-void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
+void Generator::generateConstantsCpp(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Constants.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
@@ -2162,7 +2174,7 @@ void Generator::generateConstantsCpp(Parser * parser, const QString & outPath)
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    const auto & constants = parser->constants();
+    const auto & constants = parser.constants();
     for(const auto & c: constants)
     {
         if (c.m_fileName != fileName) {
@@ -2601,7 +2613,7 @@ void Generator::sortIncludes(QStringList & includes) const
           });
 }
 
-void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
+void Generator::generateErrorsHeader(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("EDAMErrorCode.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
@@ -2623,7 +2635,7 @@ void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
         << "#endif" << ln << ln
         << blockSeparator << ln << ln;
 
-    const auto & enumerations = parser->enumerations();
+    const auto & enumerations = parser.enumerations();
     int enumerationsCount = enumerations.size();
     int i = 0;
     for(const auto & e: enumerations)
@@ -2658,7 +2670,7 @@ void Generator::generateErrorsHeader(Parser * parser, const QString & outPath)
     writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
 }
 
-void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
+void Generator::generateErrorsCpp(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("EDAMErrorCode.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
@@ -2667,7 +2679,7 @@ void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    const auto & enumerations = parser->enumerations();
+    const auto & enumerations = parser.enumerations();
     int enumerationsCount = enumerations.size();
     int i = 0;
     for(const auto & e: enumerations)
@@ -2686,7 +2698,7 @@ void Generator::generateErrorsCpp(Parser * parser, const QString & outPath)
     writeNamespaceEnd(ctx.m_out);
 }
 
-void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
+void Generator::generateTypesIOHeader(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Types_io.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
@@ -2703,8 +2715,8 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
 
     QList<const QList<Parser::Structure>*> lists;
     lists.reserve(2);
-    lists << &parser->structures();
-    lists << &parser->exceptions();
+    lists << &parser.structures();
+    lists << &parser.exceptions();
 
     for(const auto & pList: qAsConst(lists))
     {
@@ -2719,7 +2731,7 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
     }
     ctx.m_out << ln;
 
-    const auto & enumerations = parser->enumerations();
+    const auto & enumerations = parser.enumerations();
     for(const auto & e: enumerations) {
         ctx.m_out << "void readEnum" << e.m_name
             << "(ThriftBinaryBufferReader & reader, "
@@ -2730,7 +2742,7 @@ void Generator::generateTypesIOHeader(Parser * parser, const QString & outPath)
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
-void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
+void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Types.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
@@ -2742,12 +2754,13 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         << QStringLiteral("<QMap>") << QStringLiteral("<QSet>")
         << QStringLiteral("<QStringList>") << QStringLiteral("<QByteArray>")
         << QStringLiteral("<QDateTime>") << QStringLiteral("<QMetaType>")
+        << QStringLiteral("<QSharedDataPointer>")
         << QStringLiteral("<QVariant>") << QStringLiteral("<optional>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx, fileName, additionalIncludes);
 
-    const auto & typeAliases = parser->typeAliases();
+    const auto & typeAliases = parser.typeAliases();
     for(const auto & t: typeAliases)
     {
         if (!t.m_docComment.isEmpty()) {
@@ -2763,13 +2776,13 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
     QList<Parser::Structure> ordered;
 
     QSet<QString> exceptions;
-    const auto & parserExceptions = parser->exceptions();
+    const auto & parserExceptions = parser.exceptions();
     for(const auto & e: parserExceptions) {
         exceptions.insert(e.m_name);
     }
 
-    auto heap = parser->structures();
-    heap.append(parser->exceptions());
+    auto heap = parser.structures();
+    heap.append(parser.exceptions());
 
     int count = heap.count();
     while(!heap.isEmpty())
@@ -2891,10 +2904,9 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
         }
         else
         {
-            ctx.m_out << "struct QEVERCLOUD_EXPORT "
+            ctx.m_out << "class QEVERCLOUD_EXPORT "
                 << s.m_name << ": public Printable" << ln
                 << "{" << ln
-                << "private:" << ln
                 << indent << "Q_GADGET" << ln
                 << "public:" << ln;
 
@@ -3027,7 +3039,12 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
                 << "WRITE set" << capitalize(f.m_name) << ")" << ln;
         }
 
-        ctx.m_out << "};" << ln << ln;
+        ctx.m_out << ln;
+
+        ctx.m_out << "private:" << ln
+            << indent << "class " << s.m_name << "Data;" << ln
+            << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
+            << "};" << ln << ln;
     }
 
     QStringList extraLinesOutsideNamespace;
@@ -3051,7 +3068,7 @@ void Generator::generateTypesHeader(Parser * parser, const QString & outPath)
     writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
 }
 
-void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
+void Generator::generateTypesCpp(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Types.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
@@ -3066,7 +3083,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     ctx.m_out << blockSeparator << ln << ln;
     ctx.m_out << "/** @cond HIDDEN_SYMBOLS  */" << ln << ln;
 
-    const auto & enumerations = parser->enumerations();
+    const auto & enumerations = parser.enumerations();
     for(const auto & e: enumerations)
     {
         ctx.m_out <<  "void readEnum" << e.m_name
@@ -3092,12 +3109,12 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     }
 
     QSet<QString> exceptions;
-    for(const auto & e: parser->exceptions()) {
+    for(const auto & e: parser.exceptions()) {
         exceptions.insert(e.m_name);
     }
 
-    auto structsAndExceptions = parser->structures();
-    structsAndExceptions << parser->exceptions();
+    auto structsAndExceptions = parser.structures();
+    structsAndExceptions << parser.exceptions();
 
     generateLocalDataClassDefinition(ctx);
     ctx.m_out << ln;
@@ -3215,7 +3232,7 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
 
         ctx.m_out << "}" << ln << ln;
 
-        writeStructPrintDefinition(ctx.m_out, s, *parser);
+        writeStructPrintDefinition(ctx.m_out, s, parser);
         ctx.m_out << blockSeparator << ln << ln;
     }
 
@@ -3224,7 +3241,237 @@ void Generator::generateTypesCpp(Parser * parser, const QString & outPath)
     writeNamespaceEnd(ctx.m_out);
 }
 
-void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
+void Generator::generateTypeHeader(
+    Parser & parser, const Parser::Structure & s,
+    const QString & outPath)
+{
+    const QString fileName = s.m_name + QStringLiteral(".h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface, QStringLiteral("types"));
+
+    QStringList additionalIncludes = QStringList()
+        << QStringLiteral("../../EverCloudException.h")
+        << QStringLiteral("../../Printable.h")
+        << QStringLiteral("../EDAMErrorCode.h");
+        // << QStringLiteral("TypeAliases.h");
+
+    QSet<QString> dependenciesIncludes;
+    const auto processType =
+        [this, &dependenciesIncludes]
+        (const std::shared_ptr<Parser::Type> & type) -> bool
+        {
+            auto typeName = typeToStr(type, {}, MethodType::TypeName);
+            typeName = aliasedTypeName(typeName);
+
+            if (m_allStructs.contains(typeName) ||
+                m_allExceptions.contains(typeName))
+            {
+                dependenciesIncludes.insert(
+                    typeName + QStringLiteral(".h"));
+                return true;
+            }
+
+            return false;
+        };
+
+    QStack<std::shared_ptr<Parser::Type>> typesStack;
+    for (const auto & f: s.m_fields) {
+        typesStack.push(f.m_type);
+    }
+
+    while (!typesStack.isEmpty())
+    {
+        auto type = typesStack.pop();
+        if (processType(type)) {
+            continue;
+        }
+
+        if (const auto * l = dynamic_cast<Parser::ListType*>(type.get())) {
+            typesStack.push(l->m_valueType);
+            continue;
+        }
+
+        if (const auto * s = dynamic_cast<Parser::SetType*>(type.get())) {
+            typesStack.push(s->m_valueType);
+            continue;
+        }
+
+        if (const auto * m = dynamic_cast<Parser::MapType*>(type.get())) {
+            typesStack.push(m->m_keyType);
+            typesStack.push(m->m_valueType);
+            continue;
+        }
+
+        if (dynamic_cast<Parser::ByteArrayType*>(type.get())) {
+            dependenciesIncludes.insert(
+                QStringLiteral("<QByteArray>"));
+            continue;
+        }
+    }
+
+    for (const auto & include: qAsConst(dependenciesIncludes)) {
+        additionalIncludes.append(include);
+    }
+
+    sortIncludes(additionalIncludes);
+
+    writeHeaderHeader(
+        ctx, fileName, additionalIncludes, HeaderKind::Public,
+        QStringLiteral("types"));
+
+    const QString indent = QStringLiteral("    ");
+
+    ctx.m_out << "class QEVERCLOUD_EXPORT "
+        << s.m_name << ": public Printable" << ln
+        << "{" << ln
+        << indent << "Q_GADGET" << ln
+        << "public:" << ln;
+
+    generateClassLocalDataAccessoryMethods(s.m_name, ctx, indent);
+
+    for(const auto & f: qAsConst(s.m_fields))
+    {
+        if (s.m_fieldComments.contains(f.m_name))
+        {
+            auto lines =
+                s.m_fieldComments[f.m_name].split(QStringLiteral("\n"));
+
+            for(const auto & line: qAsConst(lines)) {
+                ctx.m_out << indent << line << ln;
+            }
+        }
+        else
+        {
+            ctx.m_out << indent << "/** NOT DOCUMENTED */" << ln;
+        }
+
+        generateClassAccessoryMethodsForFields(f, ctx, indent);
+        ctx.m_out << ln;
+    }
+
+    ctx.m_out << indent
+        << "void print(QTextStream & strm) const override;" << ln;
+
+    ctx.m_out << ln;
+    ctx.m_out << indent << QString::fromUtf8(
+        "bool operator==(const %1 & other) const").arg(s.m_name) << ln;
+    ctx.m_out << indent << "{" << ln;
+
+    bool first = true;
+    for(const auto & f : s.m_fields)
+    {
+        if (first) {
+            first = false;
+            ctx.m_out << indent << indent << "return ";
+        }
+        else {
+            ctx.m_out << indent << indent << indent << "&& ";
+        }
+
+        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+            ctx.m_out
+                << QString::fromUtf8("%1.isEqual(other.%1)").arg(f.m_name)
+                << ln;
+        }
+        else {
+            ctx.m_out << QString::fromUtf8("(%1 == other.%1)").arg(f.m_name)
+                << ln;
+        }
+    }
+
+    ctx.m_out << indent << indent << ";" << ln << indent << "}" << ln << ln;
+    ctx.m_out << indent << QString::fromUtf8(
+        "bool operator!=(const %1 & other) const").arg(s.m_name) << ln;
+
+    ctx.m_out << indent << "{" << ln;
+    ctx.m_out << indent << indent << "return !(*this == other);" << ln;
+    ctx.m_out << indent << "}" << ln;
+
+    ctx.m_out << ln;
+
+    QHash<QString, QString> typeAliases;
+    for(const auto & f: s.m_fields)
+    {
+        auto fieldTypeName = typeToStr(
+            f.m_type,
+            {},
+            MethodType::TypeName);
+
+        if (fieldTypeName.contains(QStringLiteral(","))) {
+            // In earlier versions of Qt Q_PROPERTY macro can't handle type
+            // names containing comma
+            typeAliases[fieldTypeName] = capitalize(f.m_name);
+        }
+    }
+
+    for(auto it = typeAliases.constBegin(), end = typeAliases.constEnd();
+        it != end; ++it)
+    {
+        ctx.m_out << indent << "using " << it.value() << " = "
+            << it.key() << ";" << ln;
+    }
+
+    if (!typeAliases.isEmpty()) {
+        ctx.m_out << ln;
+    }
+
+    ctx.m_out << indent
+        << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)" << ln
+        << indent
+        << "Q_PROPERTY(QString parentLocalId READ parentLocalId "
+        << "WRITE setParentLocalId)" << ln
+        << indent
+        << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
+        << "WRITE setLocallyModified)" << ln
+        << indent
+        << "Q_PROPERTY(bool localOnly READ isLocalOnly "
+        << "WRITE setLocalOnly)" << ln
+        << indent
+        << "Q_PROPERTY(bool favorited READ isLocallyFavorited "
+        << "WRITE setLocallyFavorited)" << ln;
+
+    for(const auto & f: s.m_fields)
+    {
+        auto fieldTypeName = typeToStr(
+            f.m_type,
+            {},
+            MethodType::TypeName);
+
+        auto it = typeAliases.find(fieldTypeName);
+        if (it != typeAliases.end()) {
+            fieldTypeName = it.value();
+        }
+
+        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+            fieldTypeName = QStringLiteral("std::optional<") +
+                fieldTypeName + QStringLiteral(">");
+        }
+
+        ctx.m_out << indent << "Q_PROPERTY(" << fieldTypeName
+            << " " << f.m_name << " READ " << f.m_name
+            << "WRITE set" << capitalize(f.m_name) << ")" << ln;
+    }
+
+    ctx.m_out << ln;
+
+    ctx.m_out << "private:" << ln
+    << indent << "class " << s.m_name << "Data;" << ln
+    << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
+    << "};" << ln << ln;
+
+    QStringList extraLinesOutsideNamespace;
+    extraLinesOutsideNamespace.reserve(1);
+
+    QString metatypeDeclarationLine;
+    QTextStream lineOut(&metatypeDeclarationLine);
+    lineOut << "Q_DECLARE_METATYPE(qevercloud::" << s.m_name << ")";
+    extraLinesOutsideNamespace << metatypeDeclarationLine;
+
+    writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
+}
+
+void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Services.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
@@ -3241,7 +3488,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
 
     writeHeaderHeader(ctx, fileName, additionalIncludes);
 
-    const auto & services = parser->services();
+    const auto & services = parser.services();
     for(const auto & s: services)
     {
         if (!s.m_extends.isEmpty()) {
@@ -3390,7 +3637,7 @@ void Generator::generateServicesHeader(Parser * parser, const QString & outPath)
     writeHeaderFooter(ctx.m_out, fileName, {}, metatypeDeclarations);
 }
 
-void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
+void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Services.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
@@ -3403,7 +3650,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
 
     writeHeaderBody(ctx, QStringLiteral("Services.h"), additionalIncludes);
 
-    const auto & services = parser->services();
+    const auto & services = parser.services();
 
     for(const auto & s: services) {
         ctx.m_out << blockSeparator << ln << ln;
@@ -3461,7 +3708,7 @@ void Generator::generateServicesCpp(Parser * parser, const QString & outPath)
     ctx.m_out << "#include <Services.moc>" << ln;
 }
 
-void Generator::generateServerHeader(Parser * parser, const QString & outPath)
+void Generator::generateServerHeader(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Servers.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
@@ -3477,7 +3724,7 @@ void Generator::generateServerHeader(Parser * parser, const QString & outPath)
 
     writeHeaderHeader(ctx, fileName, additionalIncludes);
 
-    const auto & services = parser->services();
+    const auto & services = parser.services();
     for(const auto & s: services) {
         generateServerClassDeclaration(s, ctx);
     }
@@ -3485,7 +3732,7 @@ void Generator::generateServerHeader(Parser * parser, const QString & outPath)
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
-void Generator::generateServerCpp(Parser * parser, const QString & outPath)
+void Generator::generateServerCpp(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Servers.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
@@ -3499,7 +3746,7 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
 
     ctx.m_out << "namespace {" << ln << ln;
 
-    const auto & services = parser->services();
+    const auto & services = parser.services();
     for(const auto & s: services) {
         generateServerHelperFunctions(s, ctx);
     }
@@ -3516,13 +3763,13 @@ void Generator::generateServerCpp(Parser * parser, const QString & outPath)
 }
 
 void Generator::generateTestServerHeaders(
-    Parser * parser, const QString & outPath)
+    Parser & parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
         << QStringLiteral("../SocketHelpers.h") << QStringLiteral("<QObject>");
     sortIncludes(additionalIncludes);
 
-    const auto & services = parser->services();
+    const auto & services = parser.services();
     for(const auto & s: services)
     {
         if (!s.m_extends.isEmpty()) {
@@ -3598,7 +3845,7 @@ void Generator::generateTestServerHeaders(
     }
 }
 
-void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
+void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
         << QStringLiteral("../SocketHelpers.h")
@@ -3609,8 +3856,8 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
         << QStringLiteral("<QtTest/QtTest>");
     sortIncludes(additionalIncludes);
 
-    const auto & enumerations = parser->enumerations();
-    const auto & services = parser->services();
+    const auto & enumerations = parser.enumerations();
+    const auto & services = parser.services();
     for(const auto & s: services)
     {
         if (!s.m_extends.isEmpty()) {
@@ -3654,7 +3901,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             generateTestServerPrepareRequestParams(func, enumerations, ctx);
             generateTestServerPrepareRequestResponse(func, enumerations, ctx);
-            generateTestServerHelperLambda(s, func, *parser, ctx);
+            generateTestServerHelperLambda(s, func, parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
             generateTestServerServiceCall(s, func, ServiceCallKind::Sync, ctx);
 
@@ -3675,8 +3922,8 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 ctx.m_out << "{" << ln;
 
                 generateTestServerPrepareRequestParams(func, enumerations, ctx);
-                generateTestServerPrepareRequestExceptionResponse(*parser, e, ctx);
-                generateTestServerHelperLambda(s, func, *parser, ctx, e.m_name);
+                generateTestServerPrepareRequestExceptionResponse(parser, e, ctx);
+                generateTestServerHelperLambda(s, func, parser, ctx, e.m_name);
                 generateTestServerSocketSetup(s, func, ctx);
 
                 generateTestServerServiceCall(
@@ -3705,10 +3952,10 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             generateTestServerPrepareRequestParams(func, enumerations, ctx);
             generateTestServerPrepareRequestExceptionResponse(
-                *parser, exceptionField, ctx);
+                parser, exceptionField, ctx);
 
             generateTestServerHelperLambda(
-                s, func, *parser, ctx, exceptionField.m_name);
+                s, func, parser, ctx, exceptionField.m_name);
 
             generateTestServerSocketSetup(s, func, ctx);
 
@@ -3728,7 +3975,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             generateTestServerPrepareRequestParams(func, enumerations, ctx);
             generateTestServerPrepareRequestResponse(func, enumerations, ctx);
-            generateTestServerHelperLambda(s, func, *parser, ctx);
+            generateTestServerHelperLambda(s, func, parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
             generateTestServerServiceCall(s, func, ServiceCallKind::Async, ctx);
 
@@ -3749,8 +3996,8 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
                 ctx.m_out << "{" << ln;
 
                 generateTestServerPrepareRequestParams(func, enumerations, ctx);
-                generateTestServerPrepareRequestExceptionResponse(*parser, e, ctx);
-                generateTestServerHelperLambda(s, func, *parser, ctx, e.m_name);
+                generateTestServerPrepareRequestExceptionResponse(parser, e, ctx);
+                generateTestServerHelperLambda(s, func, parser, ctx, e.m_name);
                 generateTestServerSocketSetup(s, func, ctx);
 
                 generateTestServerServiceCall(
@@ -3771,10 +4018,10 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 
             generateTestServerPrepareRequestParams(func, enumerations, ctx);
             generateTestServerPrepareRequestExceptionResponse(
-                *parser, exceptionField, ctx);
+                parser, exceptionField, ctx);
 
             generateTestServerHelperLambda(
-                s, func, *parser, ctx, exceptionField.m_name);
+                s, func, parser, ctx, exceptionField.m_name);
 
             generateTestServerSocketSetup(s, func, ctx);
 
@@ -3793,7 +4040,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 }
 
 void Generator::generateTestRandomDataGeneratorsHeader(
-    Parser * parser, const QString & outPath)
+    Parser & parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
         << QStringLiteral("<generated/Types.h>");
@@ -3824,7 +4071,7 @@ void Generator::generateTestRandomDataGeneratorsHeader(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    for(const auto & s: parser->structures())
+    for(const auto & s: parser.structures())
     {
         ctx.m_out << s.m_name << " generateRandom" << s.m_name << "();" << ln
             << ln;
@@ -3834,7 +4081,7 @@ void Generator::generateTestRandomDataGeneratorsHeader(
 }
 
 void Generator::generateTestRandomDataGeneratorsCpp(
-    Parser * parser, const QString & outPath)
+    Parser & parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
         << QStringLiteral("<QCryptographicHash>")
@@ -3956,7 +4203,7 @@ void Generator::generateTestRandomDataGeneratorsCpp(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    for(const auto & s: parser->structures())
+    for(const auto & s: parser.structures())
     {
         ctx.m_out << s.m_name << " generateRandom" << s.m_name << "()" << ln
             << "{" << ln;
@@ -3965,10 +4212,7 @@ void Generator::generateTestRandomDataGeneratorsCpp(
 
         for(const auto & f: s.m_fields) {
             generateGetRandomValueExpression(
-                f,
-                QStringLiteral("    result."),
-                *parser,
-                ctx.m_out);
+                f, QStringLiteral("    result."), parser, ctx.m_out);
         }
 
         ctx.m_out << "    return result;" << ln
@@ -5639,9 +5883,9 @@ void Generator::generateServerHelperFunctions(
     }
 }
 
-void Generator::generateSources(Parser * parser, const QString & outPath)
+void Generator::generateSources(Parser & parser, const QString & outPath)
 {
-    if (parser->unions().count() > 0) {
+    if (parser.unions().count() > 0) {
         throw std::runtime_error("unions are not suported.");
     }
 
@@ -5650,22 +5894,22 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
         << QStringLiteral("i64") << QStringLiteral("double")
         << QStringLiteral("string") << QStringLiteral("binary");
 
-    const auto & structures = parser->structures();
+    const auto & structures = parser.structures();
     for(const auto & s: structures) {
         m_allStructs << s.m_name;
     }
 
-    const auto & exceptions = parser->exceptions();
+    const auto & exceptions = parser.exceptions();
     for(const auto & e: exceptions) {
         m_allExceptions << e.m_name;
     }
 
-    const auto & enumerations = parser->enumerations();
+    const auto & enumerations = parser.enumerations();
     for(const auto & e: enumerations) {
         m_allEnums << e.m_name;
     }
 
-    const auto & includes = parser->includes();
+    const auto & includes = parser.includes();
     for(const auto & include: includes) {
         QString s = include.m_name;
         s.replace(QStringLiteral("\""), QLatin1String(""));
@@ -5673,7 +5917,7 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
         m_includeList << s;
     }
 
-    const auto & typeAliases = parser->typeAliases();
+    const auto & typeAliases = parser.typeAliases();
     for(const auto & t: typeAliases)
     {
         if (const auto * p = dynamic_cast<Parser::PrimitiveType*>(t.m_type.get()))
@@ -5699,6 +5943,10 @@ void Generator::generateSources(Parser * parser, const QString & outPath)
     generateTypesIOHeader(parser, outPath);
     generateTypesHeader(parser, outPath);
     generateTypesCpp(parser, outPath);
+
+    for (const auto & s: parser.structures()) {
+        generateTypeHeader(parser, s, outPath);
+    }
 
     generateServicesHeader(parser, outPath);
     generateServicesCpp(parser, outPath);

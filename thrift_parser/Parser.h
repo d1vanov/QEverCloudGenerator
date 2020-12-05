@@ -141,6 +141,8 @@ public:
         std::shared_ptr<Type> m_type;
     };
 
+    using TypeAliases = QList<TypeAlias>;
+
     class ConstValue
     {
     public:

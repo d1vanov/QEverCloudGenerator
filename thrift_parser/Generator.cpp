@@ -1526,7 +1526,14 @@ void Generator::writeHeaderHeader(
     ctx.m_out << ln;
 
     if (headerKind == HeaderKind::Public) {
-        QStringList sectionParts = section.split(QStringLiteral("/"), Qt::SkipEmptyParts);
+        QStringList sectionParts = section.split(
+            QChar::fromLatin1('/'),
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+            Qt::SkipEmptyParts
+#else
+            QString::SkipEmptyParts
+#endif
+            );
         ctx.m_out << "#include \"../";
         for(int i = 0; i < sectionParts.size(); ++i) {
             ctx.m_out << "../";
@@ -3241,20 +3248,49 @@ void Generator::generateTypesCpp(Parser & parser, const QString & outPath)
     writeNamespaceEnd(ctx.m_out);
 }
 
+void Generator::generateTypeAliasesHeader(
+    const Parser::TypeAliases & typeAliases, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("TypeAliases.h");
+    const QString fileSection = QStringLiteral("types");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface, fileSection);
+
+    QStringList additionalIncludes = QStringList()
+        << QStringLiteral("<QString>") << QStringLiteral("<QtGlobal>");
+
+    writeHeaderHeader(
+        ctx, fileName, additionalIncludes, HeaderKind::Public, fileSection);
+
+    for(const auto & t: typeAliases)
+    {
+        if (!t.m_docComment.isEmpty()) {
+            ctx.m_out << t.m_docComment << ln;
+        }
+
+        ctx.m_out << "using " << t.m_name << " = "
+            << typeToStr(t.m_type, t.m_name) << ";" << ln << ln;
+    }
+
+    writeHeaderFooter(ctx.m_out, fileName);
+}
+
 void Generator::generateTypeHeader(
     Parser & parser, const Parser::Structure & s,
     const QString & outPath)
 {
     const QString fileName = s.m_name + QStringLiteral(".h");
+    const QString fileSection = QStringLiteral("types");
 
     OutputFileContext ctx(
-        fileName, outPath, OutputFileType::Interface, QStringLiteral("types"));
+        fileName, outPath, OutputFileType::Interface, fileSection);
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("../../EverCloudException.h")
         << QStringLiteral("../../Printable.h")
-        << QStringLiteral("../EDAMErrorCode.h");
-        // << QStringLiteral("TypeAliases.h");
+        << QStringLiteral("../EDAMErrorCode.h")
+        << QStringLiteral("TypeAliases.h");
 
     QSet<QString> dependenciesIncludes;
     const auto processType =
@@ -3317,8 +3353,7 @@ void Generator::generateTypeHeader(
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
-        ctx, fileName, additionalIncludes, HeaderKind::Public,
-        QStringLiteral("types"));
+        ctx, fileName, additionalIncludes, HeaderKind::Public, fileSection);
 
     const QString indent = QStringLiteral("    ");
 
@@ -5943,6 +5978,8 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     generateTypesIOHeader(parser, outPath);
     generateTypesHeader(parser, outPath);
     generateTypesCpp(parser, outPath);
+
+    generateTypeAliasesHeader(parser.typeAliases(), outPath);
 
     for (const auto & s: parser.structures()) {
         generateTypeHeader(parser, s, outPath);

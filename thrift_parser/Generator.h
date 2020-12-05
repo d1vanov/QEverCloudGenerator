@@ -76,6 +76,9 @@ private:
     void generateTypesHeader(Parser & parser, const QString & outPath);
     void generateTypesCpp(Parser & parser, const QString & outPath);
 
+    void generateTypeAliasesHeader(
+        const Parser::TypeAliases & typeAliases, const QString & outPath);
+
     void generateTypeHeader(
         Parser & parser, const Parser::Structure & s, const QString & outPath);
 

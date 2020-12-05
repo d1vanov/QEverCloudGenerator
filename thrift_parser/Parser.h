@@ -49,11 +49,15 @@ public:
         QString m_name;
     };
 
+    using Namespaces = QList<Namespace>;
+
     struct Include
     {
         QString m_fileName;
         QString m_name;
     };
+
+    using Includes = QList<Include>;
 
     class Type
     {
@@ -225,6 +229,8 @@ public:
         void parseStructComment(QString rawComment);
     };
 
+    using Structures = QList<Structure>;
+
     struct Enumeration
     {
         QString m_fileName;
@@ -232,6 +238,8 @@ public:
         QString m_docComment;
         QList<std::pair<QString, QString>> m_values;
     };
+
+    using Enumerations = QList<Enumeration>;
 
     struct Function
     {
@@ -243,6 +251,8 @@ public:
         QString m_docComment;
     };
 
+    using Functions = QList<Function>;
+
     struct Service
     {
         QString m_fileName;
@@ -252,6 +262,8 @@ public:
         QList<Function> m_functions;
     };
 
+    using Services = QList<Service>;
+
     struct Constant
     {
         QString m_fileName;
@@ -260,6 +272,8 @@ public:
         std::shared_ptr<ConstValue> m_value;
         QString m_docComment;
     };
+
+    using Constants = QList<Constant>;
 
 public:
     explicit Parser(QObject * parent = nullptr);
@@ -283,32 +297,32 @@ public:
         return m_fileNames;
     }
 
-    const QList<Namespace> & namespaces() const
+    const Namespaces & namespaces() const
     {
         return m_namespaces;
     }
 
-    const QList<Include> & includes() const
+    const Includes & includes() const
     {
         return m_includes;
     }
 
-    const QList<TypeAlias> & typeAliases() const
+    const TypeAliases & typeAliases() const
     {
         return m_typeAliases;
     }
 
-    const QList<Structure> & structures() const
+    const Structures & structures() const
     {
         return m_structures;
     }
 
-    const QList<Enumeration> & enumerations() const
+    const Enumerations & enumerations() const
     {
         return m_enumerations;
     }
 
-    const QList<Structure> & exceptions() const
+    const Structures & exceptions() const
     {
         return m_exceptions;
     }
@@ -323,7 +337,7 @@ public:
         return m_constants;
     }
 
-    const QList<Structure> & unions() const
+    const Structures & unions() const
     {
         return m_unions;
     }

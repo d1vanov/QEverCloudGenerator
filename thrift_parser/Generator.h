@@ -82,6 +82,10 @@ private:
     void generateTypeHeader(
         const Parser::Structure & s, const QString & outPath);
 
+    void generateTypeDataHeader(
+        const Parser::Structure & s, const Parser::Enumerations & enumerations,
+        const QString & outPath);
+
     void generateServicesHeader(Parser & parser, const QString & outPath);
     void generateServicesCpp(Parser & parser, const QString & outPath);
 
@@ -103,7 +107,7 @@ private:
     void generateLocalDataClassDefinition(
         OutputFileContext & ctx);
 
-    void generateClassLocalDataAccessoryMethods(
+    void generateTypeLocalDataAccessoryMethods(
         const QString & className, OutputFileContext & ctx,
         QString indent = QString());
 

@@ -2917,7 +2917,7 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
                 << indent << "Q_GADGET" << ln
                 << "public:" << ln;
 
-            generateClassLocalDataAccessoryMethods(s.m_name, ctx, indent);
+            generateTypeLocalDataAccessoryMethods(s.m_name, ctx, indent);
 
             for(const auto & f: qAsConst(s.m_fields))
             {
@@ -3260,6 +3260,8 @@ void Generator::generateTypeAliasesHeader(
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("<QString>") << QStringLiteral("<QtGlobal>");
 
+    sortIncludes(additionalIncludes);
+
     writeHeaderHeader(
         ctx, fileName, additionalIncludes, HeaderKind::Public, fileSection);
 
@@ -3362,15 +3364,14 @@ void Generator::generateTypeHeader(
         << indent << "Q_GADGET" << ln
         << "public:" << ln;
 
-    generateClassLocalDataAccessoryMethods(s.m_name, ctx, indent);
+    generateTypeLocalDataAccessoryMethods(s.m_name, ctx, indent);
 
     for(const auto & f: qAsConst(s.m_fields))
     {
-        if (s.m_fieldComments.contains(f.m_name))
+        if (const auto cit = s.m_fieldComments.constFind(f.m_name);
+            cit != s.m_fieldComments.constEnd())
         {
-            auto lines =
-                s.m_fieldComments[f.m_name].split(QStringLiteral("\n"));
-
+            const auto lines = cit.value().split(QChar::fromLatin1('\n'));
             for(const auto & line: qAsConst(lines)) {
                 ctx.m_out << indent << line << ln;
             }
@@ -3475,6 +3476,113 @@ void Generator::generateTypeHeader(
     extraLinesOutsideNamespace << metatypeDeclarationLine;
 
     writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
+}
+
+void Generator::generateTypeDataHeader(
+    const Parser::Structure & s, const Parser::Enumerations & enumerations,
+    const QString & outPath)
+{
+    const QString fileName = s.m_name + QStringLiteral("Data.h");
+    const QString fileSection = QStringLiteral("types");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation, fileSection);
+
+    const QString publicHeaderInclude =
+        QStringLiteral("<generated/types/") + s.m_name + QStringLiteral(".h>");
+
+    QStringList additionalIncludes = QStringList()
+        << publicHeaderInclude << QStringLiteral("<QSharedData>");
+
+    sortIncludes(additionalIncludes);
+
+    writeHeaderHeader(
+        ctx, fileName, additionalIncludes, HeaderKind::Private, fileSection);
+
+    const QString indent = QStringLiteral("    ");
+
+    ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name << "::"
+        << s.m_name << "Data final:" << ln
+        << indent << "public QSharedData," << ln
+        << indent << "public Printable" << ln
+        << "{" << ln
+        << "public:" << ln;
+
+    ctx.m_out << indent << s.m_name << "Data() = default;" << ln
+        << indent << s.m_name << "Data(const " << s.m_name
+        << "Data & other) = default;" << ln
+        << indent << s.m_name << "Data(" << s.m_name
+        << "Data && other) = default;" << ln << ln;
+
+    ctx.m_out << indent << s.m_name << "Data & operator=(const "
+        << s.m_name << "Data & other) = delete;" << ln
+        << indent << s.m_name << "Data & operator=(" << s.m_name
+        << "Data && other) = delete;" << ln << ln;
+
+    ctx.m_out << indent << "~" << s.m_name << "Data() override = default;"
+        << ln;
+
+    ctx.m_out << ln
+        << indent << "void print(QTextStream & strm) const override;" << ln
+        << ln;
+
+    for(const auto & f: qAsConst(s.m_fields))
+    {
+        const auto typeName = typeToStr(f.m_type, {}, MethodType::TypeName);
+
+        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+            ctx.m_out << indent << "std::optional<" << typeName << "> "
+                << f.m_name << ";" << ln;
+            continue;
+        }
+
+        ctx.m_out << indent << typeName << " " << f.m_name;
+
+        const auto a = aliasedPrimitiveType(typeName);
+        const auto p = dynamic_cast<Parser::PrimitiveType*>(f.m_type.get());
+        if (a || p)
+        {
+            switch(a ? *a : p->m_type)
+            {
+            case Parser::PrimitiveType::Type::Bool:
+                ctx.m_out << " = false";
+                break;
+            case Parser::PrimitiveType::Type::Byte:
+            case Parser::PrimitiveType::Type::Int16:
+            case Parser::PrimitiveType::Type::Int32:
+            case Parser::PrimitiveType::Type::Int64:
+                ctx.m_out << " = 0";
+                break;
+            case Parser::PrimitiveType::Type::Double:
+                ctx.m_out << " = 0.0";
+                break;
+            }
+        }
+        else if (m_allEnums.contains(typeName))
+        {
+            const auto eit = std::find_if(
+                enumerations.constBegin(),
+                enumerations.constEnd(),
+                [&typeName](const auto & enumeration)
+                {
+                    return typeName == enumeration.m_name;
+                });
+
+            if (eit != enumerations.constEnd())
+            {
+                const auto & values = eit->m_values;
+                if (!values.isEmpty()) {
+                    ctx.m_out << " = " << typeName << "::"
+                        << values.front().first;
+                }
+            }
+        }
+
+        ctx.m_out << ";" << ln;
+    }
+
+    ctx.m_out << "};" << ln << ln;
+    writeHeaderFooter(ctx.m_out, fileName);
 }
 
 void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
@@ -4404,7 +4512,7 @@ void Generator::generateLocalDataClassDefinition(
         << "}" << ln;
 }
 
-void Generator::generateClassLocalDataAccessoryMethods(
+void Generator::generateTypeLocalDataAccessoryMethods(
     const QString & className, OutputFileContext & ctx, QString indent)
 {
     ctx.m_out << indent << "/**" << ln
@@ -5954,6 +6062,7 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
 
     for (const auto & s: parser.structures()) {
         generateTypeHeader(s, outPath);
+        generateTypeDataHeader(s, enumerations, outPath);
     }
 
     generateServicesHeader(parser, outPath);

@@ -3390,38 +3390,10 @@ void Generator::generateTypeHeader(
 
     ctx.m_out << ln;
     ctx.m_out << indent << QString::fromUtf8(
-        "bool operator==(const %1 & other) const").arg(s.m_name) << ln;
-    ctx.m_out << indent << "{" << ln;
+        "bool operator==(const %1 & other) const;").arg(s.m_name) << ln;
 
-    bool first = true;
-    for(const auto & f : s.m_fields)
-    {
-        if (first) {
-            first = false;
-            ctx.m_out << indent << indent << "return ";
-        }
-        else {
-            ctx.m_out << indent << indent << indent << "&& ";
-        }
-
-        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-            ctx.m_out
-                << QString::fromUtf8("%1.isEqual(other.%1)").arg(f.m_name)
-                << ln;
-        }
-        else {
-            ctx.m_out << QString::fromUtf8("(%1 == other.%1)").arg(f.m_name)
-                << ln;
-        }
-    }
-
-    ctx.m_out << indent << indent << ";" << ln << indent << "}" << ln << ln;
     ctx.m_out << indent << QString::fromUtf8(
-        "bool operator!=(const %1 & other) const").arg(s.m_name) << ln;
-
-    ctx.m_out << indent << "{" << ln;
-    ctx.m_out << indent << indent << "return !(*this == other);" << ln;
-    ctx.m_out << indent << "}" << ln;
+        "bool operator!=(const %1 & other) const;").arg(s.m_name) << ln;
 
     ctx.m_out << ln;
 

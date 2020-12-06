@@ -3364,6 +3364,24 @@ void Generator::generateTypeHeader(
         << indent << "Q_GADGET" << ln
         << "public:" << ln;
 
+    ctx.m_out << indent << s.m_name << "();" << ln;
+
+    ctx.m_out << indent << s.m_name << "(const "
+        << s.m_name << " & other);" << ln;
+
+    ctx.m_out << indent << s.m_name << "(" << s.m_name << " && other) noexcept;"
+        << ln;
+
+    ctx.m_out << indent << "~" << s.m_name << "() noexcept override;" << ln;
+
+    ctx.m_out << ln;
+
+    ctx.m_out << indent << s.m_name << " & operator=(const " << s.m_name
+        << " & other);" << ln;
+
+    ctx.m_out << indent << s.m_name << " & operator=(" << s.m_name
+        << " && other) noexcept;" << ln << ln;
+
     generateTypeLocalDataAccessoryMethods(s.m_name, ctx, indent);
 
     for(const auto & f: qAsConst(s.m_fields))
@@ -3389,11 +3407,11 @@ void Generator::generateTypeHeader(
         << "void print(QTextStream & strm) const override;" << ln;
 
     ctx.m_out << ln;
-    ctx.m_out << indent << QString::fromUtf8(
-        "bool operator==(const %1 & other) const;").arg(s.m_name) << ln;
+    ctx.m_out << indent << "[[nodiscard]] bool operator==(const " << s.m_name
+        << " & other) const noexcept;" << ln;
 
-    ctx.m_out << indent << QString::fromUtf8(
-        "bool operator!=(const %1 & other) const;").arg(s.m_name) << ln;
+    ctx.m_out << indent << "[[nodiscard]] bool operator!=(const " << s.m_name
+        << " & other) const noexcept;" << ln;
 
     ctx.m_out << ln;
 
@@ -3483,7 +3501,7 @@ void Generator::generateTypeDataHeader(
     const QString & outPath)
 {
     const QString fileName = s.m_name + QStringLiteral("Data.h");
-    const QString fileSection = QStringLiteral("types");
+    const QString fileSection = QStringLiteral("types/data");
 
     OutputFileContext ctx(
         fileName, outPath, OutputFileType::Implementation, fileSection);
@@ -3512,15 +3530,22 @@ void Generator::generateTypeDataHeader(
         << indent << s.m_name << "Data(const " << s.m_name
         << "Data & other) = default;" << ln
         << indent << s.m_name << "Data(" << s.m_name
-        << "Data && other) = default;" << ln << ln;
+        << "Data && other) noexcept = default;" << ln << ln;
 
     ctx.m_out << indent << s.m_name << "Data & operator=(const "
         << s.m_name << "Data & other) = delete;" << ln
         << indent << s.m_name << "Data & operator=(" << s.m_name
         << "Data && other) = delete;" << ln << ln;
 
-    ctx.m_out << indent << "~" << s.m_name << "Data() override = default;"
-        << ln;
+    ctx.m_out << indent << "~" << s.m_name << "Data() noexcept override "
+        << "= default;" << ln;
+
+    ctx.m_out << ln;
+    ctx.m_out << indent << "[[nodiscard]] bool operator==(const " << s.m_name
+        << "Data & other) const noexcept;" << ln;
+
+    ctx.m_out << indent << "[[nodiscard]] bool operator!=(const " << s.m_name
+        << "Data & other) const noexcept;" << ln;
 
     ctx.m_out << ln
         << indent << "void print(QTextStream & strm) const override;" << ln
@@ -3583,6 +3608,39 @@ void Generator::generateTypeDataHeader(
 
     ctx.m_out << "};" << ln << ln;
     writeHeaderFooter(ctx.m_out, fileName);
+}
+
+void Generator::generateTypeDataCpp(
+    const Parser::Structure & s, const QString & outPath)
+{
+    const QString fileName = s.m_name + QStringLiteral("Data.cpp");
+    const QString fileSection = QStringLiteral("types/data");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation, fileSection);
+
+    const QString headerFileName = s.m_name + QStringLiteral("Data.h");
+    writeHeaderBody(ctx, headerFileName);
+
+    const QString indent = QStringLiteral("    ");
+
+    ctx.m_out << "void " << s.m_name << "Data::print(" << ln
+        << indent << "QTextStream & strm) const" << ln
+        << "{" << ln;
+
+    ctx.m_out << indent << "strm << \"" << s.m_name << ": {\\n\";" << ln;
+    for(const auto & f: qAsConst(s.m_fields))
+    {
+        ctx.m_out << indent << "strm << \"" << indent << f.m_name << " = \" << "
+            << f.m_name << " << \"\\n\";" << ln;
+    }
+
+    ctx.m_out << indent << "strm << \"};\\n\";" << ln;
+    ctx.m_out << "}" << ln << ln;
+
+    // TODO: comparison operators
+
+    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
@@ -4529,7 +4587,7 @@ void Generator::generateTypeLocalDataAccessoryMethods(
         << "manually" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "QString localId() const;" << ln
+    ctx.m_out << indent << "[[nodiscard]] QString localId() const;" << ln
         << indent << "void setLocalId(QString id);" << ln << ln;
 
     ctx.m_out << indent << "/**" << ln
@@ -4549,7 +4607,7 @@ void Generator::generateTypeLocalDataAccessoryMethods(
         << indent << " * By default the parentLocalId property is empty" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "QString parentLocalId() const;" << ln
+    ctx.m_out << indent << "[[nodiscard]] QString parentLocalId() const;" << ln
         << indent << "void setParentLocalId(QString id);" << ln << ln;
 
     ctx.m_out << indent << "/**" << ln
@@ -4562,7 +4620,7 @@ void Generator::generateTypeLocalDataAccessoryMethods(
         << indent << " * with Evernote service" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "bool isLocallyModified() const;" << ln
+    ctx.m_out << indent << "[[nodiscard]] bool isLocallyModified() const;" << ln
         << indent << "void setLocallyModified(bool modified = true);"
         << ln << ln;
 
@@ -4574,7 +4632,7 @@ void Generator::generateTypeLocalDataAccessoryMethods(
         << indent << " * with Evernote service" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "bool isLocalOnly() const;" << ln
+    ctx.m_out << indent << "[[nodiscard]] bool isLocalOnly() const;" << ln
         << indent << "void setLocalOnly(bool localOnly = true);" << ln << ln;
 
     ctx.m_out << indent << "/**" << ln
@@ -4587,8 +4645,8 @@ void Generator::generateTypeLocalDataAccessoryMethods(
         << indent << " * a property between different clients" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "bool isLocallyFavorited() const;" << ln
-        << indent << "void setLocallyFavorited(bool favorited = true);"
+    ctx.m_out << indent << "[[nodiscard]] bool isLocallyFavorited() const;"
+        << ln << indent << "void setLocallyFavorited(bool favorited = true);"
         << ln << ln;
 }
 
@@ -4616,7 +4674,7 @@ void Generator::generateClassAccessoryMethodsForFields(
     }
 
     // Const getter
-    ctx.m_out << indent;
+    ctx.m_out << indent << "[[nodiscard]] ";
 
     if (isPrimitiveType) {
         ctx.m_out << fieldTypeName << " ";
@@ -4625,7 +4683,7 @@ void Generator::generateClassAccessoryMethodsForFields(
         ctx.m_out << "const " << fieldTypeName << " & ";
     }
 
-    ctx.m_out << field.m_name << "() const;" << ln;
+    ctx.m_out << field.m_name << "() const noexcept;" << ln;
 
     // For non-primitive and non-string or byte array types will also provide
     // a non-const mutable value getter with name explicitly reflecting its
@@ -4634,8 +4692,8 @@ void Generator::generateClassAccessoryMethodsForFields(
         !dynamic_cast<Parser::StringType*>(field.m_type.get()) &&
         !dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()))
     {
-        ctx.m_out << indent << fieldTypeName << " & " << "mutable"
-            << capitalize(field.m_name) << "();" << ln;
+        ctx.m_out << indent << "[[nodiscard]] " << fieldTypeName << " & "
+            << "mutable" << capitalize(field.m_name) << "();" << ln;
     }
 
     // Setter
@@ -6063,6 +6121,7 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     for (const auto & s: parser.structures()) {
         generateTypeHeader(s, outPath);
         generateTypeDataHeader(s, enumerations, outPath);
+        generateTypeDataCpp(s, outPath);
     }
 
     generateServicesHeader(parser, outPath);

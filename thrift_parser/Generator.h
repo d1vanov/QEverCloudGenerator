@@ -319,6 +319,9 @@ private:
         QTextStream & out, const Parser::Structure & s,
         const Parser & parser) const;
 
+    void writeTypeDataPrintDefinition(
+        QTextStream & out, const Parser::Structure & s) const;
+
 private:
     QStringList m_includeList;
 

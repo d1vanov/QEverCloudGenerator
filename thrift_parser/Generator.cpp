@@ -45,9 +45,7 @@ namespace {
 
 constexpr const char * ln = "\n";
 
-////////////////////////////////////////////////////////////////////////////////
-
-static const char * disclaimer =
+constexpr const char * disclaimer =
     "/**\n"
     " * Original work: Copyright (c) 2014 Sergey Skoblikov\n"
     " * Modified work: Copyright (c) 2015-2020 Dmitry Ivanov\n"
@@ -60,8 +58,8 @@ static const char * disclaimer =
     " * This file was generated from Evernote Thrift API\n"
     " */\n";
 
-static const char * blockSeparator = "/////////////////////////////////////////"
-                                     "///////////////////////////////////////";
+constexpr const char * blockSeparator = "/////////////////////////////////////////"
+                                        "///////////////////////////////////////";
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -759,6 +757,153 @@ void Generator::writeStructPrintDefinition(
     }
 
     out << "    strm << \"}\\n\";" << ln
+        << "}" << ln << ln;
+}
+
+void Generator::writeTypeDataPrintDefinition(
+    QTextStream & out, const Parser::Structure & s) const
+{
+    out << "void " << s.m_name << "::" << s.m_name
+        << "Data::print(QTextStream & strm) const" << ln
+        << "{" << ln;
+
+    constexpr const char * indent = "    ";
+
+    out << indent << "strm << \"" << s.m_name << ": {\\n\";" << ln;
+
+    out << indent << indent << "strm << \"" << indent
+        << "localId = \" << m_localId << \"\\n\";" << ln;
+
+    out << indent << indent << "strm << \"" << indent
+        << "parentLocalId = \" << m_parentLocalId" << " << \"\\n\";" << ln;
+
+    out << indent << indent << "strm << \"" << indent << "locallyModified = \""
+        << " << (m_locallyModified ? \"true\" : \"false\") << \"\\n\";" << ln;
+
+    out << indent << indent << "strm << \"" << indent << "localOnly = \""
+        << " << (m_localOnly ? \"true\" : \"false\") << \"\\n\";" << ln;
+
+    out << indent << indent << "strm << \"" << indent << "locallyFavorited = \""
+        << " << (m_locallyFavorited ? \"true\" : \"false\") << \"\\n\";" << ln;
+
+    bool previousOptional = false;
+    for(const auto & f: s.m_fields)
+    {
+        auto listType = std::dynamic_pointer_cast<Parser::ListType>(f.m_type);
+        auto setType = std::dynamic_pointer_cast<Parser::SetType>(f.m_type);
+        auto mapType = std::dynamic_pointer_cast<Parser::MapType>(f.m_type);
+
+        if (f.m_required == Parser::Field::RequiredFlag::Optional)
+        {
+            if (!previousOptional) {
+                out << ln;
+            }
+
+            out << indent << "if (m_" << f.m_name << ") {" << ln
+                << indent << indent << "strm << \"" << indent << f.m_name
+                << " = \"" << ln;
+
+            if (mapType)
+            {
+                out << indent << indent << indent << "<< \"QMap<"
+                    << typeToStr(mapType->m_keyType, {}) << ", "
+                    << typeToStr(mapType->m_valueType, {})
+                    << "> {\";" << ln
+                    << indent << indent << "for(const auto & it: toRange(*m_"
+                    << f.m_name << ")) {" << ln
+                    << indent << indent << indent << "strm << \""
+                    << indent << indent << "[\" << it.key() << \"] = \" "
+                    << "<< it.value() << \"\\n\";" << ln
+                    << indent << indent << "}" << ln
+                    << indent << indent << "strm << \"    }\\n\";" << ln;
+            }
+            else if (setType)
+            {
+                out << indent << indent << indent << "<< \"QSet<"
+                    << typeToStr(setType->m_valueType, {}) << "> {\";" << ln
+                    << indent << indent << "for(const auto & v: *m_" << f.m_name
+                    << ") {" << ln
+                    << indent << indent << indent << "strm << \""
+                    << indent << indent << "\" << v << \"\\n\";" << ln
+                    << indent << indent << "}" << ln
+                    << indent << indent << "strm << \"    }\\n\";" << ln;
+            }
+            else if (listType)
+            {
+                out << indent << indent << indent << "<< \"QList<"
+                    << typeToStr(listType->m_valueType, {}) << "> {\";" << ln
+                    << indent << indent << "for(const auto & v: *m_" << f.m_name
+                    << ") {" << ln
+                    << indent << indent << indent << "strm << \""
+                    << indent << indent << "\" << v << \"\\n\";" << ln
+                    << indent << indent << "}" << ln
+                    << indent << indent << "strm << \"    }\\n\";" << ln;
+            }
+            else
+            {
+                out << indent << indent << indent << "<< *m_"
+                    << f.m_name << " << \"\\n\";" << ln;
+            }
+
+            out << indent << "}" << ln
+                << indent << "else {" << ln
+                << indent << indent << "strm << \"" << indent << f.m_name
+                << " is not set\\n\";" << ln
+                << indent << "}" << ln << ln;
+            previousOptional = true;
+        }
+        else
+        {
+            out << indent << "strm << \"" << indent << f.m_name << " = \""
+                << ln;
+
+            if (mapType)
+            {
+                out << indent << indent << "<< \"QMap<"
+                    << typeToStr(mapType->m_keyType, {}) << ", "
+                    << typeToStr(mapType->m_valueType, {})
+                    << "> {\";" << ln
+                    << indent << "for(const auto & it: toRange(m_" << f.m_name
+                    << ")) {" << ln
+                    << indent << indent << "strm << \"" << indent
+                    << "[\" << it.key() << \"] = \" << it.value() << \"\\n\";"
+                    << ln
+                    << "    }" << ln
+                    << "    strm << \"}\\n\";" << ln;
+            }
+            else if (setType)
+            {
+                out << indent << indent << "<< \"QSet<"
+                    << typeToStr(setType->m_valueType, {}) << "> {\";" << ln
+                    << indent << "for(const auto & v: m_" << f.m_name << ") {"
+                    << ln
+                    << indent << indent << "strm << \"" << indent
+                    << "\" << v << \"\\n\";" << ln
+                    << indent << "}" << ln
+                    << indent << "strm << \"}\\n\";" << ln;
+            }
+            else if (listType)
+            {
+                out << indent << indent << "<< \"QList<"
+                    << typeToStr(listType->m_valueType, {}) << "> {\";" << ln
+                    << indent << "for(const auto & v: m_" << f.m_name << ") {"
+                    << ln
+                    << indent << indent << "strm << \"" << indent
+                    << "\" << v << \"\\n\";" << ln
+                    << indent << "}" << ln
+                    << indent << "strm << \"}\\n\";" << ln;
+            }
+            else
+            {
+                out << indent << indent << "<< m_"
+                    << f.m_name << " << \"\\n\";" << ln;
+            }
+
+            previousOptional = false;
+        }
+    }
+
+    out << indent << "strm << \"}\\n\";" << ln
         << "}" << ln << ln;
 }
 
@@ -2425,7 +2570,7 @@ void Generator::writeThriftReadField(
     QTextStream & out, const Parser::Field & field, const QString & identPrefix,
     const QString & fieldParent)
 {
-    const char * indent = "                ";
+    constexpr const char * indent = "                ";
 
     out << indent
         << typeToStr(
@@ -2870,10 +3015,10 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
             ctx.m_out << "/** NO DOC COMMENT ID FOUND */" << ln;
         }
 
-        const QString indent = QStringLiteral("    ");
-
         if (exceptions.contains(s.m_name))
         {
+            constexpr const char * indent = "    ";
+
             ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
                 << ": public EvernoteException, public Printable"
                 << ln << "{" << ln
@@ -2911,6 +3056,8 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
         }
         else
         {
+            const QString indent = QStringLiteral("    ");
+
             ctx.m_out << "class QEVERCLOUD_EXPORT "
                 << s.m_name << ": public Printable" << ln
                 << "{" << ln
@@ -2942,6 +3089,8 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
             ctx.m_out << indent
                 << "void print(QTextStream & strm) const override;" << ln;
         }
+
+        constexpr const char * indent = "    ";
 
         ctx.m_out << ln;
         ctx.m_out << indent << QString::fromUtf8(
@@ -3517,7 +3666,7 @@ void Generator::generateTypeDataHeader(
     writeHeaderHeader(
         ctx, fileName, additionalIncludes, HeaderKind::Private, fileSection);
 
-    const QString indent = QStringLiteral("    ");
+    constexpr const char * indent = "    ";
 
     ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name << "::"
         << s.m_name << "Data final:" << ln
@@ -3551,17 +3700,23 @@ void Generator::generateTypeDataHeader(
         << indent << "void print(QTextStream & strm) const override;" << ln
         << ln;
 
+    ctx.m_out << indent << "QString m_localId;" << ln
+        << indent << "QString m_parentLocalId;" << ln
+        << indent << "bool m_locallyModified = false;" << ln
+        << indent << "bool m_localOnly = false;" << ln
+        << indent << "bool m_locallyFavorited = false;" << ln << ln;
+
     for(const auto & f: qAsConst(s.m_fields))
     {
         const auto typeName = typeToStr(f.m_type, {}, MethodType::TypeName);
 
         if (f.m_required == Parser::Field::RequiredFlag::Optional) {
             ctx.m_out << indent << "std::optional<" << typeName << "> "
-                << f.m_name << ";" << ln;
+                << "m_" << f.m_name << ";" << ln;
             continue;
         }
 
-        ctx.m_out << indent << typeName << " " << f.m_name;
+        ctx.m_out << indent << typeName << " " << "m_" << f.m_name;
 
         const auto a = aliasedPrimitiveType(typeName);
         const auto p = dynamic_cast<Parser::PrimitiveType*>(f.m_type.get());
@@ -3619,27 +3774,53 @@ void Generator::generateTypeDataCpp(
     OutputFileContext ctx(
         fileName, outPath, OutputFileType::Implementation, fileSection);
 
-    const QString headerFileName = s.m_name + QStringLiteral("Data.h");
-    writeHeaderBody(ctx, headerFileName);
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#include \"" << s.m_name << "Data.h\"" << ln << ln;
+    ctx.m_out << "#include <QTextStream>" << ln << ln;
 
-    const QString indent = QStringLiteral("    ");
+    writeNamespaceBegin(ctx);
 
-    ctx.m_out << "void " << s.m_name << "Data::print(" << ln
-        << indent << "QTextStream & strm) const" << ln
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "bool " << s.m_name << "::" << s.m_name
+        << "Data::operator==(" << ln << indent << "const " << s.m_name
+        << "Data & other) const noexcept" << ln
         << "{" << ln;
 
-    ctx.m_out << indent << "strm << \"" << s.m_name << ": {\\n\";" << ln;
+    ctx.m_out << indent << "if (this == &other) {" << ln
+        << indent << indent << "return true;" << ln
+        << indent << "}" << ln << ln;
+
+    ctx.m_out << indent << "return m_localId == other.m_localId &&" << ln
+        << indent << indent << "m_parentLocalId == other.m_parentLocalId &&"
+        << ln
+        << indent << indent << "m_locallyModified == other.m_locallyModified &&"
+        << ln
+        << indent << indent << "m_localOnly == other.m_localOnly &&" << ln
+        << indent << indent << "m_locallyFavorited == other.m_locallyFavorited"
+        << " &&" << ln << indent << indent;
+
     for(const auto & f: qAsConst(s.m_fields))
     {
-        ctx.m_out << indent << "strm << \"" << indent << f.m_name << " = \" << "
-            << f.m_name << " << \"\\n\";" << ln;
+        ctx.m_out << "m_" << f.m_name << " == other.m_" << f.m_name;
+        if (&f != &(s.m_fields.constLast())) {
+            ctx.m_out << " &&" << ln << indent << indent;
+        }
+        else {
+            ctx.m_out << ";" << ln;
+        }
     }
 
-    ctx.m_out << indent << "strm << \"};\\n\";" << ln;
     ctx.m_out << "}" << ln << ln;
 
-    // TODO: comparison operators
+    ctx.m_out << "bool " << s.m_name << "::" << s.m_name
+        << "Data::operator!=(" << ln << indent << "const " << s.m_name
+        << "Data & other) const noexcept" << ln
+        << "{" << ln
+        << indent << "return !(*this == other);" << ln
+        << "}" << ln << ln;
 
+    writeTypeDataPrintDefinition(ctx.m_out, s);
     writeNamespaceEnd(ctx.m_out);
 }
 

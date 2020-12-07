@@ -82,6 +82,9 @@ private:
     void generateTypeHeader(
         const Parser::Structure & s, const QString & outPath);
 
+    void generateTypeCpp(
+        const Parser::Structure & s, const QString & outPath);
+
     void generateTypeDataHeader(
         const Parser::Structure & s, const Parser::Enumerations & enumerations,
         const QString & outPath);
@@ -110,13 +113,20 @@ private:
     void generateLocalDataClassDefinition(
         OutputFileContext & ctx);
 
-    void generateTypeLocalDataAccessoryMethods(
+    void generateTypeLocalDataAccessoryMethodDeclarations(
         const QString & className, OutputFileContext & ctx,
         QString indent = QString());
 
-    void generateClassAccessoryMethodsForFields(
+    void generateTypeLocalDataAccessoryMethodDefinitions(
+        const QString & className, OutputFileContext & ctx);
+
+    void generateClassAccessoryMethodsForFieldDeclarations(
         const Parser::Field & field, OutputFileContext & ctx,
         QString indent = QString());
+
+    void generateClassAccessoryMethodsForFieldDefinitions(
+        const Parser::Structure & s, const Parser::Field & field,
+        OutputFileContext & ctx);
 
     enum class ServiceClassType
     {
@@ -297,6 +307,11 @@ private:
     QString capitalize(const QString & input) const;
 
     QString decapitalize(const QString & input) const;
+
+    QString fieldTypeToStr(const Parser::Field & field) const;
+
+    bool isFieldOfPrimitiveType(
+        const Parser::Field & field, const QString & fieldTypeName) const;
 
     // Write methods for particular parsed fields
 

@@ -538,6 +538,37 @@ QString Generator::getGenerateRandomValueFunction(const QString & typeName) cons
     }
 }
 
+QString Generator::fieldTypeToStr(const Parser::Field & field) const
+{
+    QString fieldTypeName = typeToStr(field.m_type, field.m_name);
+    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+        fieldTypeName = QStringLiteral("std::optional<") + fieldTypeName +
+            QStringLiteral(">");
+    }
+
+    return fieldTypeName;
+}
+
+bool Generator::isFieldOfPrimitiveType(
+    const Parser::Field & field, const QString & fieldTypeName) const
+{
+    bool isPrimitiveType = false;
+    if (field.m_required != Parser::Field::RequiredFlag::Optional)
+    {
+        if (m_allEnums.contains(fieldTypeName)) {
+            isPrimitiveType = true;
+        }
+        else if (m_primitiveTypeAliases.contains(fieldTypeName)) {
+            isPrimitiveType = true;
+        }
+        else if (dynamic_cast<Parser::PrimitiveType*>(field.m_type.get())) {
+            isPrimitiveType = true;
+        }
+    }
+
+    return isPrimitiveType;
+}
+
 void Generator::writeNamespaceBegin(OutputFileContext & ctx)
 {
     ctx.m_out << "namespace qevercloud {" << ln << ln;
@@ -3026,7 +3057,7 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
                 << "public:" << ln;
 
             for(const auto & f : s.m_fields) {
-                generateClassAccessoryMethodsForFields(
+                generateClassAccessoryMethodsForFieldDeclarations(
                     f, ctx,  QStringLiteral("    "));
 
                 ctx.m_out << ln;
@@ -3064,7 +3095,7 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
                 << indent << "Q_GADGET" << ln
                 << "public:" << ln;
 
-            generateTypeLocalDataAccessoryMethods(s.m_name, ctx, indent);
+            generateTypeLocalDataAccessoryMethodDeclarations(s.m_name, ctx, indent);
 
             for(const auto & f: qAsConst(s.m_fields))
             {
@@ -3082,7 +3113,7 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
                     ctx.m_out << indent << "/** NOT DOCUMENTED */" << ln;
                 }
 
-                generateClassAccessoryMethodsForFields(f, ctx, indent);
+                generateClassAccessoryMethodsForFieldDeclarations(f, ctx, indent);
                 ctx.m_out << ln;
             }
 
@@ -3531,7 +3562,7 @@ void Generator::generateTypeHeader(
     ctx.m_out << indent << s.m_name << " & operator=(" << s.m_name
         << " && other) noexcept;" << ln << ln;
 
-    generateTypeLocalDataAccessoryMethods(s.m_name, ctx, indent);
+    generateTypeLocalDataAccessoryMethodDeclarations(s.m_name, ctx, indent);
 
     for(const auto & f: qAsConst(s.m_fields))
     {
@@ -3548,7 +3579,7 @@ void Generator::generateTypeHeader(
             ctx.m_out << indent << "/** NOT DOCUMENTED */" << ln;
         }
 
-        generateClassAccessoryMethodsForFields(f, ctx, indent);
+        generateClassAccessoryMethodsForFieldDeclarations(f, ctx, indent);
         ctx.m_out << ln;
     }
 
@@ -3643,6 +3674,80 @@ void Generator::generateTypeHeader(
     extraLinesOutsideNamespace << metatypeDeclarationLine;
 
     writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
+}
+
+void Generator::generateTypeCpp(
+    const Parser::Structure & s, const QString & outPath)
+{
+    const QString fileName = s.m_name + QStringLiteral(".cpp");
+    const QString fileSection = QStringLiteral("types");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation, fileSection);
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out  << "#include <generated/types/" << s.m_name << ".h>" << ln << ln;
+    ctx.m_out  << "#include \"data/" << s.m_name << "Data.h\"" << ln << ln;
+
+    writeNamespaceBegin(ctx);
+
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << s.m_name << "::" << s.m_name << "() : d(new " << s.m_name
+        << "Data) {}" << ln << ln;
+
+    ctx.m_out << s.m_name << "::" << s.m_name << "(const " << s.m_name
+        << " & other) : d(other.d) {}" << ln << ln;
+
+    ctx.m_out << s.m_name << "::" << s.m_name << "(" << s.m_name
+        << " && other) noexcept : d(std::move(other.d))" << ln
+        << "{}" << ln << ln;
+
+    ctx.m_out << s.m_name << "::~" << s.m_name << "() noexcept {}" << ln << ln;
+
+    ctx.m_out << s.m_name << " & " << s.m_name << "::operator=(const "
+        << s.m_name << " & other)" << ln
+        << "{" << ln
+        << indent << "if (this != &other) {" << ln
+        << indent << indent << "d = other.d;" << ln
+        << indent << "}" << ln << ln
+        << indent << "return *this;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << s.m_name << " & " << s.m_name << "::operator=(" << s.m_name
+        << " && other) noexcept" << ln
+        << "{" << ln
+        << indent << "if (this != &other) {" << ln
+        << indent << indent << "d = std::move(other.d);" << ln
+        << indent << "}" << ln << ln
+        << indent << "return *this;" << ln
+        << "}" << ln << ln;
+
+    generateTypeLocalDataAccessoryMethodDefinitions(s.m_name, ctx);
+
+    for(const auto & f: qAsConst(s.m_fields)) {
+        generateClassAccessoryMethodsForFieldDefinitions(s, f, ctx);
+    }
+
+    ctx.m_out << "void " << s.m_name
+        << "::print(QTextStream & strm) const" << ln
+        << "{" << ln
+        << indent << "d->print(strm);" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "bool " << s.m_name << "::operator==(const " << s.m_name
+        << " & other) const noexcept" << ln
+        << "{" << ln
+        << indent << "return *d == *other.d;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "bool " << s.m_name << "::operator!=(const " << s.m_name
+        << " & other) const noexcept" << ln
+        << "{" << ln
+        << indent << "return !(*this == other);" << ln
+        << "}" << ln << ln;
+
+    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateTypeDataHeader(
@@ -4751,7 +4856,7 @@ void Generator::generateLocalDataClassDefinition(
         << "}" << ln;
 }
 
-void Generator::generateTypeLocalDataAccessoryMethods(
+void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
     const QString & className, OutputFileContext & ctx, QString indent)
 {
     ctx.m_out << indent << "/**" << ln
@@ -4773,7 +4878,7 @@ void Generator::generateTypeLocalDataAccessoryMethods(
 
     ctx.m_out << indent << "/**" << ln
         << indent
-        << " * @brief localParentId can be used as a local unique identifier"
+        << " * @brief parentLocalId can be used as a local unique identifier"
         << ln << indent
         << " * of the data item being a parent to this data item." << ln
         << indent << " *" << ln
@@ -4831,28 +4936,64 @@ void Generator::generateTypeLocalDataAccessoryMethods(
         << ln << ln;
 }
 
-void Generator::generateClassAccessoryMethodsForFields(
+void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
+    const QString & className, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "QString " << className << "::localId() const" << ln
+        << "{" << ln
+        << indent << "return d->m_localId;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "void " << className << "::setLocalId(QString id)" << ln
+        << "{" << ln
+        << indent << "d->m_localId = id;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "QString " << className << "::parentLocalId() const" << ln
+        << "{" << ln
+        << indent << "return d->m_parentLocalId;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "void " << className << "::setParentLocalId(QString id)" << ln
+        << "{" << ln
+        << indent << "d->m_parentLocalId = id;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "bool " << className << "::isLocallyModified() const" << ln
+        << "{" << ln
+        << indent << "return d->m_locallyModified;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "void " << className << "::setLocallyModified("
+        << "const bool modified)" << ln
+        << "{" << ln
+        << indent << "d->m_locallyModified = modified;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "bool " << className << "::isLocalOnly() const" << ln
+        << "{" << ln
+        << indent << "return d->m_localOnly;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "void " << className << "::setLocalOnly(const bool localOnly)"
+        << ln
+        << "{" << ln
+        << indent << "d->m_localOnly = localOnly;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "bool " << className << "::isLocallyFavorited() const" << ln
+        << "{" << ln
+        << indent << "return d->m_locallyFavorited;" << ln
+        << "}" << ln << ln;
+}
+
+void Generator::generateClassAccessoryMethodsForFieldDeclarations(
     const Parser::Field & field, OutputFileContext & ctx, QString indent)
 {
-    QString fieldTypeName = typeToStr(field.m_type, field.m_name);
-    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-        fieldTypeName = QStringLiteral("std::optional<") + fieldTypeName +
-            QStringLiteral(">");
-    }
-
-    bool isPrimitiveType = false;
-    if (field.m_required != Parser::Field::RequiredFlag::Optional)
-    {
-        if (m_allEnums.contains(fieldTypeName)) {
-            isPrimitiveType = true;
-        }
-        else if (m_primitiveTypeAliases.contains(fieldTypeName)) {
-            isPrimitiveType = true;
-        }
-        else if (dynamic_cast<Parser::PrimitiveType*>(field.m_type.get())) {
-            isPrimitiveType = true;
-        }
-    }
+    const QString fieldTypeName = fieldTypeToStr(field);
+    const bool isPrimitiveType = isFieldOfPrimitiveType(field, fieldTypeName);
 
     // Const getter
     ctx.m_out << indent << "[[nodiscard]] ";
@@ -4880,6 +5021,49 @@ void Generator::generateClassAccessoryMethodsForFields(
     // Setter
     ctx.m_out << indent << "void set" << capitalize(field.m_name) << "("
         << fieldTypeName << " " << field.m_name << ");" << ln;
+}
+
+void Generator::generateClassAccessoryMethodsForFieldDefinitions(
+    const Parser::Structure & s, const Parser::Field & field,
+    OutputFileContext & ctx)
+{
+    const QString fieldTypeName = fieldTypeToStr(field);
+    const bool isPrimitiveType = isFieldOfPrimitiveType(field, fieldTypeName);
+    constexpr const char * indent = "    ";
+
+    // Const getter
+    if (isPrimitiveType) {
+        ctx.m_out << fieldTypeName << " ";
+    }
+    else {
+        ctx.m_out << "const " << fieldTypeName << " & ";
+    }
+
+    ctx.m_out << s.m_name << "::" << field.m_name << "() const noexcept" << ln
+        << "{" << ln
+        << indent << "return d->m_" << field.m_name << ";" << ln
+        << "}" << ln << ln;
+
+    // Non-const getter
+    if (!isPrimitiveType &&
+        !dynamic_cast<Parser::StringType*>(field.m_type.get()) &&
+        !dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()))
+    {
+        ctx.m_out << fieldTypeName << " & "
+            << s.m_name << "::" << "mutable"
+            << capitalize(field.m_name) << "()" << ln
+            << "{" << ln
+            << indent << "return d->m_" << field.m_name << ";" << ln
+            << "}" << ln << ln;
+    }
+
+    // Setter
+    ctx.m_out << "void " << s.m_name << "::set" << capitalize(field.m_name)
+        << "(" << fieldTypeName << " " << field.m_name << ")" << ln
+        << "{" << ln
+        << indent << "d->m_" << field.m_name << " = " << field.m_name << ";"
+        << ln
+        << "}" << ln << ln;
 }
 
 void Generator::generateServiceClassDeclaration(
@@ -6301,6 +6485,7 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
 
     for (const auto & s: parser.structures()) {
         generateTypeHeader(s, outPath);
+        generateTypeCpp(s, outPath);
         generateTypeDataHeader(s, enumerations, outPath);
         generateTypeDataCpp(s, outPath);
     }

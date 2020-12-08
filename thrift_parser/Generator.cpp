@@ -172,6 +172,123 @@ QString Generator::aliasedTypeName(const QString & s) const
     return s;
 }
 
+QStringList Generator::additionalIncludesForFields(
+    const Parser::Structure & s) const
+{
+    QStringList result;
+
+    bool hasOptionalField = false;
+    bool hasListField = false;
+    bool hasSetField = false;
+    bool hasMapField = false;
+
+    for (const auto & f: s.m_fields)
+    {
+        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+            hasOptionalField = true;
+        }
+
+        if (dynamic_cast<Parser::ListType*>(f.m_type.get())) {
+            hasListField = true;
+            continue;
+        }
+
+        if (dynamic_cast<Parser::SetType*>(f.m_type.get())) {
+            hasSetField = true;
+            continue;
+        }
+
+        if (dynamic_cast<Parser::MapType*>(f.m_type.get())) {
+            hasMapField = true;
+            continue;
+        }
+    }
+
+    if (hasOptionalField) {
+        result << QStringLiteral("<optional>");
+    }
+
+    if (hasListField) {
+        result << QStringLiteral("<QList>");
+    }
+
+    if (hasSetField) {
+        result << QStringLiteral("QSet");
+    }
+
+    if (hasMapField) {
+        result << QStringLiteral("QMap");
+    }
+
+    return result;
+}
+
+QStringList Generator::dependentTypeNames(const Parser::Structure & s) const
+{
+    QSet<QString> dependentTypeNames;
+    const auto processType =
+        [this, &dependentTypeNames]
+        (const std::shared_ptr<Parser::Type> & type) -> bool
+        {
+            const auto typeName = aliasedTypeName(
+                typeToStr(type, {}, MethodType::TypeName));
+
+            if (m_allStructs.contains(typeName) ||
+                m_allExceptions.contains(typeName))
+            {
+                dependentTypeNames.insert(typeName);
+                return true;
+            }
+
+            return false;
+        };
+
+    QStack<std::shared_ptr<Parser::Type>> typesStack;
+    for (const auto & f: s.m_fields) {
+        typesStack.push(f.m_type);
+    }
+
+    while (!typesStack.isEmpty())
+    {
+        auto type = typesStack.pop();
+        if (processType(type)) {
+            continue;
+        }
+
+        if (const auto * l = dynamic_cast<Parser::ListType*>(type.get())) {
+            typesStack.push(l->m_valueType);
+            continue;
+        }
+
+        if (const auto * s = dynamic_cast<Parser::SetType*>(type.get())) {
+            typesStack.push(s->m_valueType);
+            continue;
+        }
+
+        if (const auto * m = dynamic_cast<Parser::MapType*>(type.get())) {
+            typesStack.push(m->m_keyType);
+            typesStack.push(m->m_valueType);
+            continue;
+        }
+
+        if (dynamic_cast<Parser::ByteArrayType*>(type.get())) {
+            dependentTypeNames.insert(QStringLiteral("QByteArray"));
+            continue;
+        }
+
+        if (dynamic_cast<Parser::StringType*>(type.get())) {
+            dependentTypeNames.insert(QStringLiteral("QString"));
+            continue;
+        }
+    }
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+    return dependentTypeNames.values();
+#else
+    return dependentTypeNames.toList();
+#endif
+}
+
 QList<Parser::Field> Generator::loggableFields(
     const QList<Parser::Field> & fields) const
 {
@@ -567,6 +684,52 @@ bool Generator::isFieldOfPrimitiveType(
     }
 
     return isPrimitiveType;
+}
+
+void Generator::writeTypeProperties(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    QHash<QString, QString> typeAliases;
+    for(const auto & f: s.m_fields)
+    {
+        const auto fieldTypeName = typeToStr(f.m_type);
+        if (fieldTypeName.contains(QStringLiteral(","))) {
+            // In earlier versions of Qt Q_PROPERTY macro can't handle type
+            // names containing comma
+            typeAliases[fieldTypeName] = capitalize(f.m_name);
+        }
+    }
+
+    constexpr const char * indent = "    ";
+
+    for(auto it = typeAliases.constBegin(), end = typeAliases.constEnd();
+        it != end; ++it)
+    {
+        ctx.m_out << indent << "using " << it.value() << " = "
+            << it.key() << ";" << ln;
+    }
+
+    if (!typeAliases.isEmpty()) {
+        ctx.m_out << ln;
+    }
+
+    for(const auto & f: s.m_fields)
+    {
+        auto fieldTypeName = typeToStr( f.m_type);
+        auto it = typeAliases.find(fieldTypeName);
+        if (it != typeAliases.end()) {
+            fieldTypeName = it.value();
+        }
+
+        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+            fieldTypeName = QStringLiteral("std::optional<") +
+                fieldTypeName + QStringLiteral(">");
+        }
+
+        ctx.m_out << indent << "Q_PROPERTY(" << fieldTypeName
+            << " " << f.m_name << " READ " << f.m_name
+            << " WRITE set" << capitalize(f.m_name) << ")" << ln;
+    }
 }
 
 void Generator::writeNamespaceBegin(OutputFileContext & ctx)
@@ -2930,329 +3093,40 @@ void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
     const QString fileName = QStringLiteral("Types.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
-    QStringList additionalIncludes = QStringList()
-        << QStringLiteral("EDAMErrorCode.h") << QStringLiteral("../Printable.h")
-        << QStringLiteral("../Optional.h") << QStringLiteral("<QHash>")
-        << QStringLiteral("<QMetaType>") << QStringLiteral("<QList>")
-        << QStringLiteral("<QMap>") << QStringLiteral("<QSet>")
-        << QStringLiteral("<QStringList>") << QStringLiteral("<QByteArray>")
-        << QStringLiteral("<QDateTime>") << QStringLiteral("<QMetaType>")
-        << QStringLiteral("<QSharedDataPointer>")
-        << QStringLiteral("<QVariant>") << QStringLiteral("<optional>");
-    sortIncludes(additionalIncludes);
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_TYPES_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_TYPES_H" << ln << ln;
 
-    writeHeaderHeader(ctx, fileName, additionalIncludes);
-
-    const auto & typeAliases = parser.typeAliases();
-    for(const auto & t: typeAliases)
-    {
-        if (!t.m_docComment.isEmpty()) {
-            ctx.m_out << t.m_docComment << ln;
-        }
-
-        ctx.m_out << "using " << t.m_name << " = "
-            << typeToStr(t.m_type, t.m_name) << ";" << ln << ln;
+    const auto & structures = parser.structures();
+    QStringList typesIncludes;
+    typesIncludes.reserve(structures.size());
+    for (const auto & s: structures) {
+        typesIncludes << s.m_name;
     }
+
+    std::sort(typesIncludes.begin(), typesIncludes.end());
+
+    for (const auto & include: qAsConst(typesIncludes)) {
+        ctx.m_out << "#include \"types/" << include << ".h\"" << ln;
+    }
+
     ctx.m_out << ln;
 
-    QSet<QString> safe;
-    QList<Parser::Structure> ordered;
-
-    QSet<QString> exceptions;
-    const auto & parserExceptions = parser.exceptions();
-    for(const auto & e: parserExceptions) {
-        exceptions.insert(e.m_name);
+    const auto & exceptions = parser.exceptions();
+    QStringList exceptionIncludes;
+    exceptionIncludes.reserve(exceptions.size());
+    for (const auto & s: exceptions) {
+        exceptionIncludes << s.m_name;
     }
 
-    auto heap = parser.structures();
-    heap.append(parser.exceptions());
+    std::sort(exceptionIncludes.begin(), exceptionIncludes.end());
 
-    int count = heap.count();
-    while(!heap.isEmpty())
-    {
-        int i = 0;
-        while(i < heap.count())
-        {
-            const Parser::Structure s = heap[i];
-            bool safeStruct = true;
-            for(const auto & f : s.m_fields)
-            {
-                QString typeName = getIdentifier(f.m_type);
-                QString typeName2;
-                if (typeName.isEmpty())
-                {
-                    auto listType =
-                        std::dynamic_pointer_cast<Parser::ListType>(f.m_type);
-                    auto setType =
-                        std::dynamic_pointer_cast<Parser::SetType>(f.m_type);
-                    auto mapType =
-                        std::dynamic_pointer_cast<Parser::MapType>(f.m_type);
-
-                    if (setType) {
-                        typeName = getIdentifier(setType->m_valueType);
-                    }
-                    else if (listType) {
-                        typeName = getIdentifier(listType->m_valueType);
-                    }
-                    else if (mapType) {
-                        typeName = getIdentifier(mapType->m_valueType);
-                        typeName2 = getIdentifier(mapType->m_keyType);
-                    }
-                }
-
-                if (!typeName.isEmpty() &&
-                    (m_allStructs.contains(typeName) ||
-                     m_allExceptions.contains(typeName)) &&
-                    !safe.contains(typeName))
-                {
-                    safeStruct = false;
-                    break;
-                }
-
-                if (!typeName2.isEmpty() &&
-                    (m_allStructs.contains(typeName2) ||
-                     m_allExceptions.contains(typeName2))
-                    && !safe.contains(typeName2))
-                {
-                    safeStruct = false;
-                    break;
-                }
-            }
-
-            if (safeStruct) {
-                safe << s.m_name;
-                ordered << s;
-                heap.removeAt(i);
-            }
-            else {
-                ++i;
-            }
-        }
-
-        if (count == heap.count()) {
-            throw std::runtime_error("Struct sorting is in infinite loop!");
-        }
+    for (const auto & include: qAsConst(exceptionIncludes)) {
+        ctx.m_out << "#include \"exceptions/" << include << ".h\"" << ln;
     }
 
-    generateLocalDataClassDeclaration(ctx);
     ctx.m_out << ln;
-
-    for(const auto & s: qAsConst(ordered))
-    {
-        if (!s.m_docComment.isEmpty()) {
-            ctx.m_out << s.m_docComment << ln;
-        }
-        else {
-            ctx.m_out << "/** NO DOC COMMENT ID FOUND */" << ln;
-        }
-
-        if (exceptions.contains(s.m_name))
-        {
-            constexpr const char * indent = "    ";
-
-            ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
-                << ": public EvernoteException, public Printable"
-                << ln << "{" << ln
-                << indent << "Q_GADGET" << ln
-                << "public:" << ln;
-
-            for(const auto & f : s.m_fields) {
-                generateClassAccessoryMethodsForFieldDeclarations(
-                    f, ctx,  QStringLiteral("    "));
-
-                ctx.m_out << ln;
-            }
-
-            ctx.m_out << indent << s.m_name
-                << "();" << ln;
-            ctx.m_out << indent << "~" << s.m_name
-                << "() noexcept override;" << ln;
-
-            if (!s.m_fields.isEmpty()) {
-                ctx.m_out << ln;
-                ctx.m_out << indent << s.m_name
-                    << "(const " << s.m_name << " & other);" << ln;
-            }
-
-            ctx.m_out << indent
-                << "const char * what() const noexcept override;" << ln;
-
-            ctx.m_out << indent
-                << "EverCloudExceptionDataPtr exceptionData() const override;"
-                << ln << ln;
-
-            ctx.m_out << indent
-                << "void print(QTextStream & strm) const override;"
-                << ln;
-        }
-        else
-        {
-            const QString indent = QStringLiteral("    ");
-
-            ctx.m_out << "class QEVERCLOUD_EXPORT "
-                << s.m_name << ": public Printable" << ln
-                << "{" << ln
-                << indent << "Q_GADGET" << ln
-                << "public:" << ln;
-
-            generateTypeLocalDataAccessoryMethodDeclarations(s.m_name, ctx, indent);
-
-            for(const auto & f: qAsConst(s.m_fields))
-            {
-                if (s.m_fieldComments.contains(f.m_name))
-                {
-                    auto lines =
-                        s.m_fieldComments[f.m_name].split(QStringLiteral("\n"));
-
-                    for(const auto & line: qAsConst(lines)) {
-                        ctx.m_out << indent << line << ln;
-                    }
-                }
-                else
-                {
-                    ctx.m_out << indent << "/** NOT DOCUMENTED */" << ln;
-                }
-
-                generateClassAccessoryMethodsForFieldDeclarations(f, ctx, indent);
-                ctx.m_out << ln;
-            }
-
-            ctx.m_out << indent
-                << "void print(QTextStream & strm) const override;" << ln;
-        }
-
-        constexpr const char * indent = "    ";
-
-        ctx.m_out << ln;
-        ctx.m_out << indent << QString::fromUtf8(
-            "bool operator==(const %1 & other) const").arg(s.m_name) << ln;
-        ctx.m_out << indent << "{" << ln;
-
-        bool first = true;
-        for(const auto & f : s.m_fields)
-        {
-            if (first) {
-                first = false;
-                ctx.m_out << indent << indent << "return ";
-            }
-            else {
-                ctx.m_out << indent << indent << indent << "&& ";
-            }
-
-            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                ctx.m_out
-                    << QString::fromUtf8("%1.isEqual(other.%1)").arg(f.m_name)
-                    << ln;
-            }
-            else {
-                ctx.m_out << QString::fromUtf8("(%1 == other.%1)").arg(f.m_name)
-                    << ln;
-            }
-        }
-
-        ctx.m_out << indent << indent << ";" << ln << indent << "}" << ln << ln;
-        ctx.m_out << indent << QString::fromUtf8(
-            "bool operator!=(const %1 & other) const").arg(s.m_name) << ln;
-
-        ctx.m_out << indent << "{" << ln;
-        ctx.m_out << indent << indent << "return !(*this == other);" << ln;
-        ctx.m_out << indent << "}" << ln;
-
-        ctx.m_out << ln;
-
-        QHash<QString, QString> typeAliases;
-        for(const auto & f: s.m_fields)
-        {
-            auto fieldTypeName = typeToStr(
-                f.m_type,
-                {},
-                MethodType::TypeName);
-
-            if (fieldTypeName.contains(QStringLiteral(","))) {
-                // In earlier versions of Qt Q_PROPERTY macro can't handle type
-                // names containing comma
-                typeAliases[fieldTypeName] = capitalize(f.m_name);
-            }
-        }
-
-        for(auto it = typeAliases.constBegin(), end = typeAliases.constEnd();
-            it != end; ++it)
-        {
-            ctx.m_out << indent << "using " << it.value() << " = "
-                << it.key() << ";" << ln;
-        }
-
-        if (!typeAliases.isEmpty()) {
-            ctx.m_out << ln;
-        }
-
-        if (!exceptions.contains(s.m_name)) {
-            ctx.m_out << indent
-                << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)"
-                << ln << indent
-                << "Q_PROPERTY(QString parentLocalId READ parentLocalId "
-                << "WRITE setParentLocalId)"
-                << ln << indent
-                << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
-                << "WRITE setLocallyModified)"
-                << ln << indent
-                << "Q_PROPERTY(bool localOnly READ isLocalOnly "
-                << "WRITE setLocalOnly)"
-                << ln << indent
-                << "Q_PROPERTY(bool favorited READ isLocallyFavorited "
-                << "WRITE setLocallyFavorited)"
-                << ln;
-        }
-
-        for(const auto & f: s.m_fields)
-        {
-            auto fieldTypeName = typeToStr(
-                f.m_type,
-                {},
-                MethodType::TypeName);
-
-            auto it = typeAliases.find(fieldTypeName);
-            if (it != typeAliases.end()) {
-                fieldTypeName = it.value();
-            }
-
-            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                fieldTypeName = QStringLiteral("std::optional<") +
-                    fieldTypeName + QStringLiteral(">");
-            }
-
-            ctx.m_out << indent << "Q_PROPERTY(" << fieldTypeName
-                << " " << f.m_name << " READ " << f.m_name
-                << "WRITE set" << capitalize(f.m_name) << ")" << ln;
-        }
-
-        ctx.m_out << ln;
-
-        ctx.m_out << "private:" << ln
-            << indent << "class " << s.m_name << "Data;" << ln
-            << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
-            << "};" << ln << ln;
-    }
-
-    QStringList extraLinesOutsideNamespace;
-    extraLinesOutsideNamespace.reserve(ordered.size() + 2);
-
-    Parser::Structure everCloudLocalDataStruct;
-    everCloudLocalDataStruct.m_name = QStringLiteral("EverCloudLocalData");
-    ordered.prepend(everCloudLocalDataStruct);
-
-    for(const auto & s: qAsConst(ordered)) {
-        QString line;
-        QTextStream lineOut(&line);
-
-        lineOut << "Q_DECLARE_METATYPE(qevercloud::" << s.m_name << ")";
-        lineOut.flush();
-
-        extraLinesOutsideNamespace << line;
-    }
-    extraLinesOutsideNamespace << QString();
-
-    writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_H" << ln;
 }
 
 void Generator::generateTypesCpp(Parser & parser, const QString & outPath)
@@ -3473,62 +3347,26 @@ void Generator::generateTypeHeader(
         << QStringLiteral("../EDAMErrorCode.h")
         << QStringLiteral("TypeAliases.h");
 
-    QSet<QString> dependenciesIncludes;
-    const auto processType =
-        [this, &dependenciesIncludes]
-        (const std::shared_ptr<Parser::Type> & type) -> bool
-        {
-            auto typeName = typeToStr(type, {}, MethodType::TypeName);
-            typeName = aliasedTypeName(typeName);
+    additionalIncludes << additionalIncludesForFields(s);
 
-            if (m_allStructs.contains(typeName) ||
-                m_allExceptions.contains(typeName))
-            {
-                dependenciesIncludes.insert(
-                    typeName + QStringLiteral(".h"));
-                return true;
-            }
-
-            return false;
-        };
-
-    QStack<std::shared_ptr<Parser::Type>> typesStack;
-    for (const auto & f: s.m_fields) {
-        typesStack.push(f.m_type);
-    }
-
-    while (!typesStack.isEmpty())
-    {
-        auto type = typesStack.pop();
-        if (processType(type)) {
+    const auto deps = dependentTypeNames(s);
+    for (const auto & dep: qAsConst(deps)) {
+        if (dep == QStringLiteral("QString")) {
             continue;
         }
 
-        if (const auto * l = dynamic_cast<Parser::ListType*>(type.get())) {
-            typesStack.push(l->m_valueType);
+        if (dep == QStringLiteral("QByteArray")) {
+            additionalIncludes.append(QStringLiteral("<QByteArray>"));
             continue;
         }
 
-        if (const auto * s = dynamic_cast<Parser::SetType*>(type.get())) {
-            typesStack.push(s->m_valueType);
+        if (dep.endsWith(QStringLiteral("Exception"))) {
+            additionalIncludes.append(
+                QStringLiteral("../exceptions/") + dep + QStringLiteral(".h"));
             continue;
         }
 
-        if (const auto * m = dynamic_cast<Parser::MapType*>(type.get())) {
-            typesStack.push(m->m_keyType);
-            typesStack.push(m->m_valueType);
-            continue;
-        }
-
-        if (dynamic_cast<Parser::ByteArrayType*>(type.get())) {
-            dependenciesIncludes.insert(
-                QStringLiteral("<QByteArray>"));
-            continue;
-        }
-    }
-
-    for (const auto & include: qAsConst(dependenciesIncludes)) {
-        additionalIncludes.append(include);
+        additionalIncludes.append(dep + QStringLiteral(".h"));
     }
 
     sortIncludes(additionalIncludes);
@@ -3537,6 +3375,10 @@ void Generator::generateTypeHeader(
         ctx, fileName, additionalIncludes, HeaderKind::Public, fileSection);
 
     const QString indent = QStringLiteral("    ");
+
+    if (!s.m_docComment.isEmpty()) {
+        ctx.m_out << s.m_docComment << ln;
+    }
 
     ctx.m_out << "class QEVERCLOUD_EXPORT "
         << s.m_name << ": public Printable" << ln
@@ -3595,32 +3437,6 @@ void Generator::generateTypeHeader(
 
     ctx.m_out << ln;
 
-    QHash<QString, QString> typeAliases;
-    for(const auto & f: s.m_fields)
-    {
-        auto fieldTypeName = typeToStr(
-            f.m_type,
-            {},
-            MethodType::TypeName);
-
-        if (fieldTypeName.contains(QStringLiteral(","))) {
-            // In earlier versions of Qt Q_PROPERTY macro can't handle type
-            // names containing comma
-            typeAliases[fieldTypeName] = capitalize(f.m_name);
-        }
-    }
-
-    for(auto it = typeAliases.constBegin(), end = typeAliases.constEnd();
-        it != end; ++it)
-    {
-        ctx.m_out << indent << "using " << it.value() << " = "
-            << it.key() << ";" << ln;
-    }
-
-    if (!typeAliases.isEmpty()) {
-        ctx.m_out << ln;
-    }
-
     ctx.m_out << indent
         << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)" << ln
         << indent
@@ -3636,30 +3452,9 @@ void Generator::generateTypeHeader(
         << "Q_PROPERTY(bool favorited READ isLocallyFavorited "
         << "WRITE setLocallyFavorited)" << ln;
 
-    for(const auto & f: s.m_fields)
-    {
-        auto fieldTypeName = typeToStr(
-            f.m_type,
-            {},
-            MethodType::TypeName);
-
-        auto it = typeAliases.find(fieldTypeName);
-        if (it != typeAliases.end()) {
-            fieldTypeName = it.value();
-        }
-
-        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-            fieldTypeName = QStringLiteral("std::optional<") +
-                fieldTypeName + QStringLiteral(">");
-        }
-
-        ctx.m_out << indent << "Q_PROPERTY(" << fieldTypeName
-            << " " << f.m_name << " READ " << f.m_name
-            << " WRITE set" << capitalize(f.m_name) << ")" << ln;
-    }
+    writeTypeProperties(s, ctx);
 
     ctx.m_out << ln;
-
     ctx.m_out << "private:" << ln
     << indent << "class " << s.m_name << "Data;" << ln
     << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
@@ -3927,6 +3722,117 @@ void Generator::generateTypeDataCpp(
 
     writeTypeDataPrintDefinition(ctx.m_out, s);
     writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateExceptionHeader(
+    const Parser::Structure & s, const QString & outPath)
+{
+    const QString fileName = s.m_name + QStringLiteral(".h");
+    const QString fileSection = QStringLiteral("exceptions");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface, fileSection);
+
+    QStringList additionalIncludes = QStringList()
+        << QStringLiteral("../../EverCloudException.h")
+        << QStringLiteral("../../Printable.h")
+        << QStringLiteral("../EDAMErrorCode.h")
+        << QStringLiteral("../types/TypeAliases.h");
+
+    additionalIncludes << additionalIncludesForFields(s);
+
+    const auto deps = dependentTypeNames(s);
+    for (const auto & dep: qAsConst(deps)) {
+        if (dep == QStringLiteral("QString")) {
+            continue;
+        }
+
+        if (dep == QStringLiteral("QByteArray")) {
+            additionalIncludes.append(QStringLiteral("<QByteArray>"));
+            continue;
+        }
+
+        if (!dep.endsWith(QStringLiteral("Exception"))) {
+            additionalIncludes.append(
+                QStringLiteral("../types/") + dep + QStringLiteral(".h"));
+            continue;
+        }
+
+        additionalIncludes.append(dep + QStringLiteral(".h"));
+    }
+
+    sortIncludes(additionalIncludes);
+
+    writeHeaderHeader(
+        ctx, fileName, additionalIncludes, HeaderKind::Public, fileSection);
+
+    constexpr const char * indent = "    ";
+
+    if (!s.m_docComment.isEmpty()) {
+        ctx.m_out << s.m_docComment << ln;
+    }
+
+    ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
+        << ": public EvernoteException, public Printable" << ln
+        << "{" << ln
+        << indent << "Q_GADGET" << ln
+        << "public:" << ln;
+
+    ctx.m_out << indent << s.m_name << "();" << ln;
+
+    if (!s.m_fields.isEmpty()) {
+        ctx.m_out << ln;
+        ctx.m_out << indent << s.m_name
+            << "(const " << s.m_name << " & other);" << ln;
+    }
+
+    ctx.m_out << indent << "~" << s.m_name << "() noexcept override;" << ln
+        << ln;
+
+    ctx.m_out << indent
+        << "[[nodiscard]] const char * what() const noexcept override;" << ln
+        << ln;
+
+    ctx.m_out << indent
+        << "[[nodiscard]] EverCloudExceptionDataPtr exceptionData() const "
+        << "override;" << ln
+        << ln;
+
+    for(const auto & f : s.m_fields) {
+        generateClassAccessoryMethodsForFieldDeclarations(
+            f, ctx,  QStringLiteral("    "));
+
+        ctx.m_out << ln;
+    }
+
+    ctx.m_out << indent
+        << "void print(QTextStream & strm) const override;" << ln
+        << ln;
+
+    ctx.m_out << indent << "[[nodiscard]] bool operator==(const " << s.m_name
+        << " & other) const noexcept;" << ln;
+
+    ctx.m_out << indent << "[[nodiscard]] bool operator!=(const " << s.m_name
+        << " & other) const noexcept;" << ln;
+
+    ctx.m_out << ln;
+    writeTypeProperties(s, ctx);
+
+    ctx.m_out << ln;
+    ctx.m_out << "private:" << ln
+        << indent << "class " << s.m_name << "Data;" << ln
+        << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
+        << "};" << ln << ln;
+
+    QStringList extraLinesOutsideNamespace;
+    extraLinesOutsideNamespace.reserve(1);
+
+    QString metatypeDeclarationLine;
+    QTextStream lineOut(&metatypeDeclarationLine);
+    lineOut << "Q_DECLARE_METATYPE(qevercloud::" << s.m_name << ")";
+    extraLinesOutsideNamespace << metatypeDeclarationLine;
+
+    writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
 }
 
 void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
@@ -6488,6 +6394,10 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
         generateTypeCpp(s, outPath);
         generateTypeDataHeader(s, enumerations, outPath);
         generateTypeDataCpp(s, outPath);
+    }
+
+    for (const auto & s: parser.exceptions()) {
+        generateExceptionHeader(s, outPath);
     }
 
     generateServicesHeader(parser, outPath);

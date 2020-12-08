@@ -92,6 +92,9 @@ private:
     void generateTypeDataCpp(
         const Parser::Structure & s, const QString & outPath);
 
+    void generateExceptionHeader(
+        const Parser::Structure & s, const QString & outPath);
+
     void generateServicesHeader(Parser & parser, const QString & outPath);
     void generateServicesCpp(Parser & parser, const QString & outPath);
 
@@ -280,7 +283,8 @@ private:
     };
 
     QString typeToStr(
-        std::shared_ptr<Parser::Type> type, const QString & identifier,
+        std::shared_ptr<Parser::Type> type,
+        const QString & identifier = QString(),
         const MethodType methodType = MethodType::TypeName) const;
 
     // Other auxiliary methods
@@ -295,10 +299,32 @@ private:
     QString aliasedTypeName(const QString & s) const;
 
     /**
-     * @brief loggableFields - filters out fields like authentication token,
-     * consumer key, consumer secret etc which should not be present in the log
-     * @param fields - fields to be filtered for logging
-     * @return the list of non-secret fields which can be put into a log entry
+     * @brief additionalIncludesForFields examines the passed in structure and
+     *        returns the list containing some stdlib's or Qt's headers which
+     *        need to be included to satisfy the structure's requirements.
+     *
+     * @param s     Structure for which additional includes are computed
+     */
+    QStringList additionalIncludesForFields(const Parser::Structure & s) const;
+
+    /**
+     * @brief dependentTypeNames provides a list of singular types (i.e.
+     *        non-list/map/set ones) which are contained within the members of
+     *        the passed in structure, members of structure members and so on
+     *        recursively.
+     *
+     * @param s     Structure which fields' dependent type names are computed
+     */
+    QStringList dependentTypeNames(const Parser::Structure & s) const;
+
+    /**
+     * @brief loggableFields filters out fields like authentication token,
+     *        consumer key, consumer secret etc which should not be present in
+     *        the log
+     *
+     * @param fields            Fields to be filtered for logging
+     * @return                  The list of non-secret fields which can be put
+     *                          into a log entry
      */
     QList<Parser::Field> loggableFields(const QList<Parser::Field> & fields) const;
 
@@ -314,6 +340,9 @@ private:
         const Parser::Field & field, const QString & fieldTypeName) const;
 
     // Write methods for particular parsed fields
+
+    void writeTypeProperties(
+        const Parser::Structure & s, OutputFileContext & ctx);
 
     void writeNamespaceBegin(OutputFileContext & ctx);
 

@@ -312,6 +312,20 @@ QList<Parser::Field> Generator::loggableFields(
     return result;
 }
 
+bool Generator::shouldGenerateLocalDataMethods(const Parser::Structure & s) const
+{
+    for (const auto & f: s.m_fields)
+    {
+        if (typeToStr(f.m_type) == QStringLiteral("Guid") &&
+            f.m_name == QStringLiteral("guid"))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 QString Generator::camelCaseToSnakeCase(const QString & input) const
 {
     QString result;
@@ -3404,7 +3418,10 @@ void Generator::generateTypeHeader(
     ctx.m_out << indent << s.m_name << " & operator=(" << s.m_name
         << " && other) noexcept;" << ln << ln;
 
-    generateTypeLocalDataAccessoryMethodDeclarations(s.m_name, ctx, indent);
+    const bool generateLocalData = shouldGenerateLocalDataMethods(s);
+    if (generateLocalData) {
+        generateTypeLocalDataAccessoryMethodDeclarations(s.m_name, ctx, indent);
+    }
 
     for(const auto & f: qAsConst(s.m_fields))
     {
@@ -3437,20 +3454,23 @@ void Generator::generateTypeHeader(
 
     ctx.m_out << ln;
 
-    ctx.m_out << indent
-        << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)" << ln
-        << indent
-        << "Q_PROPERTY(QString parentLocalId READ parentLocalId "
-        << "WRITE setParentLocalId)" << ln
-        << indent
-        << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
-        << "WRITE setLocallyModified)" << ln
-        << indent
-        << "Q_PROPERTY(bool localOnly READ isLocalOnly "
-        << "WRITE setLocalOnly)" << ln
-        << indent
-        << "Q_PROPERTY(bool favorited READ isLocallyFavorited "
-        << "WRITE setLocallyFavorited)" << ln;
+    if (generateLocalData)
+    {
+        ctx.m_out << indent
+            << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)"
+            << ln << indent
+            << "Q_PROPERTY(QString parentLocalId READ parentLocalId "
+            << "WRITE setParentLocalId)" << ln
+            << indent
+            << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
+            << "WRITE setLocallyModified)" << ln
+            << indent
+            << "Q_PROPERTY(bool localOnly READ isLocalOnly "
+            << "WRITE setLocalOnly)" << ln
+            << indent
+            << "Q_PROPERTY(bool favorited READ isLocallyFavorited "
+            << "WRITE setLocallyFavorited)" << ln;
+    }
 
     writeTypeProperties(s, ctx);
 
@@ -3518,7 +3538,9 @@ void Generator::generateTypeCpp(
         << indent << "return *this;" << ln
         << "}" << ln << ln;
 
-    generateTypeLocalDataAccessoryMethodDefinitions(s.m_name, ctx);
+    if (shouldGenerateLocalDataMethods(s)) {
+        generateTypeLocalDataAccessoryMethodDefinitions(s.m_name, ctx);
+    }
 
     for(const auto & f: qAsConst(s.m_fields)) {
         generateClassAccessoryMethodsForFieldDefinitions(s, f, ctx);
@@ -3600,11 +3622,13 @@ void Generator::generateTypeDataHeader(
         << indent << "void print(QTextStream & strm) const override;" << ln
         << ln;
 
-    ctx.m_out << indent << "QString m_localId;" << ln
-        << indent << "QString m_parentLocalId;" << ln
-        << indent << "bool m_locallyModified = false;" << ln
-        << indent << "bool m_localOnly = false;" << ln
-        << indent << "bool m_locallyFavorited = false;" << ln << ln;
+    if (shouldGenerateLocalDataMethods(s)) {
+        ctx.m_out << indent << "QString m_localId;" << ln
+            << indent << "QString m_parentLocalId;" << ln
+            << indent << "bool m_locallyModified = false;" << ln
+            << indent << "bool m_localOnly = false;" << ln
+            << indent << "bool m_locallyFavorited = false;" << ln << ln;
+    }
 
     for(const auto & f: qAsConst(s.m_fields))
     {
@@ -3691,14 +3715,17 @@ void Generator::generateTypeDataCpp(
         << indent << indent << "return true;" << ln
         << indent << "}" << ln << ln;
 
-    ctx.m_out << indent << "return m_localId == other.m_localId &&" << ln
-        << indent << indent << "m_parentLocalId == other.m_parentLocalId &&"
-        << ln
-        << indent << indent << "m_locallyModified == other.m_locallyModified &&"
-        << ln
-        << indent << indent << "m_localOnly == other.m_localOnly &&" << ln
-        << indent << indent << "m_locallyFavorited == other.m_locallyFavorited"
-        << " &&" << ln << indent << indent;
+    if (shouldGenerateLocalDataMethods(s)) {
+        ctx.m_out << indent << "return m_localId == other.m_localId &&" << ln
+            << indent << indent
+            << "m_parentLocalId == other.m_parentLocalId &&" << ln
+            << indent << indent
+            << "m_locallyModified == other.m_locallyModified &&" << ln
+            << indent << indent << "m_localOnly == other.m_localOnly &&" << ln
+            << indent << indent
+            << "m_locallyFavorited == other.m_locallyFavorited &&" << ln
+            << indent << indent;
+    }
 
     for(const auto & f: qAsConst(s.m_fields))
     {

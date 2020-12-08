@@ -328,6 +328,8 @@ private:
      */
     QList<Parser::Field> loggableFields(const QList<Parser::Field> & fields) const;
 
+    bool shouldGenerateLocalDataMethods(const Parser::Structure & s) const;
+
     QString camelCaseToSnakeCase(const QString & input) const;
 
     QString capitalize(const QString & input) const;

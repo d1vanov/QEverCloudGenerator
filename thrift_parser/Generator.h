@@ -80,20 +80,20 @@ private:
         const Parser::TypeAliases & typeAliases, const QString & outPath);
 
     void generateTypeHeader(
-        const Parser::Structure & s, const QString & outPath);
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
 
     void generateTypeCpp(
-        const Parser::Structure & s, const QString & outPath);
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
 
     void generateTypeDataHeader(
         const Parser::Structure & s, const Parser::Enumerations & enumerations,
-        const QString & outPath);
+        const QString & outPath, const QString & fileSection);
 
     void generateTypeDataCpp(
-        const Parser::Structure & s, const QString & outPath);
-
-    void generateExceptionHeader(
-        const Parser::Structure & s, const QString & outPath);
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
 
     void generateServicesHeader(Parser & parser, const QString & outPath);
     void generateServicesCpp(Parser & parser, const QString & outPath);
@@ -109,12 +109,6 @@ private:
 
     void generateTestRandomDataGeneratorsCpp(
         Parser & parser, const QString & outPath);
-
-    void generateLocalDataClassDeclaration(
-        OutputFileContext & ctx);
-
-    void generateLocalDataClassDefinition(
-        OutputFileContext & ctx);
 
     void generateTypeLocalDataAccessoryMethodDeclarations(
         const QString & className, OutputFileContext & ctx,
@@ -253,11 +247,11 @@ private:
 
     void writeThriftWriteFields(
         QTextStream & out, const QList<Parser::Field> & fields,
-        const QString & identPrefix, const QString & fieldPrefix);
+        const QString & indentPrefix, const QString & fieldPrefix);
 
     void writeThriftReadField(
         QTextStream & out, const Parser::Field & field,
-        const QString & identPrefix,
+        const QString & indentPrefix,
         const QString & fieldParent);
 
     void sortIncludes(QStringList & includes) const;
@@ -360,10 +354,6 @@ private:
     void writeEnumerationPrintDefinition(
         QTextStream & out, const Parser::Enumeration & e,
         const char * printer) const;
-
-    void writeStructPrintDefinition(
-        QTextStream & out, const Parser::Structure & s,
-        const Parser & parser) const;
 
     void writeTypeDataPrintDefinition(
         QTextStream & out, const Parser::Structure & s) const;

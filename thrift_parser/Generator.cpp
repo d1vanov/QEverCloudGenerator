@@ -2505,10 +2505,13 @@ void Generator::writeThriftWriteFields(
         const bool isOptional =
             (field.m_required == Parser::Field::RequiredFlag::Optional);
 
+        const QString fieldSuffix =
+            (fieldPrefix.isEmpty() ? QLatin1String("") : QStringLiteral("()"));
+
         if (isOptional) {
             indent = QStringLiteral("    ");
             out << "    if (" << fieldPrefix
-                << field.m_name << "()) {" << ln;
+                << field.m_name << fieldSuffix << ") {" << ln;
         }
 
         out << indent << "    writer.writeFieldBegin(" << ln
@@ -2539,7 +2542,7 @@ void Generator::writeThriftWriteFields(
             out << indent
                 << "    for(const auto & value: qAsConst("
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
-                << "())) {" << ln;
+                << fieldSuffix << ")) {" << ln;
 
             QString writeMethod = typeToStr(
                 valueType, indentPrefix + QStringLiteral(",") + field.m_name,
@@ -2568,7 +2571,7 @@ void Generator::writeThriftWriteFields(
 
             out << indent << "    for(const auto & value: qAsConst("
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
-                << "())) {" << ln;
+                << fieldSuffix << ")) {" << ln;
 
             QString writeMethod = typeToStr(
                 valueType, indentPrefix + QStringLiteral(",") + field.m_name,
@@ -2605,7 +2608,7 @@ void Generator::writeThriftWriteFields(
 
             out << indent << "    for(const auto & it: "
                 << "toRange(" << (isOptional ? "*" : "") << fieldPrefix
-                << field.m_name << "())) {" << ln;
+                << field.m_name << fieldSuffix << ")) {" << ln;
 
             QString keyWriteMethod = typeToStr(
                 keyType, indentPrefix + QStringLiteral(",") + field.m_name,
@@ -2635,7 +2638,8 @@ void Generator::writeThriftWriteFields(
         {
             out << indent << "    " << writeMethod
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
-                << "()" << (writeMethod.contains(QStringLiteral("static_cast<"))
+                << fieldSuffix
+                << (writeMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
                     : QLatin1String(""))
                 << ");" << ln;
@@ -2780,13 +2784,26 @@ void Generator::writeThriftReadField(
         out << indent << readMethod << "v);" << ln;
     }
 
-    out << indent << fieldParent << "set" << capitalize(field.m_name) << "(";
-
-    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-        out << "std::make_optional(v));" << ln;
+    if (fieldParent.isEmpty()) {
+        out << indent << field.m_name << " = ";
     }
     else {
-        out << "v);" << ln;
+        out << indent << fieldParent << "set" << capitalize(field.m_name)
+            << "(";
+    }
+
+    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+        out << "std::make_optional(v)";
+    }
+    else {
+        out << "v";
+    }
+
+    if (fieldParent.isEmpty()) {
+        out << ";" << ln;
+    }
+    else {
+        out << ");" << ln;
     }
 }
 

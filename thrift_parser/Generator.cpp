@@ -392,12 +392,17 @@ void Generator::generateGetRandomValueExpression(
     {
         out << prefix;
         if (!field.m_name.isEmpty()) {
-            out << field.m_name << " = ";
+            out << "set" << capitalize(field.m_name) << "(";
         }
 
         out << getGenerateRandomValueFunction(
-            typeToStr(field.m_type, {}, MethodType::TypeName)) << end;
+            typeToStr(field.m_type, {}, MethodType::TypeName));
 
+        if (!field.m_name.isEmpty()) {
+            out << ")";
+        }
+
+        out << end;
         return;
     }
 
@@ -406,10 +411,6 @@ void Generator::generateGetRandomValueExpression(
     if (identifierType)
     {
         out << prefix;
-        if (!field.m_name.isEmpty()) {
-            out << field.m_name << " = ";
-        }
-
         auto actualType = clearInclude(identifierType->m_identifier);
         actualType = aliasedTypeName(actualType);
 
@@ -441,7 +442,18 @@ void Generator::generateGetRandomValueExpression(
             }
 
             int index = rand() % e.m_values.size();
-            out << actualType << "::" << e.m_values[index].first << end;
+
+            if (!field.m_name.isEmpty()) {
+                out << "set" << capitalize(field.m_name) << "(";
+            }
+
+            out << actualType << "::" << e.m_values[index].first;
+
+            if (!field.m_name.isEmpty()) {
+                out << ")";
+            }
+
+            out << end;
         }
         else if (exceptionIt != exceptions.end())
         {
@@ -450,8 +462,19 @@ void Generator::generateGetRandomValueExpression(
         }
         else
         {
-            out << getGenerateRandomValueFunction(actualType) << end;
+            if (!field.m_name.isEmpty()) {
+                out << "set" << capitalize(field.m_name) << "(";
+            }
+
+            out << getGenerateRandomValueFunction(actualType);
+
+            if (!field.m_name.isEmpty()) {
+                out << ")";
+            }
+
+            out << end;
         }
+
 
         return;
     }
@@ -467,25 +490,29 @@ void Generator::generateGetRandomValueExpression(
                 {},
                 MethodType::TypeName);
 
-            out << prefix << field.m_name << " = QList<"
-                << valueType << ">();" << ln;
+            out << prefix << "set" << capitalize(field.m_name) << "(QList<"
+                << valueType << ">());" << ln;
         }
 
         for(size_t i = 0; i < 3; ++i)
         {
-            out << prefix << field.m_name;
+            out << prefix << "mutable" << capitalize(field.m_name) << "()";
 
             if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-                out << ".ref()";
+                out << "->";
+            }
+            else {
+                out << ".";
             }
 
-            out << " << ";
+            out << "push_back(";
 
             Parser::Field pseudoField;
             pseudoField.m_type = listType->m_valueType;
             pseudoField.m_required = Parser::Field::RequiredFlag::Required;
 
-            generateGetRandomValueExpression(pseudoField, {}, parser, out);
+            generateGetRandomValueExpression(
+                pseudoField, {}, parser, out, QStringLiteral(");\n"));
         }
 
         return;
@@ -502,13 +529,13 @@ void Generator::generateGetRandomValueExpression(
                 {},
                 MethodType::TypeName);
 
-            out << prefix << field.m_name << " = QSet<"
-                << valueType << ">();" << ln;
+            out << prefix << "set" << capitalize(field.m_name) << "(QSet<"
+                << valueType << ">());" << ln;
         }
 
         for(size_t i = 0; i < 3; ++i)
         {
-            out << prefix << field.m_name;
+            out << prefix << "mutable" << capitalize(field.m_name) << "()";
 
             if (field.m_required == Parser::Field::RequiredFlag::Optional) {
                 out << "->";
@@ -523,13 +550,8 @@ void Generator::generateGetRandomValueExpression(
             pseudoField.m_type = setType->m_valueType;
             pseudoField.m_required = Parser::Field::RequiredFlag::Required;
 
-            QString setItemEnd = QStringLiteral(");\n");
             generateGetRandomValueExpression(
-                pseudoField,
-                {},
-                parser,
-                out,
-                setItemEnd);
+                pseudoField, {}, parser, out, QStringLiteral(");\n"));
         }
 
         return;
@@ -552,33 +574,37 @@ void Generator::generateGetRandomValueExpression(
                 {},
                 MethodType::TypeName);
 
-            out << prefix << field.m_name << " = QMap<"
-                << keyType << ", " << valueType << ">();" << ln;
+            out << prefix << "set" << capitalize(field.m_name) << "(QMap<"
+                << keyType << ", " << valueType << ">());" << ln;
         }
 
         for(size_t i = 0; i < 3; ++i)
         {
-            out << prefix << field.m_name;
+            out << prefix << "mutable" << capitalize(field.m_name) << "()";
 
             if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-                out << ".ref()";
+                out << "->";
+            }
+            else {
+                out << ".";
             }
 
-            out << "[";
+            out << "insert(";
 
             Parser::Field pseudoKeyField;
             pseudoKeyField.m_type = mapType->m_keyType;
             pseudoKeyField.m_required = Parser::Field::RequiredFlag::Required;
+            pseudoKeyField.m_name.clear();
 
             generateGetRandomValueExpression(pseudoKeyField, {}, parser, out, {});
 
-            out << "] = ";
+            out << ", ";
 
             Parser::Field pseudoValueField;
             pseudoValueField.m_type = mapType->m_valueType;
             pseudoValueField.m_required = Parser::Field::RequiredFlag::Required;
 
-            generateGetRandomValueExpression(pseudoValueField, {}, parser, out);
+            generateGetRandomValueExpression(pseudoValueField, {}, parser, out, QStringLiteral(");\n"));
         }
 
         return;
@@ -611,9 +637,18 @@ void Generator::generateGetRandomExceptionExpression(
     const Parser & parser,
     QTextStream & out)
 {
-    out << e.m_name << "();" << ln;
+    out << "set";
 
-    QString fieldPrefix = prefix + field.m_name;
+    QString exceptionSetterPartName = capitalize(e.m_name);
+    if (exceptionSetterPartName.startsWith(QStringLiteral("EDAM"))) {
+        exceptionSetterPartName.remove(0, 4);
+    }
+
+    out << exceptionSetterPartName << "(" << e.m_name << "());" << ln;
+
+    QString fieldPrefix = prefix + QStringLiteral("mutable") +
+        capitalize(field.m_name) + QStringLiteral("()");
+
     if (field.m_required == Parser::Field::RequiredFlag::Optional) {
         fieldPrefix += QStringLiteral("->");
     }

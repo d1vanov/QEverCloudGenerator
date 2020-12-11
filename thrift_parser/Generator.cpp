@@ -2998,8 +2998,7 @@ void Generator::generateTypesIOHeader(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("<generated/Types.h>") << QStringLiteral("../Impl.h")
-        << QStringLiteral("<Optional.h>");
+        << QStringLiteral("<generated/Types.h>") << QStringLiteral("../Impl.h");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
@@ -3371,6 +3370,16 @@ void Generator::generateTypeHeader(
     ctx.m_out << indent
         << "void print(QTextStream & strm) const override;" << ln;
 
+    if (m_allExceptions.contains(s.m_name)) {
+        ctx.m_out << indent
+            << "[[nodiscard]] const char * what() const noexcept override;"
+            << ln;
+
+        ctx.m_out << indent
+            << "[[nodiscard]] EverCloudExceptionDataPtr exceptionData() const "
+            << "override;" << ln;
+    }
+
     ctx.m_out << ln;
     ctx.m_out << indent << "[[nodiscard]] bool operator==(const " << s.m_name
         << " & other) const noexcept;" << ln;
@@ -3694,7 +3703,6 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
         << QStringLiteral("../AsyncResult.h")
         << QStringLiteral("../DurableService.h")
         << QStringLiteral("../RequestContext.h")
-        << QStringLiteral("../Optional.h")
         << QStringLiteral("Constants.h")
         << QStringLiteral("Types.h")
         << QStringLiteral("<QObject>");
@@ -3929,7 +3937,6 @@ void Generator::generateServerHeader(Parser & parser, const QString & outPath)
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("../RequestContext.h")
-        << QStringLiteral("../Optional.h")
         << QStringLiteral("Constants.h")
         << QStringLiteral("Types.h")
         << QStringLiteral("<QObject>")

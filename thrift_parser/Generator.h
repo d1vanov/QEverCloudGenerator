@@ -208,16 +208,6 @@ private:
     void verifyTypeIsValueOrIdentifier(
         const std::shared_ptr<Parser::Type> & type) const;
 
-    void generateGetRandomExceptionExpression(
-        const Parser::Field & field,
-        const Parser::Structure & e,
-        const QString & prefix,
-        const Parser & parser,
-        QTextStream & out);
-
-    void generateGetThriftExceptionExpression(
-        QTextStream & out);
-
     QString getGenerateRandomValueFunction(const QString & typeName) const;
 
     // Methods for writing header and source files

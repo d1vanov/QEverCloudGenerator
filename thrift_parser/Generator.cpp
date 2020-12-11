@@ -457,8 +457,24 @@ void Generator::generateGetRandomValueExpression(
         }
         else if (exceptionIt != exceptions.end())
         {
-            generateGetRandomExceptionExpression(
-                field, *exceptionIt, prefix, parser, out);
+            if (field.m_name.isEmpty()) {
+                throw std::runtime_error{
+                    "Generation of random exceptions is only supported for "
+                    "struct fields"};
+            }
+
+            out << "set" << capitalize(field.m_name) << "("
+                << actualType << "());" << ln;
+
+            const QString fieldPrefix = prefix + QStringLiteral("mutable") +
+                capitalize(field.m_name) + QStringLiteral("()") +
+                (field.m_required == Parser::Field::RequiredFlag::Optional
+                 ? QStringLiteral("->")
+                 : QStringLiteral("."));
+
+            for(const auto & f: exceptionIt->m_fields) {
+                generateGetRandomValueExpression(f, fieldPrefix, parser, out);
+            }
         }
         else
         {
@@ -628,45 +644,6 @@ void Generator::verifyTypeIsValueOrIdentifier(
             "Unsupported type: expecting base or identifier type: " +
             typeName.toStdString());
     }
-}
-
-void Generator::generateGetRandomExceptionExpression(
-    const Parser::Field & field,
-    const Parser::Structure & e,
-    const QString & prefix,
-    const Parser & parser,
-    QTextStream & out)
-{
-    out << "set";
-
-    QString exceptionSetterPartName = capitalize(e.m_name);
-    if (exceptionSetterPartName.startsWith(QStringLiteral("EDAM"))) {
-        exceptionSetterPartName.remove(0, 4);
-    }
-
-    out << exceptionSetterPartName << "(" << e.m_name << "());" << ln;
-
-    QString fieldPrefix = prefix + QStringLiteral("mutable") +
-        capitalize(field.m_name) + QStringLiteral("()");
-
-    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-        fieldPrefix += QStringLiteral("->");
-    }
-    else {
-        fieldPrefix += QStringLiteral(".");
-    }
-
-    for(const auto & f: e.m_fields) {
-        generateGetRandomValueExpression(f, fieldPrefix, parser, out);
-    }
-}
-
-void Generator::generateGetThriftExceptionExpression(
-    QTextStream & out)
-{
-    out << "ThriftException(" << ln
-        << "        ThriftException::Type::INTERNAL_ERROR," << ln
-        << "        QStringLiteral(\"Internal error\"));" << ln;
 }
 
 QString Generator::getGenerateRandomValueFunction(const QString & typeName) const
@@ -1436,8 +1413,11 @@ void Generator::generateTestServerPrepareRequestExceptionResponse(
         MethodType::TypeName);
 
     if (exceptionTypeName == QStringLiteral("ThriftException")) {
-        ctx.m_out << "    auto " << e.m_name << " = ";
-        generateGetThriftExceptionExpression(ctx.m_out);
+        ctx.m_out << "    auto " << e.m_name << " = "
+            << "ThriftException(" << ln
+            << "        ThriftException::Type::INTERNAL_ERROR," << ln
+            << "        QStringLiteral(\"Internal error\"));" << ln;
+
         ctx.m_out << ln;
         return;
     }
@@ -1457,15 +1437,15 @@ void Generator::generateTestServerPrepareRequestExceptionResponse(
             exceptionTypeName.toStdString());
     }
 
-    ctx.m_out << "    auto " << e.m_name << " = ";
+    ctx.m_out << "    auto " << e.m_name << " = " << exceptionTypeName
+        << "();" << ln;
 
-    const QString prefix = QStringLiteral("    ");
-    generateGetRandomExceptionExpression(
-        e,
-        *exceptionIt,
-        prefix,
-        parser,
-        ctx.m_out);
+    const QString fieldPrefix =
+        QStringLiteral("    ") + e.m_name + QStringLiteral(".");
+
+    for(const auto & f: exceptionIt->m_fields) {
+        generateGetRandomValueExpression(f, fieldPrefix, parser, ctx.m_out);
+    }
 
     ctx.m_out << ln;
 }
@@ -4574,6 +4554,12 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
         << "{" << ln
         << indent << "return d->m_locallyFavorited;" << ln
         << "}" << ln << ln;
+
+    ctx.m_out << "void " << className << "::setLocallyFavorited("
+        << "const bool favorited)" << ln
+        << "{" << ln
+        << indent << "d->m_locallyFavorited = favorited;" << ln
+        << "}" << ln << ln;
 }
 
 void Generator::generateClassAccessoryMethodsForFieldDeclarations(
@@ -6010,7 +5996,7 @@ void Generator::generateServerHelperFunctions(
 void Generator::generateSources(Parser & parser, const QString & outPath)
 {
     if (parser.unions().count() > 0) {
-        throw std::runtime_error("unions are not suported.");
+        throw std::runtime_error("unions are not supported.");
     }
 
     m_baseTypes << QStringLiteral("bool") << QStringLiteral("byte")

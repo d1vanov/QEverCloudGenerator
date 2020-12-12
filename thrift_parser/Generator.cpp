@@ -3526,18 +3526,31 @@ void Generator::generateTypeCpp(
 
         if (s.m_fields.isEmpty())
         {
-            ctx.m_out << ") :" << ln
-                << indent << "EvernoteExceptionData(QStringLiteral(\""
-                << s.m_name << "Data\"))," << ln
+            ctx.m_out << "QString error) :" << ln
+                << indent << "EvernoteExceptionData(error)," << ln
                 << indent << "d(new " << s.m_name << "Data::Impl)" << ln
                 << "{}" << ln;
         }
         else
         {
             ctx.m_out << ln;
+            ctx.m_out << indent << "QString error," << ln;
+
             for (const auto & f: s.m_fields)
             {
-                ctx.m_out << indent << typeToStr(f.m_type) << " " << f.m_name;
+                ctx.m_out << indent;
+
+                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                    ctx.m_out << "std::optional<";
+                }
+
+                ctx.m_out << typeToStr(f.m_type);
+
+                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                    ctx.m_out << ">";
+                }
+
+                ctx.m_out << " " << f.m_name;
 
                 if (&f != &(s.m_fields.back())) {
                     ctx.m_out << "," << ln;
@@ -3548,8 +3561,7 @@ void Generator::generateTypeCpp(
             }
 
             ctx.m_out << ":" << ln
-                << indent << "EvernoteExceptionData(QStringLiteral(\""
-                << s.m_name << "Data\"))," << ln
+                << indent << "EvernoteExceptionData(error)," << ln
                 << indent << "d(new " << s.m_name << "Data::Impl)" << ln
                 << "{" << ln;
 
@@ -3722,6 +3734,52 @@ void Generator::generateTypeImplHeader(
             << indent << "Impl(" << s.m_name << "Data::Impl && other) noexcept"
             << " = default;" << ln << ln;
 
+        if (!s.m_fields.isEmpty())
+        {
+            ctx.m_out << indent << "explicit Impl(" << ln;
+
+            for (const auto & f: s.m_fields)
+            {
+                ctx.m_out << indent << indent;
+
+                if (f.m_required == Parser::Field::RequiredFlag::Optional)
+                {
+                    ctx.m_out << "std::optional<";
+                }
+
+                ctx.m_out << typeToStr(f.m_type);
+
+                if (f.m_required == Parser::Field::RequiredFlag::Optional)
+                {
+                    ctx.m_out << ">";
+                }
+
+                ctx.m_out << " " << f.m_name;
+
+                if (&f != &(s.m_fields.back())) {
+                    ctx.m_out << "," << ln;
+                }
+                else {
+                    ctx.m_out << ") :" << ln;
+                }
+            }
+
+            for (const auto & f: s.m_fields)
+            {
+                ctx.m_out << indent << indent << "m_" << f.m_name
+                    << "(std::move(" << f.m_name << "))";
+
+                if (&f != &(s.m_fields.back())) {
+                    ctx.m_out << "," << ln;
+                }
+                else {
+                    ctx.m_out << ln;
+                }
+            }
+
+            ctx.m_out << indent << "{}" << ln << ln;
+        }
+
         ctx.m_out << indent << s.m_name << "Data::Impl & operator=(const "
             << s.m_name << "Data::Impl & other) = delete;" << ln
             << indent << s.m_name << "Data::Impl & operator=("
@@ -3841,16 +3899,28 @@ void Generator::generateExceptionDataClassDeclaration(
 
     if (s.m_fields.isEmpty())
     {
-        ctx.m_out << ");" << ln;
+        ctx.m_out << "QString error);" << ln;
     }
     else
     {
         ctx.m_out << ln;
+        ctx.m_out << indent << indent << "QString error," << ln;
 
         for (const auto & f: s.m_fields)
         {
-            ctx.m_out << indent << indent << typeToStr(f.m_type)
-                << " " << f.m_name;
+            ctx.m_out << indent << indent;
+
+            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << "std::optional<";
+            }
+
+            ctx.m_out << typeToStr(f.m_type);
+
+            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << ">";
+            }
+
+            ctx.m_out << " " << f.m_name;
 
             if (&f != &(s.m_fields.back())) {
                 ctx.m_out << "," << ln;

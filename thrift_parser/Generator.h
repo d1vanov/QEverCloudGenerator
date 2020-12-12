@@ -87,11 +87,11 @@ private:
         const Parser::Structure & s, const QString & outPath,
         const QString & fileSection);
 
-    void generateTypeDataHeader(
+    void generateTypeImplHeader(
         const Parser::Structure & s, const Parser::Enumerations & enumerations,
         const QString & outPath, const QString & fileSection);
 
-    void generateTypeDataCpp(
+    void generateTypeImplCpp(
         const Parser::Structure & s, const QString & outPath,
         const QString & fileSection);
 

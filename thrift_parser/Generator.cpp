@@ -852,8 +852,8 @@ void Generator::writeEnumerationPrintDefinition(
 void Generator::writeTypeDataPrintDefinition(
     QTextStream & out, const Parser::Structure & s) const
 {
-    out << "void " << s.m_name << "::" << s.m_name
-        << "Data::print(QTextStream & strm) const" << ln
+    out << "void " << s.m_name
+        << "::Data::print(QTextStream & strm) const" << ln
         << "{" << ln;
 
     constexpr const char * indent = "    ";
@@ -3391,8 +3391,8 @@ void Generator::generateTypeHeader(
 
     ctx.m_out << ln;
     ctx.m_out << "private:" << ln
-        << indent << "class " << s.m_name << "Data;" << ln
-        << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
+        << indent << "class Impl;" << ln
+        << indent << "QSharedDataPointer<Impl> d;" << ln
         << "};" << ln << ln;
 
     const bool isException = m_allExceptions.contains(s.m_name);
@@ -3411,7 +3411,7 @@ void Generator::generateTypeHeader(
     if (isException) {
         extraLinesOutsideNamespace <<
             (QStringLiteral("Q_DECLARE_METATYPE(qevercloud::") + s.m_name +
-             QStringLiteral("Data"));
+             QStringLiteral("Data)"));
     }
 
     writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
@@ -3431,14 +3431,14 @@ void Generator::generateTypeCpp(
     ctx.m_out  << "#include <generated/" << fileSection << "/" << s.m_name
         << ".h>" << ln << ln;
 
-    ctx.m_out  << "#include \"data/" << s.m_name << "Data.h\"" << ln << ln;
+    ctx.m_out  << "#include \"impl/" << s.m_name << "Impl.h\"" << ln << ln;
 
     writeNamespaceBegin(ctx);
 
     constexpr const char * indent = "    ";
 
     ctx.m_out << s.m_name << "::" << s.m_name << "() : d(new " << s.m_name
-        << "Data) {}" << ln << ln;
+        << "::Impl) {}" << ln << ln;
 
     ctx.m_out << s.m_name << "::" << s.m_name << "(const " << s.m_name
         << " & other) : d(other.d) {}" << ln << ln;
@@ -3496,15 +3496,15 @@ void Generator::generateTypeCpp(
     writeNamespaceEnd(ctx.m_out);
 }
 
-void Generator::generateTypeDataHeader(
+void Generator::generateTypeImplHeader(
     const Parser::Structure & s, const Parser::Enumerations & enumerations,
     const QString & outPath, const QString & fileSection)
 {
-    const QString fileName = s.m_name + QStringLiteral("Data.h");
+    const QString fileName = s.m_name + QStringLiteral("Impl.h");
 
     OutputFileContext ctx(
         fileName, outPath, OutputFileType::Implementation,
-        fileSection + QStringLiteral("/data"));
+        fileSection + QStringLiteral("/impl"));
 
     const QString publicHeaderInclude =
         QStringLiteral("<generated/") + fileSection + QStringLiteral("/") +
@@ -3521,32 +3521,31 @@ void Generator::generateTypeDataHeader(
     constexpr const char * indent = "    ";
 
     ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name << "::"
-        << s.m_name << "Data final:" << ln
+        << "Impl final:" << ln
         << indent << "public QSharedData," << ln
         << indent << "public Printable" << ln
         << "{" << ln
         << "public:" << ln;
 
-    ctx.m_out << indent << s.m_name << "Data() = default;" << ln
-        << indent << s.m_name << "Data(const " << s.m_name
-        << "Data & other) = default;" << ln
-        << indent << s.m_name << "Data(" << s.m_name
-        << "Data && other) noexcept = default;" << ln << ln;
+    ctx.m_out << indent << "Impl() = default;" << ln
+        << indent << "Impl(const " << s.m_name
+        << "::Impl & other) = default;" << ln
+        << indent << "Impl(" << s.m_name
+        << "::Impl && other) noexcept = default;" << ln << ln;
 
-    ctx.m_out << indent << s.m_name << "Data & operator=(const "
-        << s.m_name << "Data & other) = delete;" << ln
-        << indent << s.m_name << "Data & operator=(" << s.m_name
-        << "Data && other) = delete;" << ln << ln;
+    ctx.m_out << indent << s.m_name << "::Impl & operator=(const "
+        << s.m_name << "::Impl & other) = delete;" << ln
+        << indent << s.m_name << "::Impl & operator=(" << s.m_name
+        << "::Impl && other) = delete;" << ln << ln;
 
-    ctx.m_out << indent << "~" << s.m_name << "Data() noexcept override "
-        << "= default;" << ln;
+    ctx.m_out << indent << "~Impl() noexcept override = default;" << ln;
 
     ctx.m_out << ln;
     ctx.m_out << indent << "[[nodiscard]] bool operator==(const " << s.m_name
-        << "Data & other) const noexcept;" << ln;
+        << "::Impl & other) const noexcept;" << ln;
 
     ctx.m_out << indent << "[[nodiscard]] bool operator!=(const " << s.m_name
-        << "Data & other) const noexcept;" << ln;
+        << "::Impl & other) const noexcept;" << ln;
 
     ctx.m_out << ln
         << indent << "void print(QTextStream & strm) const override;" << ln
@@ -3619,15 +3618,15 @@ void Generator::generateTypeDataHeader(
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
-void Generator::generateTypeDataCpp(
+void Generator::generateTypeImplCpp(
     const Parser::Structure & s, const QString & outPath,
     const QString & fileSection)
 {
-    const QString fileName = s.m_name + QStringLiteral("Data.cpp");
+    const QString fileName = s.m_name + QStringLiteral("Impl.cpp");
 
     OutputFileContext ctx(
         fileName, outPath, OutputFileType::Implementation,
-        fileSection + QStringLiteral("/data"));
+        fileSection + QStringLiteral("/impl"));
 
     ctx.m_out << disclaimer << ln;
     ctx.m_out << "#include \"" << s.m_name << "Data.h\"" << ln << ln;
@@ -3637,9 +3636,9 @@ void Generator::generateTypeDataCpp(
 
     constexpr const char * indent = "    ";
 
-    ctx.m_out << "bool " << s.m_name << "::" << s.m_name
-        << "Data::operator==(" << ln << indent << "const " << s.m_name
-        << "Data & other) const noexcept" << ln
+    ctx.m_out << "bool " << s.m_name
+        << "::Impl::operator==(" << ln << indent << "const " << s.m_name
+        << "::Impl & other) const noexcept" << ln
         << "{" << ln;
 
     ctx.m_out << indent << "if (this == &other) {" << ln
@@ -3674,9 +3673,9 @@ void Generator::generateTypeDataCpp(
 
     ctx.m_out << "}" << ln << ln;
 
-    ctx.m_out << "bool " << s.m_name << "::" << s.m_name
-        << "Data::operator!=(" << ln << indent << "const " << s.m_name
-        << "Data & other) const noexcept" << ln
+    ctx.m_out << "bool " << s.m_name
+        << "::Impl::operator!=(" << ln << indent << "const " << s.m_name
+        << "::Impl & other) const noexcept" << ln
         << "{" << ln
         << indent << "return !(*this == other);" << ln
         << "}" << ln << ln;
@@ -3738,8 +3737,8 @@ void Generator::generateExceptionDataClassDeclaration(
         << ln << ln;
 
     ctx.m_out << "private:" << ln
-        << indent << "class Data;" << ln
-        << indent << "QSharedDataPointer<Data> d;" << ln;
+        << indent << "class Impl;" << ln
+        << indent << "QSharedDataPointer<Impl> d;" << ln;
 
     ctx.m_out << "};" << ln << ln;
 }
@@ -6131,8 +6130,8 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     {
         generateTypeHeader(s, outPath, typesSection);
         generateTypeCpp(s, outPath, typesSection);
-        generateTypeDataHeader(s, enumerations, outPath, typesSection);
-        generateTypeDataCpp(s, outPath, typesSection);
+        generateTypeImplHeader(s, enumerations, outPath, typesSection);
+        generateTypeImplCpp(s, outPath, typesSection);
     }
 
     const QString exceptionsSection = QStringLiteral("exceptions");
@@ -6140,8 +6139,8 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     {
         generateTypeHeader(s, outPath, exceptionsSection);
         generateTypeCpp(s, outPath, exceptionsSection);
-        generateTypeDataHeader(s, enumerations, outPath, exceptionsSection);
-        generateTypeDataCpp(s, outPath, exceptionsSection);
+        generateTypeImplHeader(s, enumerations, outPath, exceptionsSection);
+        generateTypeImplCpp(s, outPath, exceptionsSection);
     }
 
     generateServicesHeader(parser, outPath);

@@ -3401,18 +3401,12 @@ void Generator::generateTypeHeader(
     }
 
     QStringList extraLinesOutsideNamespace;
-    extraLinesOutsideNamespace.reserve(isException ? 2 : 1);
+    extraLinesOutsideNamespace.reserve(1);
 
     QString metatypeDeclarationLine;
     QTextStream lineOut(&metatypeDeclarationLine);
     lineOut << "Q_DECLARE_METATYPE(qevercloud::" << s.m_name << ")";
     extraLinesOutsideNamespace << metatypeDeclarationLine;
-
-    if (isException) {
-        extraLinesOutsideNamespace <<
-            (QStringLiteral("Q_DECLARE_METATYPE(qevercloud::") + s.m_name +
-             QStringLiteral("Data)"));
-    }
 
     writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
 }

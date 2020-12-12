@@ -3493,6 +3493,98 @@ void Generator::generateTypeCpp(
         << indent << "return !(*this == other);" << ln
         << "}" << ln << ln;
 
+    if (m_allExceptions.contains(s.m_name))
+    {
+        // TODO: should check if m_error is empty and if so, put
+        // exception details there
+        ctx.m_out << "const char * " << s.m_name << "::what() const noexcept"
+            << ln << "{" << ln
+            << indent << "return EvernoteException::what();" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "EverCloudExceptionDataPtr " << s.m_name
+            << "::exceptionData() const" << ln
+            << "{" << ln
+            << indent << "return std::make_shared<" << s.m_name << "Data>("
+            << ln;
+
+        for (const auto & f: s.m_fields)
+        {
+            ctx.m_out << indent << indent << f.m_name << "()";
+
+            if (&f != &(s.m_fields.back())) {
+                ctx.m_out << "," << ln;
+            }
+            else {
+                ctx.m_out << ");" << ln;
+            }
+        }
+
+        ctx.m_out << "}" << ln << ln;
+
+        ctx.m_out << s.m_name << "Data::" << s.m_name << "Data(";
+
+        if (s.m_fields.isEmpty())
+        {
+            ctx.m_out << ") :" << ln
+                << indent << "EvernoteExceptionData(QStringLiteral(\""
+                << s.m_name << "Data\"))," << ln
+                << indent << "d(new " << s.m_name << "Data::Impl)" << ln
+                << "{}" << ln;
+        }
+        else
+        {
+            ctx.m_out << ln;
+            for (const auto & f: s.m_fields)
+            {
+                ctx.m_out << indent << typeToStr(f.m_type) << " " << f.m_name;
+
+                if (&f != &(s.m_fields.back())) {
+                    ctx.m_out << "," << ln;
+                }
+                else {
+                    ctx.m_out << ")";
+                }
+            }
+
+            ctx.m_out << ":" << ln
+                << indent << "EvernoteExceptionData(QStringLiteral(\""
+                << s.m_name << "Data\"))," << ln
+                << indent << "d(new " << s.m_name << "Data::Impl)" << ln
+                << "{" << ln;
+
+            for (const auto & f: s.m_fields)
+            {
+                ctx.m_out << indent << "d->m_" << f.m_name << " = std::move("
+                    << f.m_name << ");" << ln;
+            }
+
+            ctx.m_out << "}" << ln << ln;
+
+            Parser::Structure sData = s;
+            sData.m_name = s.m_name + QStringLiteral("Data");
+
+            for (const auto & f: s.m_fields)
+            {
+                generateClassAccessoryMethodsForFieldDefinitions(
+                    sData, f, ctx);
+            }
+        }
+
+        ctx.m_out << "void " << s.m_name << "Data::throwException() const" << ln
+            << "{" << ln
+            << indent << s.m_name << " e;" << ln;
+
+        for (const auto & f: s.m_fields)
+        {
+            ctx.m_out << indent << "e.set" << capitalize(f.m_name)
+                << "(d->m_" << f.m_name << ");" << ln;
+        }
+
+        ctx.m_out << indent << "throw e;" << ln
+            << "}" << ln << ln;
+    }
+
     writeNamespaceEnd(ctx.m_out);
 }
 
@@ -3616,8 +3708,7 @@ void Generator::generateTypeImplHeader(
 
     ctx.m_out << "};" << ln << ln;
 
-    const bool isException = m_allExceptions.contains(s.m_name);
-    if (isException)
+    if (m_allExceptions.contains(s.m_name))
     {
         ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name
             << "Data::Impl final:" << ln
@@ -3641,8 +3732,19 @@ void Generator::generateTypeImplHeader(
 
         for (const auto & f: s.m_fields)
         {
-            ctx.m_out << indent << typeToStr(f.m_type) << " m_" << f.m_name
-                << ";" << ln;
+            ctx.m_out << indent;
+
+            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << "std::optional<";
+            }
+
+            ctx.m_out << typeToStr(f.m_type);
+
+            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << ">";
+            }
+
+            ctx.m_out << " m_" << f.m_name << ";" << ln;
         }
 
         ctx.m_out << "};" << ln << ln;

@@ -3583,6 +3583,9 @@ void Generator::generateTypeCpp(
             }
         }
 
+        ctx.m_out << s.m_name << "Data::~" << s.m_name << "Data() noexcept {}"
+            << ln << ln;
+
         ctx.m_out << "void " << s.m_name << "Data::throwException() const" << ln
             << "{" << ln
             << indent << s.m_name << " e;" << ln;
@@ -3932,6 +3935,9 @@ void Generator::generateExceptionDataClassDeclaration(
     }
 
     ctx.m_out << ln;
+
+    ctx.m_out << indent << "~" << s.m_name << "Data() noexcept override;" << ln
+        << ln;
 
     for (const auto & f: s.m_fields) {
         generateClassAccessoryMethodsForFieldDeclarations(f, ctx, indent);

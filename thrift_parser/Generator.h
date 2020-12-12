@@ -95,6 +95,9 @@ private:
         const Parser::Structure & s, const QString & outPath,
         const QString & fileSection);
 
+    void generateExceptionDataClassDeclaration(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
     void generateServicesHeader(Parser & parser, const QString & outPath);
     void generateServicesCpp(Parser & parser, const QString & outPath);
 

@@ -3391,17 +3391,28 @@ void Generator::generateTypeHeader(
 
     ctx.m_out << ln;
     ctx.m_out << "private:" << ln
-    << indent << "class " << s.m_name << "Data;" << ln
-    << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
-    << "};" << ln << ln;
+        << indent << "class " << s.m_name << "Data;" << ln
+        << indent << "QSharedDataPointer<" << s.m_name << "Data> d;" << ln
+        << "};" << ln << ln;
+
+    const bool isException = m_allExceptions.contains(s.m_name);
+    if (isException) {
+        generateExceptionDataClassDeclaration(s, ctx);
+    }
 
     QStringList extraLinesOutsideNamespace;
-    extraLinesOutsideNamespace.reserve(1);
+    extraLinesOutsideNamespace.reserve(isException ? 2 : 1);
 
     QString metatypeDeclarationLine;
     QTextStream lineOut(&metatypeDeclarationLine);
     lineOut << "Q_DECLARE_METATYPE(qevercloud::" << s.m_name << ")";
     extraLinesOutsideNamespace << metatypeDeclarationLine;
+
+    if (isException) {
+        extraLinesOutsideNamespace <<
+            (QStringLiteral("Q_DECLARE_METATYPE(qevercloud::") + s.m_name +
+             QStringLiteral("Data"));
+    }
 
     writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
 }
@@ -3672,6 +3683,65 @@ void Generator::generateTypeDataCpp(
 
     writeTypeDataPrintDefinition(ctx.m_out, s);
     writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateExceptionDataClassDeclaration(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    const QString indent = QStringLiteral("    ");
+
+    ctx.m_out << "/**" << ln
+        << " * Asynchronous API counterpart of " << s.m_name
+        << ". See EverCloudExceptionData" << ln
+        << " * for more details." << ln
+        << " */" << ln;
+
+    ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
+        << "Data: public EvernoteExceptionData" << ln
+        << "{" << ln
+        << indent << "Q_OBJECT" << ln
+        << indent << "Q_DISABLE_COPY(" << s.m_name << "Data)" << ln
+        << "public:" << ln;
+
+    ctx.m_out << indent << "explicit " << s.m_name << "Data(";
+
+    if (s.m_fields.isEmpty())
+    {
+        ctx.m_out << ");" << ln;
+    }
+    else
+    {
+        ctx.m_out << ln;
+
+        for (const auto & f: s.m_fields)
+        {
+            ctx.m_out << indent << indent << typeToStr(f.m_type)
+                << " " << f.m_name;
+
+            if (&f != &(s.m_fields.back())) {
+                ctx.m_out << "," << ln;
+            }
+            else {
+                ctx.m_out << ");" << ln;
+            }
+        }
+    }
+
+    ctx.m_out << ln;
+
+    for (const auto & f: s.m_fields) {
+        generateClassAccessoryMethodsForFieldDeclarations(f, ctx, indent);
+        ctx.m_out << ln;
+    }
+
+    ctx.m_out << indent << "virtual void throwException() const override;"
+        << ln << ln;
+
+    ctx.m_out << "private:" << ln
+        << indent << "class Data;" << ln
+        << indent << "QSharedDataPointer<Data> d;" << ln;
+
+    ctx.m_out << "};" << ln << ln;
 }
 
 void Generator::generateServicesHeader(Parser & parser, const QString & outPath)

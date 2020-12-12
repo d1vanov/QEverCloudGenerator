@@ -348,7 +348,7 @@ private:
         QTextStream & out, const Parser::Enumeration & e,
         const char * printer) const;
 
-    void writeTypeDataPrintDefinition(
+    void writeTypeImplPrintDefinition(
         QTextStream & out, const Parser::Structure & s) const;
 
 private:

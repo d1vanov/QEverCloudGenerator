@@ -849,11 +849,11 @@ void Generator::writeEnumerationPrintDefinition(
         << "}" << ln << ln;
 }
 
-void Generator::writeTypeDataPrintDefinition(
+void Generator::writeTypeImplPrintDefinition(
     QTextStream & out, const Parser::Structure & s) const
 {
     out << "void " << s.m_name
-        << "::Data::print(QTextStream & strm) const" << ln
+        << "::Impl::print(QTextStream & strm) const" << ln
         << "{" << ln;
 
     constexpr const char * indent = "    ";
@@ -3819,7 +3819,7 @@ void Generator::generateTypeImplCpp(
         fileSection + QStringLiteral("/impl"));
 
     ctx.m_out << disclaimer << ln;
-    ctx.m_out << "#include \"" << s.m_name << "Data.h\"" << ln << ln;
+    ctx.m_out << "#include \"" << s.m_name << "Impl.h\"" << ln << ln;
     ctx.m_out << "#include <QTextStream>" << ln << ln;
 
     writeNamespaceBegin(ctx);
@@ -3870,7 +3870,7 @@ void Generator::generateTypeImplCpp(
         << indent << "return !(*this == other);" << ln
         << "}" << ln << ln;
 
-    writeTypeDataPrintDefinition(ctx.m_out, s);
+    writeTypeImplPrintDefinition(ctx.m_out, s);
     writeNamespaceEnd(ctx.m_out);
 }
 

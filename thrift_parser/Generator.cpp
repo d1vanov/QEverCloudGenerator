@@ -3615,6 +3615,39 @@ void Generator::generateTypeImplHeader(
     }
 
     ctx.m_out << "};" << ln << ln;
+
+    const bool isException = m_allExceptions.contains(s.m_name);
+    if (isException)
+    {
+        ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name
+            << "Data::Impl final:" << ln
+            << indent << "public QSharedData" << ln
+            << "{" << ln
+            << "public:" << ln;
+
+        ctx.m_out << indent << "Impl() = default;" << ln
+            << indent << "Impl(const " << s.m_name << "Data::Impl & other)"
+            << " = default;" << ln
+            << indent << "Impl(" << s.m_name << "Data::Impl && other) noexcept"
+            << " = default;" << ln << ln;
+
+        ctx.m_out << indent << s.m_name << "Data::Impl & operator=(const "
+            << s.m_name << "Data::Impl & other) = delete;" << ln
+            << indent << s.m_name << "Data::Impl & operator=("
+            << s.m_name << "Data::Impl && other) = delete;" << ln << ln;
+
+        ctx.m_out << indent << "~Impl() noexcept = default;" << ln
+            << ln;
+
+        for (const auto & f: s.m_fields)
+        {
+            ctx.m_out << indent << typeToStr(f.m_type) << " m_" << f.m_name
+                << ";" << ln;
+        }
+
+        ctx.m_out << "};" << ln << ln;
+    }
+
     writeHeaderFooter(ctx.m_out, fileName);
 }
 

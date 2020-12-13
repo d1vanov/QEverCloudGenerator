@@ -24,7 +24,6 @@
  */
 
 #include "Generator.h"
-#include "Helpers.h"
 
 #include <QDir>
 #include <QFile>
@@ -36,8 +35,6 @@
 #include <algorithm>
 #include <memory>
 #include <stdexcept>
-
-using namespace qevercloud;
 
 namespace {
 
@@ -2418,11 +2415,7 @@ void Generator::generateConstantsCpp(Parser & parser, const QString & outPath)
     const QString fileName = QStringLiteral("Constants.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    auto additionalIncludes = QStringList()
-        << QStringLiteral("<qevercloud/Helpers.h>");
-
-    sortIncludes(additionalIncludes);
-    writeHeaderBody(ctx, QStringLiteral("Constants.h"), additionalIncludes);
+    writeHeaderBody(ctx, QStringLiteral("Constants.h"), {});
 
     ctx.m_out << blockSeparator << ln << ln;
 
@@ -2841,7 +2834,6 @@ void Generator::generateErrorsHeader(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../Helpers.h")
         << QStringLiteral("<QDebug>") << QStringLiteral("<QMetaType>")
         << QStringLiteral("<QTextStream>");
 
@@ -3009,10 +3001,9 @@ void Generator::generateTypesCpp(Parser & parser, const QString & outPath)
     const QString fileName = QStringLiteral("Types.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    auto additionalIncludes = QStringList()
-        << QStringLiteral("Types_io.h") << QStringLiteral("<qevercloud/Helpers.h>")
-        << QStringLiteral("<QUuid>") << QStringLiteral("<QDebug>")
-        << QStringLiteral("<optional>");
+    auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
+        << QStringLiteral("Types_io.h") << QStringLiteral("<QUuid>")
+        << QStringLiteral("<QDebug>") << QStringLiteral("<optional>");
 
     sortIncludes(additionalIncludes);
     writeHeaderBody(ctx, QStringLiteral("Types.h"), additionalIncludes);
@@ -3680,6 +3671,7 @@ void Generator::generateTypeImplCpp(
 
     ctx.m_out << disclaimer << ln;
     ctx.m_out << "#include \"" << s.m_name << "Impl.h\"" << ln << ln;
+    ctx.m_out << "#include \"../../../../src/Impl.h\"" << ln << ln;
     ctx.m_out << "#include <QTextStream>" << ln << ln;
 
     writeNamespaceBegin(ctx);
@@ -4106,7 +4098,6 @@ void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
         << QStringLiteral("Types_io.h") << QStringLiteral("<qevercloud/Log.h>")
         << QStringLiteral("<qevercloud/DurableService.h>")
-        << QStringLiteral("<qevercloud/Helpers.h>")
         << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
     sortIncludes(additionalIncludes);
 

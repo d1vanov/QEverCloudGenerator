@@ -68,13 +68,13 @@ QString generatedFileOutputPath(
 {
     QString path = outPath;
     if (type == OutputFileType::Interface) {
-        path += QStringLiteral("/headers/generated");
+        path += QStringLiteral("/include/qevercloud/generated");
     }
     else if (type == OutputFileType::Implementation) {
         path += QStringLiteral("/src/generated");
     }
     else if (type == OutputFileType::Test) {
-        path += QStringLiteral("/src/tests/generated");
+        path += QStringLiteral("/tests/generated");
     }
     else {
         throw std::logic_error(
@@ -1811,14 +1811,14 @@ void Generator::writeHeaderBody(
     ctx.m_out << disclaimer << ln;
 
     if (headerKind == HeaderKind::Public) {
-        ctx.m_out << "#include <generated/" << headerFileName << ">" << ln;
+        ctx.m_out << "#include <qevercloud/generated/" << headerFileName << ">" << ln;
     }
     else {
         ctx.m_out << "#include \"" << headerFileName << "\"" << ln;
     }
 
     if (headerKind == HeaderKind::Test) {
-        ctx.m_out << "#include \"../../Impl.h\"" << ln;
+        ctx.m_out << "#include \"../../src/Impl.h\"" << ln;
     }
     else {
         ctx.m_out << "#include \"../Impl.h\"" << ln;
@@ -2418,9 +2418,10 @@ void Generator::generateConstantsCpp(Parser & parser, const QString & outPath)
     const QString fileName = QStringLiteral("Constants.cpp");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
-    auto additionalIncludes = QStringList() << QStringLiteral("<Helpers.h>");
-    sortIncludes(additionalIncludes);
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("<qevercloud/Helpers.h>");
 
+    sortIncludes(additionalIncludes);
     writeHeaderBody(ctx, QStringLiteral("Constants.h"), additionalIncludes);
 
     ctx.m_out << blockSeparator << ln << ln;
@@ -2446,59 +2447,6 @@ void Generator::generateConstantsCpp(Parser & parser, const QString & outPath)
 
     ctx.m_out << ln;
     writeNamespaceEnd(ctx.m_out);
-}
-
-QString Generator::fieldDeclarationToStr(const Parser::Field & field)
-{
-    QString typeName = typeToStr(field.m_type, field.m_name);
-    QString s = typeName;
-    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-        s = QStringLiteral("Optional<") + s + QStringLiteral(">");
-    }
-
-    s += QStringLiteral(" ") + field.m_name;
-    if (field.m_initializer) {
-        s += QStringLiteral(" = ") +
-            valueToStr(field.m_initializer, field.m_type, field.m_name);
-        return s;
-    }
-
-    if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-        return s;
-    }
-
-    std::optional<Parser::PrimitiveType::Type> primitiveType;
-    if (const auto it = m_primitiveTypeAliases.find(typeName);
-        it != m_primitiveTypeAliases.end())
-    {
-        primitiveType = it.value();
-    }
-    else if (const auto * p = dynamic_cast<Parser::PrimitiveType*>(field.m_type.get()))
-    {
-        primitiveType = p->m_type;
-    }
-
-    if (!primitiveType) {
-        return s;
-    }
-
-    switch(*primitiveType)
-    {
-    case Parser::PrimitiveType::Type::Bool:
-        s += QStringLiteral(" = false");
-        break;
-    case Parser::PrimitiveType::Type::Byte:
-    case Parser::PrimitiveType::Type::Int16:
-    case Parser::PrimitiveType::Type::Int32:
-    case Parser::PrimitiveType::Type::Int64:
-        s += QStringLiteral(" = 0");
-        break;
-    case Parser::PrimitiveType::Type::Double:
-        s += QStringLiteral(" = 0.0");
-        break;
-    }
-
-    return s;
 }
 
 QString Generator::getIdentifier(const std::shared_ptr<Parser::Type> & type)
@@ -2978,7 +2926,7 @@ void Generator::generateTypesIOHeader(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("<generated/Types.h>") << QStringLiteral("../Impl.h");
+        << QStringLiteral("<qevercloud/generated/Types.h>") << QStringLiteral("../Impl.h");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
@@ -3062,7 +3010,7 @@ void Generator::generateTypesCpp(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("Types_io.h") << QStringLiteral("<Helpers.h>")
+        << QStringLiteral("Types_io.h") << QStringLiteral("<qevercloud/Helpers.h>")
         << QStringLiteral("<QUuid>") << QStringLiteral("<QDebug>")
         << QStringLiteral("<optional>");
 
@@ -3242,23 +3190,16 @@ void Generator::generateTypeHeader(
         fileName, outPath, OutputFileType::Interface, fileSection);
 
     QStringList additionalIncludes = QStringList()
-        << QStringLiteral("../../EverCloudException.h")
-        << QStringLiteral("../../Printable.h")
-        << QStringLiteral("../EDAMErrorCode.h");
-
-    const bool isTypesSection = (fileSection == QStringLiteral("types"));
+        << QStringLiteral("<qevercloud/EverCloudException.h>")
+        << QStringLiteral("<qevercloud/Printable.h>")
+        << QStringLiteral("<qevercloud/generated/EDAMErrorCode.h>");
 
     const bool isExceptionsSection =
-        (!isTypesSection && (fileSection == QStringLiteral("exceptions")));
+        (fileSection == QStringLiteral("exceptions"));
 
-    if (isTypesSection) {
-        additionalIncludes << QStringLiteral("TypeAliases.h");
-    }
-    else if (isExceptionsSection) {
-        additionalIncludes << QStringLiteral("../types/TypeAliases.h");
-    }
-
-    additionalIncludes << additionalIncludesForFields(s);
+    additionalIncludes
+        << QStringLiteral("<qevercloud/generated/types/TypeAliases.h>")
+        << additionalIncludesForFields(s);
 
     const auto deps = dependentTypeNames(s);
     for (const auto & dep: qAsConst(deps)) {
@@ -3274,13 +3215,15 @@ void Generator::generateTypeHeader(
         const bool isExceptionType = m_allExceptions.contains(dep);
         if (isExceptionType && !isExceptionsSection) {
             additionalIncludes.append(
-                QStringLiteral("../exceptions/") + dep + QStringLiteral(".h"));
+                QStringLiteral("<qevercloud/generated/exceptions/") + dep +
+                QStringLiteral(".h>"));
             continue;
         }
 
         if (!isExceptionType && isExceptionsSection) {
             additionalIncludes.append(
-                QStringLiteral("../types/") + dep + QStringLiteral(".h"));
+                QStringLiteral("<qevercloud/generated/types/") + dep +
+                QStringLiteral(".h>"));
             continue;
         }
 
@@ -3423,7 +3366,7 @@ void Generator::generateTypeCpp(
 
     ctx.m_out << disclaimer << ln;
 
-    ctx.m_out  << "#include <generated/" << fileSection << "/" << s.m_name
+    ctx.m_out  << "#include <qevercloud/generated/" << fileSection << "/" << s.m_name
         << ".h>" << ln << ln;
 
     ctx.m_out  << "#include \"impl/" << s.m_name << "Impl.h\"" << ln << ln;
@@ -3525,8 +3468,8 @@ void Generator::generateTypeImplHeader(
         fileSection + QStringLiteral("/impl"));
 
     const QString publicHeaderInclude =
-        QStringLiteral("<generated/") + fileSection + QStringLiteral("/") +
-        s.m_name + QStringLiteral(".h>");
+        QStringLiteral("<qevercloud/generated/") + fileSection +
+        QStringLiteral("/") + s.m_name + QStringLiteral(".h>");
 
     QStringList additionalIncludes = QStringList()
         << publicHeaderInclude << QStringLiteral("<QSharedData>");
@@ -3996,11 +3939,11 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     QStringList additionalIncludes = QStringList()
-        << QStringLiteral("../AsyncResult.h")
-        << QStringLiteral("../DurableService.h")
-        << QStringLiteral("../RequestContext.h")
-        << QStringLiteral("Constants.h")
-        << QStringLiteral("Types.h")
+        << QStringLiteral("<qevercloud/AsyncResult.h>")
+        << QStringLiteral("<qevercloud/DurableService.h>")
+        << QStringLiteral("<qevercloud/RequestContext.h>")
+        << QStringLiteral("<qevercloud/generated/Constants.h>")
+        << QStringLiteral("<qevercloud/generated/Types.h>")
         << QStringLiteral("<QObject>");
     sortIncludes(additionalIncludes);
 
@@ -4161,8 +4104,9 @@ void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<Log.h>")
-        << QStringLiteral("<DurableService.h>") << QStringLiteral("<Helpers.h>")
+        << QStringLiteral("Types_io.h") << QStringLiteral("<qevercloud/Log.h>")
+        << QStringLiteral("<qevercloud/DurableService.h>")
+        << QStringLiteral("<qevercloud/Helpers.h>")
         << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
     sortIncludes(additionalIncludes);
 
@@ -4232,9 +4176,9 @@ void Generator::generateServerHeader(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
     QStringList additionalIncludes = QStringList()
-        << QStringLiteral("../RequestContext.h")
-        << QStringLiteral("Constants.h")
-        << QStringLiteral("Types.h")
+        << QStringLiteral("<qevercloud/RequestContext.h>")
+        << QStringLiteral("<qevercloud/generated/Constants.h>")
+        << QStringLiteral("<qevercloud/generated/Types.h>")
         << QStringLiteral("<QObject>")
         << QStringLiteral("<functional>");
     sortIncludes(additionalIncludes);
@@ -4255,7 +4199,7 @@ void Generator::generateServerCpp(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<Log.h>");
+        << QStringLiteral("Types_io.h") << QStringLiteral("<qevercloud/Log.h>");
     sortIncludes(additionalIncludes);
     writeHeaderBody(ctx, QStringLiteral("Servers.h"), additionalIncludes);
 
@@ -4367,10 +4311,11 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
     auto additionalIncludes = QStringList()
         << QStringLiteral("../SocketHelpers.h")
         << QStringLiteral("RandomDataGenerators.h")
-        << QStringLiteral("<generated/Servers.h>")
-        << QStringLiteral("<generated/Services.h>")
+        << QStringLiteral("<qevercloud/generated/Servers.h>")
+        << QStringLiteral("<qevercloud/generated/Services.h>")
         << QStringLiteral("<QTcpServer>")
         << QStringLiteral("<QtTest/QtTest>");
+
     sortIncludes(additionalIncludes);
 
     const auto & enumerations = parser.enumerations();
@@ -4560,7 +4505,7 @@ void Generator::generateTestRandomDataGeneratorsHeader(
     Parser & parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("<generated/Types.h>");
+        << QStringLiteral("<qevercloud/generated/Types.h>");
     sortIncludes(additionalIncludes);
 
     const QString fileName = QStringLiteral("RandomDataGenerators.h");

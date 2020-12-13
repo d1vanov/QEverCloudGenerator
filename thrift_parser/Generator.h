@@ -272,8 +272,6 @@ private:
         const QString & identifier,
         const QString & offset = QString());
 
-    QString fieldDeclarationToStr(const Parser::Field & field);
-
     enum class MethodType
     {
         TypeName = 0,

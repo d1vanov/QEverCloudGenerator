@@ -3351,6 +3351,7 @@ void Generator::generateTypeHeader(
         << "void print(QTextStream & strm) const override;" << ln;
 
     if (m_allExceptions.contains(s.m_name)) {
+        ctx.m_out << ln;
         ctx.m_out << indent
             << "[[nodiscard]] const char * what() const noexcept override;"
             << ln;

@@ -3489,109 +3489,12 @@ void Generator::generateTypeCpp(
 
     if (m_allExceptions.contains(s.m_name))
     {
-        // TODO: should check if m_error is empty and if so, put
-        // exception details there
-        ctx.m_out << "const char * " << s.m_name << "::what() const noexcept"
-            << ln << "{" << ln
-            << indent << "return EvernoteException::what();" << ln
-            << "}" << ln << ln;
+        generateExceptionClassWhatMethodDefinition(s, ctx);
+        generateExceptionClassExceptionDataMethodDefinition(s, ctx);
 
-        ctx.m_out << "EverCloudExceptionDataPtr " << s.m_name
-            << "::exceptionData() const" << ln
-            << "{" << ln
-            << indent << "return std::make_shared<" << s.m_name << "Data>("
-            << ln;
-
-        for (const auto & f: s.m_fields)
-        {
-            ctx.m_out << indent << indent << f.m_name << "()";
-
-            if (&f != &(s.m_fields.back())) {
-                ctx.m_out << "," << ln;
-            }
-            else {
-                ctx.m_out << ");" << ln;
-            }
-        }
-
-        ctx.m_out << "}" << ln << ln;
-
-        ctx.m_out << s.m_name << "Data::" << s.m_name << "Data(";
-
-        if (s.m_fields.isEmpty())
-        {
-            ctx.m_out << "QString error) :" << ln
-                << indent << "EvernoteExceptionData(error)," << ln
-                << indent << "d(new " << s.m_name << "Data::Impl)" << ln
-                << "{}" << ln;
-        }
-        else
-        {
-            ctx.m_out << ln;
-            ctx.m_out << indent << "QString error," << ln;
-
-            for (const auto & f: s.m_fields)
-            {
-                ctx.m_out << indent;
-
-                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                    ctx.m_out << "std::optional<";
-                }
-
-                ctx.m_out << typeToStr(f.m_type);
-
-                if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                    ctx.m_out << ">";
-                }
-
-                ctx.m_out << " " << f.m_name;
-
-                if (&f != &(s.m_fields.back())) {
-                    ctx.m_out << "," << ln;
-                }
-                else {
-                    ctx.m_out << ")";
-                }
-            }
-
-            ctx.m_out << ":" << ln
-                << indent << "EvernoteExceptionData(error)," << ln
-                << indent << "d(new " << s.m_name << "Data::Impl)" << ln
-                << "{" << ln;
-
-            for (const auto & f: s.m_fields)
-            {
-                ctx.m_out << indent << "d->m_" << f.m_name << " = std::move("
-                    << f.m_name << ");" << ln;
-            }
-
-            ctx.m_out << "}" << ln << ln;
-
-            Parser::Structure sData = s;
-            sData.m_name = s.m_name + QStringLiteral("Data");
-
-            for (const auto & f: s.m_fields)
-            {
-                generateClassAccessoryMethodsForFieldDefinitions(
-                    sData, f, ctx);
-            }
-        }
-
-        ctx.m_out << s.m_name << "Data::~" << s.m_name << "Data() noexcept {}"
-            << ln << ln;
-
-        ctx.m_out << "void " << s.m_name << "Data::throwException() const" << ln
-            << "{" << ln
-            << indent << s.m_name << " e;" << ln;
-
-        for (const auto & f: s.m_fields)
-        {
-            ctx.m_out << indent << "e.set" << capitalize(f.m_name)
-                << "(d->m_" << f.m_name << ");" << ln;
-        }
-
-        ctx.m_out << indent << "throw e;" << ln
-            << "}" << ln << ln;
+        generateExceptionDataClassConstructorWithArgsDefinition(s, ctx);
+        generateExceptionDataClassDestructorDefinition(s, ctx);
+        generateExceptionDataClassThrowExceptionMethodDefinition(s, ctx);
     }
 
     writeNamespaceEnd(ctx.m_out);
@@ -3946,6 +3849,133 @@ void Generator::generateExceptionDataClassDeclaration(
         << indent << "QSharedDataPointer<Impl> d;" << ln;
 
     ctx.m_out << "};" << ln << ln;
+}
+
+void Generator::generateExceptionDataClassConstructorWithArgsDefinition(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << s.m_name << "Data::" << s.m_name << "Data(";
+
+    if (s.m_fields.isEmpty())
+    {
+        ctx.m_out << "QString error) :" << ln
+            << indent << "EvernoteExceptionData(error)," << ln
+            << indent << "d(new " << s.m_name << "Data::Impl)" << ln
+            << "{}" << ln;
+
+        return;
+    }
+
+    ctx.m_out << ln << indent << "QString error," << ln;
+    for (const auto & f: s.m_fields)
+    {
+        ctx.m_out << indent;
+
+        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+            ctx.m_out << "std::optional<";
+        }
+
+        ctx.m_out << typeToStr(f.m_type);
+
+        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+            ctx.m_out << ">";
+        }
+
+        ctx.m_out << " " << f.m_name;
+
+        if (&f != &(s.m_fields.back())) {
+            ctx.m_out << "," << ln;
+        }
+        else {
+            ctx.m_out << ")";
+        }
+    }
+
+    ctx.m_out << ":" << ln
+        << indent << "EvernoteExceptionData(error)," << ln
+        << indent << "d(new " << s.m_name << "Data::Impl)" << ln
+        << "{" << ln;
+
+    for (const auto & f: s.m_fields) {
+        ctx.m_out << indent << "d->m_" << f.m_name << " = std::move("
+            << f.m_name << ");" << ln;
+    }
+
+    ctx.m_out << "}" << ln << ln;
+
+    Parser::Structure sData = s;
+    sData.m_name = s.m_name + QStringLiteral("Data");
+
+    for (const auto & f: s.m_fields) {
+        generateClassAccessoryMethodsForFieldDefinitions(
+            sData, f, ctx);
+    }
+}
+
+void Generator::generateExceptionDataClassDestructorDefinition(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    ctx.m_out << s.m_name << "Data::~" << s.m_name << "Data() noexcept {}"
+        << ln << ln;
+}
+
+void Generator::generateExceptionDataClassThrowExceptionMethodDefinition(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "void " << s.m_name << "Data::throwException() const" << ln
+        << "{" << ln
+        << indent << s.m_name << " e;" << ln;
+
+    for (const auto & f: s.m_fields) {
+        ctx.m_out << indent << "e.set" << capitalize(f.m_name)
+            << "(d->m_" << f.m_name << ");" << ln;
+    }
+
+    ctx.m_out << indent << "throw e;" << ln
+        << "}" << ln << ln;
+}
+
+void Generator::generateExceptionClassWhatMethodDefinition(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    // TODO: should check if m_error is empty and if so, put
+    // exception details there
+    ctx.m_out << "const char * " << s.m_name << "::what() const noexcept"
+        << ln << "{" << ln
+        << indent << "return EvernoteException::what();" << ln
+        << "}" << ln << ln;
+}
+
+void Generator::generateExceptionClassExceptionDataMethodDefinition(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "EverCloudExceptionDataPtr " << s.m_name
+        << "::exceptionData() const" << ln
+        << "{" << ln
+        << indent << "return std::make_shared<" << s.m_name << "Data>("
+        << ln << indent << indent << "QString::fromUtf8(what())," << ln;
+
+    for (const auto & f: s.m_fields)
+    {
+        ctx.m_out << indent << indent << f.m_name << "()";
+
+        if (&f != &(s.m_fields.back())) {
+            ctx.m_out << "," << ln;
+        }
+        else {
+            ctx.m_out << ");" << ln;
+        }
+    }
+
+    ctx.m_out << "}" << ln << ln;
 }
 
 void Generator::generateServicesHeader(Parser & parser, const QString & outPath)

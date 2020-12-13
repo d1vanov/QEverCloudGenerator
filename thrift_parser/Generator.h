@@ -98,6 +98,21 @@ private:
     void generateExceptionDataClassDeclaration(
         const Parser::Structure & s, OutputFileContext & ctx);
 
+    void generateExceptionDataClassConstructorWithArgsDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateExceptionDataClassDestructorDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateExceptionDataClassThrowExceptionMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateExceptionClassWhatMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateExceptionClassExceptionDataMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
     void generateServicesHeader(Parser & parser, const QString & outPath);
     void generateServicesCpp(Parser & parser, const QString & outPath);
 

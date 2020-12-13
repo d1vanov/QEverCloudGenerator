@@ -3431,15 +3431,28 @@ void Generator::generateTypeCpp(
     writeNamespaceBegin(ctx);
 
     constexpr const char * indent = "    ";
+    const bool isException = m_allExceptions.contains(s.m_name);
 
-    ctx.m_out << s.m_name << "::" << s.m_name << "() : d(new " << s.m_name
-        << "::Impl) {}" << ln << ln;
+    ctx.m_out << s.m_name << "::" << s.m_name << "() :" << ln;
+
+    if (isException) {
+        ctx.m_out << indent << "EvernoteException(QStringLiteral(\""
+            << s.m_name << "\"))," << ln;
+    }
+
+    ctx.m_out << indent << "d(new " << s.m_name
+        << "::Impl)" << ln;
+
+    ctx.m_out << " {}" << ln << ln;
 
     ctx.m_out << s.m_name << "::" << s.m_name << "(const " << s.m_name
-        << " & other) : d(other.d) {}" << ln << ln;
+        << " & other) :" << ln
+        << indent << "d(other.d)" << ln
+        << "{}" << ln << ln;
 
     ctx.m_out << s.m_name << "::" << s.m_name << "(" << s.m_name
-        << " && other) noexcept : d(std::move(other.d))" << ln
+        << " && other) noexcept :" << ln
+        << indent << "d(std::move(other.d))" << ln
         << "{}" << ln << ln;
 
     ctx.m_out << s.m_name << "::~" << s.m_name << "() noexcept {}" << ln << ln;
@@ -3488,7 +3501,7 @@ void Generator::generateTypeCpp(
         << indent << "return !(*this == other);" << ln
         << "}" << ln << ln;
 
-    if (m_allExceptions.contains(s.m_name))
+    if (isException)
     {
         generateExceptionClassWhatMethodDefinition(s, ctx);
         generateExceptionClassExceptionDataMethodDefinition(s, ctx);
@@ -3945,8 +3958,6 @@ void Generator::generateExceptionClassWhatMethodDefinition(
 {
     constexpr const char * indent = "    ";
 
-    // TODO: should check if m_error is empty and if so, put
-    // exception details there
     ctx.m_out << "const char * " << s.m_name << "::what() const noexcept"
         << ln << "{" << ln
         << indent << "return EvernoteException::what();" << ln

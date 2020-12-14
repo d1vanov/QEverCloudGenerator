@@ -240,8 +240,7 @@ private:
     void writeHeaderHeader(
         OutputFileContext & ctx, const QString & fileName,
         const QStringList & additionalIncludes = QStringList(),
-        const HeaderKind headerKind = HeaderKind::Public,
-        const QString & section = {});
+        const HeaderKind headerKind = HeaderKind::Public);
 
     void writeHeaderBody(
         OutputFileContext & ctx, const QString & headerFileName,

@@ -1754,33 +1754,20 @@ void Generator::generateTestServerServiceCall(
 void Generator::writeHeaderHeader(
     OutputFileContext & ctx, const QString & fileName,
     const QStringList & additionalIncludes,
-    const HeaderKind headerKind,
-    const QString & section)
+    const HeaderKind headerKind)
 {
     ctx.m_out << disclaimer << ln;
 
     QString guard =
         QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H")
         .arg(fileName.split(QChar::fromLatin1('.'))[0].toUpper());
+
     ctx.m_out << "#ifndef " << guard << ln;
     ctx.m_out << "#define " << guard << ln;
     ctx.m_out << ln;
 
     if (headerKind == HeaderKind::Public) {
-        QStringList sectionParts = section.split(
-            QChar::fromLatin1('/'),
-#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
-            Qt::SkipEmptyParts
-#else
-            QString::SkipEmptyParts
-#endif
-            );
-        ctx.m_out << "#include \"../";
-        for(int i = 0; i < sectionParts.size(); ++i) {
-            ctx.m_out << "../";
-        }
-        ctx.m_out << "Export.h\"" << ln;
-        ctx.m_out << ln;
+        ctx.m_out << "#include <qevercloud/Export.h>" << ln << ln;
     }
 
     for(const auto & include: qAsConst(additionalIncludes))
@@ -3156,7 +3143,7 @@ void Generator::generateTypeAliasesHeader(
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
-        ctx, fileName, additionalIncludes, HeaderKind::Public, fileSection);
+        ctx, fileName, additionalIncludes, HeaderKind::Public);
 
     for(const auto & t: typeAliases)
     {
@@ -3182,7 +3169,7 @@ void Generator::generateTypeHeader(
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("<qevercloud/EverCloudException.h>")
-        << QStringLiteral("<qevercloud/Printable.h>")
+        << QStringLiteral("<qevercloud/utility/Printable.h>")
         << QStringLiteral("<qevercloud/generated/EDAMErrorCode.h>");
 
     const bool isExceptionsSection =
@@ -3224,7 +3211,7 @@ void Generator::generateTypeHeader(
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
-        ctx, fileName, additionalIncludes, HeaderKind::Public, fileSection);
+        ctx, fileName, additionalIncludes, HeaderKind::Public);
 
     const QString indent = QStringLiteral("    ");
 
@@ -3468,7 +3455,7 @@ void Generator::generateTypeImplHeader(
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
-        ctx, fileName, additionalIncludes, HeaderKind::Private, fileSection);
+        ctx, fileName, additionalIncludes, HeaderKind::Private);
 
     constexpr const char * indent = "    ";
 

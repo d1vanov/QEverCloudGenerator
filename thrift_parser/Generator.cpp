@@ -4083,11 +4083,12 @@ void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Impl.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<qevercloud/Log.h>")
+        << QStringLiteral("Types_io.h")
+        << QStringLiteral("<qevercloud/utility/Log.h>")
         << QStringLiteral("<qevercloud/DurableService.h>")
         << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
-    sortIncludes(additionalIncludes);
 
+    sortIncludes(additionalIncludes);
     writeHeaderBody(ctx, QStringLiteral("Services.h"), additionalIncludes);
 
     const auto & services = parser.services();
@@ -4177,7 +4178,9 @@ void Generator::generateServerCpp(Parser & parser, const QString & outPath)
     OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<qevercloud/Log.h>");
+        << QStringLiteral("Types_io.h")
+        << QStringLiteral("<qevercloud/utility/Log.h>");
+
     sortIncludes(additionalIncludes);
     writeHeaderBody(ctx, QStringLiteral("Servers.h"), additionalIncludes);
 

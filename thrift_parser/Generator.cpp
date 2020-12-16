@@ -4055,26 +4055,7 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
         }
     }
 
-    QStringList metatypeDeclarations;
-    metatypeDeclarations.reserve(6);
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::Notebook>)");
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::Tag>)");
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::SavedSearch>)");
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::NoteVersionId>)");
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::SharedNotebook>)");
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::LinkedNotebook>)");
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::BusinessInvitation>)");
-    metatypeDeclarations
-        << QStringLiteral("Q_DECLARE_METATYPE(QList<qevercloud::UserProfile>)");
-
-    writeHeaderFooter(ctx.m_out, fileName, {}, metatypeDeclarations);
+    writeHeaderFooter(ctx.m_out, fileName);
 }
 
 void Generator::generateServicesCpp(Parser & parser, const QString & outPath)

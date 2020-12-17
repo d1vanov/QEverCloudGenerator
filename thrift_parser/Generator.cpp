@@ -311,6 +311,10 @@ QList<Parser::Field> Generator::loggableFields(
 
 bool Generator::shouldGenerateLocalDataMethods(const Parser::Structure & s) const
 {
+    if (s.m_name == QStringLiteral("User")) {
+        return true;
+    }
+
     if (m_allExceptions.contains(s.m_name)) {
         return false;
     }
@@ -3170,14 +3174,20 @@ void Generator::generateTypeHeader(
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("<qevercloud/EverCloudException.h>")
         << QStringLiteral("<qevercloud/utility/Printable.h>")
-        << QStringLiteral("<qevercloud/generated/EDAMErrorCode.h>");
+        << QStringLiteral("<qevercloud/generated/EDAMErrorCode.h>")
+        << QStringLiteral("<qevercloud/generated/types/TypeAliases.h>")
+        << additionalIncludesForFields(s);
 
     const bool isExceptionsSection =
         (fileSection == QStringLiteral("exceptions"));
 
-    additionalIncludes
-        << QStringLiteral("<qevercloud/generated/types/TypeAliases.h>")
-        << additionalIncludesForFields(s);
+    const bool generateLocalData =
+        !isExceptionsSection && shouldGenerateLocalDataMethods(s);
+
+    if (generateLocalData) {
+        additionalIncludes << QStringLiteral("<QHash>")
+            << QStringLiteral("<QVariant>");
+    }
 
     const auto deps = dependentTypeNames(s);
     for (const auto & dep: qAsConst(deps)) {
@@ -3248,7 +3258,6 @@ void Generator::generateTypeHeader(
     ctx.m_out << indent << s.m_name << " & operator=(" << s.m_name
         << " && other) noexcept;" << ln << ln;
 
-    const bool generateLocalData = shouldGenerateLocalDataMethods(s);
     if (generateLocalData) {
         generateTypeLocalDataAccessoryMethodDeclarations(s.m_name, ctx, indent);
     }
@@ -3452,6 +3461,12 @@ void Generator::generateTypeImplHeader(
     QStringList additionalIncludes = QStringList()
         << publicHeaderInclude << QStringLiteral("<QSharedData>");
 
+    const auto generateLocalData = shouldGenerateLocalDataMethods(s);
+    if (generateLocalData) {
+        additionalIncludes << QStringLiteral("<QHash>")
+            << QStringLiteral("<QVariant>");
+    }
+
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
@@ -3490,12 +3505,13 @@ void Generator::generateTypeImplHeader(
         << indent << "void print(QTextStream & strm) const override;" << ln
         << ln;
 
-    if (shouldGenerateLocalDataMethods(s)) {
+    if (generateLocalData) {
         ctx.m_out << indent << "QString m_localId;" << ln
             << indent << "QString m_parentLocalId;" << ln
             << indent << "bool m_locallyModified = false;" << ln
             << indent << "bool m_localOnly = false;" << ln
-            << indent << "bool m_locallyFavorited = false;" << ln << ln;
+            << indent << "bool m_locallyFavorited = false;" << ln
+            << indent << "QHash<QString, QVariant> m_localData;" << ln << ln;
     }
 
     for(const auto & f: qAsConst(s.m_fields))
@@ -4663,8 +4679,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
         << "manually" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "[[nodiscard]] QString localId() const;" << ln
-        << indent << "void setLocalId(QString id);" << ln << ln;
+    ctx.m_out << indent << "[[nodiscard]] QString localId() const noexcept;"
+        << ln << indent << "void setLocalId(QString id);" << ln << ln;
 
     ctx.m_out << indent << "/**" << ln
         << indent
@@ -4683,7 +4699,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
         << indent << " * By default the parentLocalId property is empty" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "[[nodiscard]] QString parentLocalId() const;" << ln
+    ctx.m_out << indent << "[[nodiscard]] QString parentLocalId() const "
+        << "noexcept;" << ln
         << indent << "void setParentLocalId(QString id);" << ln << ln;
 
     ctx.m_out << indent << "/**" << ln
@@ -4696,7 +4713,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
         << indent << " * with Evernote service" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "[[nodiscard]] bool isLocallyModified() const;" << ln
+    ctx.m_out << indent << "[[nodiscard]] bool isLocallyModified() const "
+        << "noexcept;" << ln
         << indent << "void setLocallyModified(bool modified = true);"
         << ln << ln;
 
@@ -4708,8 +4726,9 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
         << indent << " * with Evernote service" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "[[nodiscard]] bool isLocalOnly() const;" << ln
-        << indent << "void setLocalOnly(bool localOnly = true);" << ln << ln;
+    ctx.m_out << indent << "[[nodiscard]] bool isLocalOnly() const noexcept;"
+        << ln << indent << "void setLocalOnly(bool localOnly = true);" << ln
+        << ln;
 
     ctx.m_out << indent << "/**" << ln
         << indent
@@ -4721,9 +4740,19 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
         << indent << " * a property between different clients" << ln
         << indent << " */" << ln;
 
-    ctx.m_out << indent << "[[nodiscard]] bool isLocallyFavorited() const;"
-        << ln << indent << "void setLocallyFavorited(bool favorited = true);"
+    ctx.m_out << indent << "[[nodiscard]] bool isLocallyFavorited() const "
+        << "noexcept;" << ln
+        << indent << "void setLocallyFavorited(bool favorited = true);"
         << ln << ln;
+
+    ctx.m_out << indent << "[[nodiscard]] const QHash<QString, QVariant> & "
+        << "localData() const noexcept;" << ln;
+
+    ctx.m_out << indent << "[[nodiscard]] QHash<QString, QVariant> & "
+        << "mutableLocalData();" << ln;
+
+    ctx.m_out << indent << "void setLocalData(QHash<QString, QVariant> "
+        "localData);" << ln << ln;
 }
 
 void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
@@ -4731,7 +4760,7 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
 {
     constexpr const char * indent = "    ";
 
-    ctx.m_out << "QString " << className << "::localId() const" << ln
+    ctx.m_out << "QString " << className << "::localId() const noexcept" << ln
         << "{" << ln
         << indent << "return d->m_localId;" << ln
         << "}" << ln << ln;
@@ -4741,7 +4770,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
         << indent << "d->m_localId = id;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "QString " << className << "::parentLocalId() const" << ln
+    ctx.m_out << "QString " << className << "::parentLocalId() const noexcept"
+        << ln
         << "{" << ln
         << indent << "return d->m_parentLocalId;" << ln
         << "}" << ln << ln;
@@ -4751,7 +4781,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
         << indent << "d->m_parentLocalId = id;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "bool " << className << "::isLocallyModified() const" << ln
+    ctx.m_out << "bool " << className << "::isLocallyModified() const noexcept"
+        << ln
         << "{" << ln
         << indent << "return d->m_locallyModified;" << ln
         << "}" << ln << ln;
@@ -4762,7 +4793,7 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
         << indent << "d->m_locallyModified = modified;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "bool " << className << "::isLocalOnly() const" << ln
+    ctx.m_out << "bool " << className << "::isLocalOnly() const noexcept" << ln
         << "{" << ln
         << indent << "return d->m_localOnly;" << ln
         << "}" << ln << ln;
@@ -4773,7 +4804,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
         << indent << "d->m_localOnly = localOnly;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "bool " << className << "::isLocallyFavorited() const" << ln
+    ctx.m_out << "bool " << className << "::isLocallyFavorited() const noexcept"
+        << ln
         << "{" << ln
         << indent << "return d->m_locallyFavorited;" << ln
         << "}" << ln << ln;
@@ -4782,6 +4814,25 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
         << "const bool favorited)" << ln
         << "{" << ln
         << indent << "d->m_locallyFavorited = favorited;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "const QHash<QString, QVariant> & "
+        << className << "::localData() const noexcept"
+        << ln
+        << "{" << ln
+        << indent << "return d->m_localData;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "QHash<QString, QVariant> & " << className
+        << "::mutableLocalData()" << ln
+        << "{" << ln
+        << indent << "return d->m_localData;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "void " << className
+        << "::setLocalData(QHash<QString, QVariant> localData)" << ln
+        << "{" << ln
+        << indent << "d->m_localData = std::move(localData);" << ln
         << "}" << ln << ln;
 }
 

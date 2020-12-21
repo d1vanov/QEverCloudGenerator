@@ -311,7 +311,10 @@ QList<Parser::Field> Generator::loggableFields(
 
 bool Generator::shouldGenerateLocalDataMethods(const Parser::Structure & s) const
 {
-    if (s.m_name == QStringLiteral("User")) {
+    if ( (s.m_name == QStringLiteral("User")) ||
+         (s.m_name == QStringLiteral("SharedNotebook")) ||
+         (s.m_name == QStringLiteral("SharedNote")) )
+    {
         return true;
     }
 

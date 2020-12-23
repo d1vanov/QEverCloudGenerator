@@ -3179,6 +3179,7 @@ void Generator::generateTypeHeader(
         << QStringLiteral("<qevercloud/utility/Printable.h>")
         << QStringLiteral("<qevercloud/generated/EDAMErrorCode.h>")
         << QStringLiteral("<qevercloud/generated/types/TypeAliases.h>")
+        << QStringLiteral("<QSharedDataPointer>")
         << additionalIncludesForFields(s);
 
     const bool isExceptionsSection =

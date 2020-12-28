@@ -60,7 +60,7 @@ constexpr const char * blockSeparator = "///////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////
 
-QString generatedFileOutputPath(
+[[nodiscard]] QString generatedFileOutputPath(
     const QString & outPath, const QString & section, const OutputFileType type)
 {
     QString path = outPath;
@@ -332,6 +332,131 @@ bool Generator::shouldGenerateLocalDataMethods(const Parser::Structure & s) cons
     }
 
     return false;
+}
+
+bool Generator::structContainsFieldsWithLocalData(
+    const Parser::Structure & s, const Parser::Structures & structs) const
+{
+    for (const auto & f: s.m_fields)
+    {
+        auto identifierType =
+            std::dynamic_pointer_cast<Parser::IdentifierType>(f.m_type);
+
+        if (!identifierType)
+        {
+            if (const auto listType =
+                std::dynamic_pointer_cast<Parser::ListType>(f.m_type))
+            {
+                identifierType =
+                    std::dynamic_pointer_cast<Parser::IdentifierType>(
+                        listType->m_valueType);
+            }
+            else if (const auto setType =
+                     std::dynamic_pointer_cast<Parser::SetType>(f.m_type))
+            {
+                identifierType =
+                    std::dynamic_pointer_cast<Parser::IdentifierType>(
+                        setType->m_valueType);
+            }
+            else if (const auto mapType =
+                     std::dynamic_pointer_cast<Parser::MapType>(f.m_type))
+            {
+                identifierType =
+                    std::dynamic_pointer_cast<Parser::IdentifierType>(
+                        mapType->m_valueType);
+            }
+
+            if (!identifierType) {
+                continue;
+            }
+        }
+
+        const auto actualType =
+            aliasedTypeName(clearInclude(identifierType->m_identifier));
+
+        const auto sit = std::find_if(
+            structs.constBegin(),
+            structs.constEnd(),
+            [&actualType](const Parser::Structure & strct)
+            {
+                return strct.m_name == actualType;
+            });
+
+        if (sit == structs.constEnd()) {
+            continue;
+        }
+
+        if (shouldGenerateLocalDataMethods(*sit)) {
+            return true;
+        }
+
+        if (structContainsFieldsWithLocalData(*sit, structs)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+Parser::Structures Generator::collectStructsWithLocalData(
+    Parser & parser) const
+{
+    Parser::Structures relevantStructs;
+    const auto & structs = parser.structures();
+    for (const auto & s: qAsConst(structs))
+    {
+        if (shouldGenerateLocalDataMethods(s)) {
+            relevantStructs.push_back(s);
+            continue;
+        }
+
+        if (structContainsFieldsWithLocalData(s, structs)) {
+            relevantStructs.push_back(s);
+            continue;
+        }
+    }
+
+    std::sort(
+        relevantStructs.begin(),
+        relevantStructs.end(),
+        [](const Parser::Structure & lhs, const Parser::Structure & rhs)
+        {
+            return lhs.m_name.localeAwareCompare(rhs.m_name) < 0;
+        });
+
+    return relevantStructs;
+}
+
+std::optional<Parser::Structure> Generator::structForType(
+    const std::shared_ptr<Parser::Type> & type, const Parser & parser) const
+{
+    if (!type) {
+        return std::nullopt;
+    }
+
+    const auto identifierType =
+        std::dynamic_pointer_cast<Parser::IdentifierType>(type);
+    if (!identifierType) {
+        return std::nullopt;
+    }
+
+    const auto actualType =
+        aliasedTypeName(clearInclude(identifierType->m_identifier));
+
+    const auto & structs = parser.structures();
+    const auto sit = std::find_if(
+        structs.constBegin(),
+        structs.constEnd(),
+        [&actualType](const Parser::Structure & strct)
+        {
+            return actualType == strct.m_name;
+        });
+
+    if (sit == structs.constEnd()) {
+        return std::nullopt;
+    }
+
+    return *sit;
 }
 
 QString Generator::camelCaseToSnakeCase(const QString & input) const
@@ -1511,6 +1636,8 @@ void Generator::generateTestServerHelperLambda(
 
     ctx.m_out << "        {" << ln;
 
+    constexpr const char * indent = "    ";
+
     for(const auto & param: func.m_params)
     {
         if (param.m_name == QStringLiteral("authenticationToken")) {
@@ -1520,8 +1647,76 @@ void Generator::generateTestServerHelperLambda(
             continue;
         }
 
-        ctx.m_out << "            Q_ASSERT(" << param.m_name << " == "
-            << param.m_name << "Param);" << ln;
+        if (const auto s = structForType(param.m_type, parser); s &&
+            (shouldGenerateLocalDataMethods(*s) ||
+             structContainsFieldsWithLocalData(*s, parser.structures())))
+        {
+            ctx.m_out << indent << indent << indent
+                << "compareValuesWithoutLocalIds("
+                << param.m_name << "Param, " << param.m_name << ");" << ln;
+        }
+        else if (const auto listType =
+                    std::dynamic_pointer_cast<Parser::ListType>(param.m_type))
+        {
+            if (const auto s =
+                structForType(listType->m_valueType, parser); s &&
+                (shouldGenerateLocalDataMethods(*s) ||
+                    structContainsFieldsWithLocalData(*s, parser.structures())))
+            {
+                ctx.m_out << indent << indent << indent
+                    << "compareListValuesWithoutLocalIds("
+                    << param.m_name << "Param, " << param.m_name << ");" << ln;
+            }
+            else
+            {
+                ctx.m_out << indent << indent << indent << "Q_ASSERT("
+                    << param.m_name << " == " << param.m_name << "Param);"
+                    << ln;
+            }
+        }
+        else if (const auto setType =
+                 std::dynamic_pointer_cast<Parser::SetType>(param.m_type))
+        {
+            if (const auto s =
+                structForType(setType->m_valueType, parser); s &&
+                (shouldGenerateLocalDataMethods(*s) ||
+                    structContainsFieldsWithLocalData(*s, parser.structures())))
+            {
+                ctx.m_out << indent << indent << indent
+                    << "compareSetValuesWithoutLocalIds("
+                    << param.m_name << "Param, " << param.m_name << ");" << ln;
+            }
+            else
+            {
+                ctx.m_out << indent << indent << indent << "Q_ASSERT("
+                    << param.m_name << " == " << param.m_name << "Param);"
+                    << ln;
+            }
+        }
+        else if (const auto mapType =
+                 std::dynamic_pointer_cast<Parser::MapType>(param.m_type))
+        {
+            if (const auto s =
+                structForType(setType->m_valueType, parser); s &&
+                (shouldGenerateLocalDataMethods(*s) ||
+                    structContainsFieldsWithLocalData(*s, parser.structures())))
+            {
+                ctx.m_out << indent << indent << indent
+                    << "compareMapValuesWithoutLocalIds("
+                    << param.m_name << "Param, " << param.m_name << ");" << ln;
+            }
+            else
+            {
+                ctx.m_out << indent << indent << indent << "Q_ASSERT("
+                    << param.m_name << " == " << param.m_name << "Param);"
+                    << ln;
+            }
+        }
+        else
+        {
+            ctx.m_out << indent << indent << indent << "Q_ASSERT("
+                << param.m_name << " == " << param.m_name << "Param);" << ln;
+        }
     }
 
     if (!exceptionToThrow.isEmpty()) {
@@ -1621,6 +1816,7 @@ void Generator::generateTestServerSocketSetup(
 }
 
 void Generator::generateTestServerServiceCall(
+    Parser & parser,
     const Parser::Service & service,
     const Parser::Function & func,
     const ServiceCallKind callKind,
@@ -1716,8 +1912,76 @@ void Generator::generateTestServerServiceCall(
         if (exceptionTypeToCatch.isEmpty())
         {
             if (funcReturnTypeName != QStringLiteral("void")) {
-                ctx.m_out << indent << "QVERIFY(valueFetcher.m_value == response);"
-                    << ln;
+                if (const auto s = structForType(func.m_type, parser); s &&
+                    (shouldGenerateLocalDataMethods(*s) ||
+                     structContainsFieldsWithLocalData(*s, parser.structures())))
+                {
+                    ctx.m_out << indent
+                        << "compareValuesWithoutLocalIds("
+                        << "valueFetcher.m_value, response);" << ln;
+                }
+                else if (const auto listType =
+                         std::dynamic_pointer_cast<Parser::ListType>(func.m_type))
+                {
+                    if (const auto s =
+                        structForType(listType->m_valueType, parser); s &&
+                        (shouldGenerateLocalDataMethods(*s) ||
+                         structContainsFieldsWithLocalData(*s, parser.structures())))
+                    {
+                        ctx.m_out << indent
+                            << "compareListValuesWithoutLocalIds("
+                            << "valueFetcher.m_value, response);" << ln;
+                    }
+                    else
+                    {
+                        ctx.m_out << indent
+                            << "QVERIFY(valueFetcher.m_value == response);"
+                            << ln;
+                    }
+                }
+                else if (const auto setType =
+                         std::dynamic_pointer_cast<Parser::SetType>(func.m_type))
+                {
+                    if (const auto s =
+                        structForType(setType->m_valueType, parser); s &&
+                        (shouldGenerateLocalDataMethods(*s) ||
+                         structContainsFieldsWithLocalData(*s, parser.structures())))
+                    {
+                        ctx.m_out << indent
+                            << "compareSetValuesWithoutLocalIds("
+                            << "valueFetcher.m_value, response);" << ln;
+                    }
+                    else
+                    {
+                        ctx.m_out << indent
+                            << "QVERIFY(valueFetcher.m_value == response);"
+                            << ln;
+                    }
+                }
+                else if (const auto mapType =
+                         std::dynamic_pointer_cast<Parser::MapType>(func.m_type))
+                {
+                    if (const auto s =
+                        structForType(mapType->m_valueType, parser); s &&
+                        (shouldGenerateLocalDataMethods(*s) ||
+                         structContainsFieldsWithLocalData(*s, parser.structures())))
+                    {
+                        ctx.m_out << indent
+                            << "compareMapValuesWithoutLocalIds("
+                            << "valueFetcher.m_value, response);" << ln;
+                    }
+                    else
+                    {
+                        ctx.m_out << indent
+                            << "QVERIFY(valueFetcher.m_value == response);"
+                            << ln;
+                    }
+                }
+                else
+                {
+                    ctx.m_out << indent
+                        << "QVERIFY(valueFetcher.m_value == response);" << ln;
+                }
             }
 
             ctx.m_out << indent << "QVERIFY(valueFetcher.m_exceptionData.get() == nullptr);"
@@ -1754,7 +2018,69 @@ void Generator::generateTestServerServiceCall(
     if ((callKind == ServiceCallKind::Sync) &&
         (funcReturnTypeName != QStringLiteral("void")))
     {
-        ctx.m_out << "    QVERIFY(res == response);" << ln;
+        if (const auto s = structForType(func.m_type, parser); s &&
+            (shouldGenerateLocalDataMethods(*s) ||
+             structContainsFieldsWithLocalData(*s, parser.structures())))
+        {
+            ctx.m_out << indent
+                << "compareValuesWithoutLocalIds(res, response);" << ln;
+        }
+        else if (const auto listType =
+                 std::dynamic_pointer_cast<Parser::ListType>(func.m_type))
+        {
+            if (const auto s =
+                structForType(listType->m_valueType, parser); s &&
+                (shouldGenerateLocalDataMethods(*s) ||
+                 structContainsFieldsWithLocalData(*s, parser.structures())))
+            {
+                ctx.m_out << indent
+                    << "compareListValuesWithoutLocalIds(res, response);" << ln;
+            }
+            else
+            {
+                ctx.m_out << indent
+                    << "QVERIFY(res == response);" << ln;
+            }
+        }
+        else if (const auto setType =
+                 std::dynamic_pointer_cast<Parser::SetType>(func.m_type))
+        {
+            if (const auto s =
+                structForType(setType->m_valueType, parser); s &&
+                (shouldGenerateLocalDataMethods(*s) ||
+                 structContainsFieldsWithLocalData(*s, parser.structures())))
+            {
+                ctx.m_out << indent
+                    << "compareSetValuesWithoutLocalIds(res, response);" << ln;
+            }
+            else
+            {
+                ctx.m_out << indent
+                    << "QVERIFY(res == response);" << ln;
+            }
+        }
+        else if (const auto mapType =
+                 std::dynamic_pointer_cast<Parser::MapType>(func.m_type))
+        {
+            if (const auto s =
+                structForType(mapType->m_valueType, parser); s &&
+                (shouldGenerateLocalDataMethods(*s) ||
+                 structContainsFieldsWithLocalData(*s, parser.structures())))
+            {
+                ctx.m_out << indent
+                    << "compareMapValuesWithoutLocalIds(res, response);" << ln;
+            }
+            else
+            {
+                ctx.m_out << indent
+                    << "QVERIFY(res == response);" << ln;
+            }
+        }
+        else
+        {
+            ctx.m_out << indent
+                << "QVERIFY(res == response);" << ln;
+        }
     }
 }
 
@@ -3485,8 +3811,14 @@ void Generator::generateTypeImplHeader(
         << "{" << ln
         << "public:" << ln;
 
-    ctx.m_out << indent << "Impl() = default;" << ln
-        << indent << "Impl(const " << s.m_name
+    if (shouldGenerateLocalDataMethods(s)) {
+        ctx.m_out << indent << "Impl();" << ln;
+    }
+    else {
+        ctx.m_out << indent << "Impl() = default;" << ln;
+    }
+
+    ctx.m_out << indent << "Impl(const " << s.m_name
         << "::Impl & other) = default;" << ln
         << indent << "Impl(" << s.m_name
         << "::Impl && other) noexcept = default;" << ln << ln;
@@ -3679,11 +4011,27 @@ void Generator::generateTypeImplCpp(
     ctx.m_out << disclaimer << ln;
     ctx.m_out << "#include \"" << s.m_name << "Impl.h\"" << ln << ln;
     ctx.m_out << "#include \"../../../../src/Impl.h\"" << ln << ln;
-    ctx.m_out << "#include <QTextStream>" << ln << ln;
+    ctx.m_out << "#include <QTextStream>" << ln;
 
+    const bool isTypeWithLocalData = shouldGenerateLocalDataMethods(s);
+    if (isTypeWithLocalData) {
+        ctx.m_out << "#include <QUuid>" << ln;
+    }
+
+    ctx.m_out << ln;
     writeNamespaceBegin(ctx);
 
     constexpr const char * indent = "    ";
+
+    if (isTypeWithLocalData) {
+        ctx.m_out << s.m_name << "::Impl::Impl()" << ln
+            << "{" << ln
+            << indent << "m_localId = QUuid::createUuid().toString();" << ln
+            << indent << "// Remove curvy braces" << ln
+            << indent << "m_localId.remove(m_localId.size() - 1, 1);" << ln
+            << indent << "m_localId.remove(0, 1);" << ln
+            << "}" << ln << ln;
+    }
 
     ctx.m_out << "bool " << s.m_name
         << "::Impl::operator==(" << ln << indent << "const " << s.m_name
@@ -4296,10 +4644,12 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
         << QStringLiteral("<qevercloud/generated/Servers.h>")
         << QStringLiteral("<qevercloud/generated/Services.h>")
         << QStringLiteral("<QTcpServer>")
-        << QStringLiteral("<QtTest/QtTest>");
+        << QStringLiteral("<QtTest/QtTest>")
+        << QStringLiteral("ClearLocalIds.h");
 
     sortIncludes(additionalIncludes);
 
+    constexpr const char * indent = "    ";
     const auto & enumerations = parser.enumerations();
     const auto & services = parser.services();
     for(const auto & s: services)
@@ -4320,6 +4670,72 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
             HeaderKind::Test);
 
         ctx.m_out << blockSeparator << ln << ln;
+
+        ctx.m_out << "namespace {" << ln << ln
+            << blockSeparator << ln << ln;
+
+        ctx.m_out << "template <class T>" << ln
+            << "void compareValuesWithoutLocalIds(const T & lhs, const T & rhs)"
+            << ln << "{" << ln
+            << indent << "T lhsCopy = lhs;" << ln
+            << indent << "clearLocalIds(lhsCopy);" << ln << ln
+            << indent << "T rhsCopy = rhs;" << ln
+            << indent << "clearLocalIds(rhsCopy);" << ln << ln
+            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "template <class T>" << ln
+            << "void compareListValuesWithoutLocalIds("
+            << "const QList<T> & lhs, const QList<T> & rhs)" << ln
+            << "{" << ln
+            << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
+            << indent << "QList<T> lhsCopy = lhs;" << ln
+            << indent << "for (auto & v: lhsCopy) {" << ln
+            << indent << indent << "clearLocalIds(v);" << ln
+            << indent << "}" << ln << ln
+            << indent << "QList<T> rhsCopy = rhs;" << ln
+            << indent << "for (auto & v: rhsCopy) {" << ln
+            << indent << indent << "clearLocalIds(v);" << ln
+            << indent << "}" << ln << ln
+            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "template <class T>" << ln
+            << "void compareSetValuesWithoutLocalIds("
+            << "const QSet<T> & lhs, const QSet<T> & rhs)" << ln
+            << "{" << ln
+            << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
+            << indent << "QSet<T> lhsCopy = lhs;" << ln
+            << indent << "for (auto & v: lhsCopy) {" << ln
+            << indent << indent << "clearLocalIds(v);" << ln
+            << indent << "}" << ln << ln
+            << indent << "QSet<T> rhsCopy = rhs;" << ln
+            << indent << "for (auto & v: rhsCopy) {" << ln
+            << indent << indent << "clearLocalIds(v);" << ln
+            << indent << "}" << ln << ln
+            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "template <class K, class V>" << ln
+            << "void compareMapValuesWithoutLocalIds("
+            << "const QMap<K, V> & lhs, const QMap<K, V> & rhs)" << ln
+            << "{" << ln
+            << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
+            << indent << "QMap<K, V> lhsCopy = lhs;" << ln
+            << indent << "for (auto it = lhsCopy.begin(); it != lhsCopy.end();"
+            << " ++it) {" << ln
+            << indent << indent << "clearLocalIds(it.value());" << ln
+            << indent << "}" << ln << ln
+            << indent << "QMap<K, V> rhsCopy = rhs;" << ln
+            << indent << "for (auto it = rhsCopy.begin(); it != rhsCopy.end();"
+            << " ++it) {" << ln
+            << indent << indent << "clearLocalIds(it.value());" << ln
+            << indent << "}" << ln << ln
+            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "} // namespace" << ln << ln
+            << blockSeparator << ln << ln;
 
         ctx.m_out << s.m_name << "Tester::" << s.m_name << "Tester"
             << "(QObject * parent) :" << ln
@@ -4347,7 +4763,9 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
             generateTestServerPrepareRequestResponse(func, enumerations, ctx);
             generateTestServerHelperLambda(s, func, parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
-            generateTestServerServiceCall(s, func, ServiceCallKind::Sync, ctx);
+
+            generateTestServerServiceCall(
+                parser, s, func, ServiceCallKind::Sync, ctx);
 
             ctx.m_out << "}" << ln << ln;
 
@@ -4371,8 +4789,8 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
                 generateTestServerSocketSetup(s, func, ctx);
 
                 generateTestServerServiceCall(
-                    s, func, ServiceCallKind::Sync, ctx, exceptionTypeName,
-                    e.m_name);
+                    parser, s, func, ServiceCallKind::Sync, ctx,
+                    exceptionTypeName, e.m_name);
 
                 ctx.m_out << "}" << ln << ln;
             }
@@ -4404,7 +4822,7 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
             generateTestServerSocketSetup(s, func, ctx);
 
             generateTestServerServiceCall(
-                s, func, ServiceCallKind::Sync, ctx,
+                parser, s, func, ServiceCallKind::Sync, ctx,
                 QStringLiteral("ThriftException"), exceptionField.m_name);
 
             ctx.m_out << "}" << ln << ln;
@@ -4421,7 +4839,9 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
             generateTestServerPrepareRequestResponse(func, enumerations, ctx);
             generateTestServerHelperLambda(s, func, parser, ctx);
             generateTestServerSocketSetup(s, func, ctx);
-            generateTestServerServiceCall(s, func, ServiceCallKind::Async, ctx);
+
+            generateTestServerServiceCall(
+                parser, s, func, ServiceCallKind::Async, ctx);
 
             ctx.m_out << "}" << ln << ln;
 
@@ -4445,8 +4865,8 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
                 generateTestServerSocketSetup(s, func, ctx);
 
                 generateTestServerServiceCall(
-                    s, func, ServiceCallKind::Async, ctx, exceptionTypeName,
-                    e.m_name);
+                    parser, s, func, ServiceCallKind::Async, ctx,
+                    exceptionTypeName, e.m_name);
 
                 ctx.m_out << "}" << ln << ln;
             }
@@ -4470,7 +4890,7 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
             generateTestServerSocketSetup(s, func, ctx);
 
             generateTestServerServiceCall(
-                s, func, ServiceCallKind::Async, ctx,
+                parser, s, func, ServiceCallKind::Async, ctx,
                 QStringLiteral("ThriftException"), exceptionField.m_name);
 
             ctx.m_out << "}" << ln << ln;
@@ -4486,9 +4906,8 @@ void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
 void Generator::generateTestRandomDataGeneratorsHeader(
     Parser & parser, const QString & outPath)
 {
-    auto additionalIncludes = QStringList()
+    const auto additionalIncludes = QStringList()
         << QStringLiteral("<qevercloud/generated/Types.h>");
-    sortIncludes(additionalIncludes);
 
     const QString fileName = QStringLiteral("RandomDataGenerators.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
@@ -4661,6 +5080,232 @@ void Generator::generateTestRandomDataGeneratorsCpp(
 
         ctx.m_out << "    return result;" << ln
             << "}" << ln << ln;
+    }
+
+    writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateTestClearLocalIdsHeader(
+    Parser & parser, const QString & outPath)
+{
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("<qevercloud/generated/Types.h>");
+
+    const QString fileName = QStringLiteral("ClearLocalIds.h");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+    writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
+
+    const auto relevantStructs = collectStructsWithLocalData(parser);
+    for (const auto & s: qAsConst(relevantStructs))
+    {
+        ctx.m_out << "void clearLocalIds(" << s.m_name << " & v);" << ln;
+    }
+
+    ctx.m_out << ln;
+    writeHeaderFooter(ctx.m_out, fileName);
+}
+
+void Generator::generateTestClearLocalIdsCpp(
+    Parser & parser, const QString & outPath)
+{
+    const auto additionalIncludes = QStringList()
+        << QStringLiteral("<qevercloud/utility/ToRange.h>");
+
+    const QString fileName = QStringLiteral("ClearLocalIds.cpp");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+    writeHeaderBody(
+        ctx,
+        QStringLiteral("ClearLocalIds.h"),
+        additionalIncludes,
+        HeaderKind::Test);
+
+    const auto & structs = parser.structures();
+    const auto relevantStructs = collectStructsWithLocalData(parser);
+    constexpr const char * indent = "    ";
+    for (const auto & s: qAsConst(relevantStructs))
+    {
+        ctx.m_out << "void clearLocalIds(" << s.m_name << " & v)" << ln
+            << "{" << ln;
+
+        if (shouldGenerateLocalDataMethods(s)) {
+            ctx.m_out << indent << "v.setLocalId(QString{});" << ln;
+        }
+
+        for (const auto & f: s.m_fields)
+        {
+            if (const auto identifierType =
+                std::dynamic_pointer_cast<Parser::IdentifierType>(f.m_type))
+            {
+                const auto actualType =
+                    aliasedTypeName(clearInclude(identifierType->m_identifier));
+
+                const auto sit = std::find_if(
+                    structs.constBegin(),
+                    structs.constEnd(),
+                    [&actualType](const Parser::Structure & strct)
+                    {
+                        return strct.m_name == actualType;
+                    });
+
+                if ((sit != structs.constEnd()) &&
+                    (shouldGenerateLocalDataMethods(*sit) ||
+                     structContainsFieldsWithLocalData(*sit, structs)))
+                {
+                    if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                        ctx.m_out << indent << "if (v." << f.m_name << "()) {"
+                            << ln
+                            << indent << indent << "clearLocalIds(*v.mutable"
+                            << capitalize(f.m_name) << "());" << ln
+                            << indent << "}" << ln;
+                    }
+                    else {
+                        ctx.m_out << indent << "clearLocalIds(v.mutable"
+                            << capitalize(f.m_name) << "());" << ln;
+                    }
+                }
+            }
+            else if (const auto listType =
+                     std::dynamic_pointer_cast<Parser::ListType>(f.m_type))
+            {
+                if (const auto identifierType =
+                    std::dynamic_pointer_cast<Parser::IdentifierType>(
+                        listType->m_valueType))
+                {
+                    const auto actualType = aliasedTypeName(
+                        clearInclude(identifierType->m_identifier));
+
+                    const auto sit = std::find_if(
+                        structs.constBegin(),
+                        structs.constEnd(),
+                        [&actualType](const Parser::Structure & strct)
+                        {
+                            return strct.m_name == actualType;
+                        });
+
+                    if ((sit != structs.constEnd()) &&
+                        (shouldGenerateLocalDataMethods(*sit) ||
+                         structContainsFieldsWithLocalData(*sit, structs)))
+                    {
+                        if (f.m_required ==
+                            Parser::Field::RequiredFlag::Optional)
+                        {
+                            ctx.m_out << indent << "if (v." << f.m_name
+                                << "()) {" << ln
+                                << indent << indent
+                                << "for (auto & i: *v.mutable"
+                                << capitalize(f.m_name) << "()) {" << ln
+                                << indent << indent << indent
+                                << "clearLocalIds(i);" << ln
+                                << indent << indent << "}" << ln
+                                << indent << "}" << ln;
+                        }
+                        else
+                        {
+                            ctx.m_out << indent << "for (auto & i: v.mutable"
+                                << capitalize(f.m_name) << "()) {" << ln
+                                << indent << indent << "clearLocalIds(i);" << ln
+                                << indent << "}" << ln;
+                        }
+                    }
+                }
+            }
+            else if (const auto setType =
+                     std::dynamic_pointer_cast<Parser::SetType>(f.m_type))
+            {
+                if (const auto identifierType =
+                    std::dynamic_pointer_cast<Parser::IdentifierType>(
+                        setType->m_valueType))
+                {
+                    const auto actualType = aliasedTypeName(
+                        clearInclude(identifierType->m_identifier));
+
+                    const auto sit = std::find_if(
+                        structs.constBegin(),
+                        structs.constEnd(),
+                        [&actualType](const Parser::Structure & strct)
+                        {
+                            return strct.m_name == actualType;
+                        });
+
+                    if ((sit != structs.constEnd()) &&
+                        (shouldGenerateLocalDataMethods(*sit) ||
+                         structContainsFieldsWithLocalData(*sit, structs)))
+                    {
+                        if (f.m_required ==
+                            Parser::Field::RequiredFlag::Optional)
+                        {
+                            ctx.m_out << indent << "if (v." << f.m_name
+                                << "()) {" << ln
+                                << indent << indent
+                                << "for (auto & i: *v.mutable"
+                                << capitalize(f.m_name) << "()) {" << ln
+                                << indent << indent << indent
+                                << "clearLocalIds(i);" << ln
+                                << indent << indent << "}" << ln
+                                << indent << "}" << ln;
+                        }
+                        else
+                        {
+                            ctx.m_out << indent << "for (auto & i: v.mutable"
+                                << capitalize(f.m_name) << "()) {" << ln
+                                << indent << indent << "clearLocalIds(i);" << ln
+                                << indent << "}" << ln;
+                        }
+                    }
+                }
+            }
+            else if (const auto mapType =
+                     std::dynamic_pointer_cast<Parser::MapType>(f.m_type))
+            {
+                if (const auto identifierType =
+                    std::dynamic_pointer_cast<Parser::IdentifierType>(
+                        mapType->m_valueType))
+                {
+                    const auto actualType = aliasedTypeName(
+                        clearInclude(identifierType->m_identifier));
+
+                    const auto sit = std::find_if(
+                        structs.constBegin(),
+                        structs.constEnd(),
+                        [&actualType](const Parser::Structure & strct)
+                        {
+                            return strct.m_name == actualType;
+                        });
+
+                    if ((sit != structs.constEnd()) &&
+                        (shouldGenerateLocalDataMethods(*sit) ||
+                         structContainsFieldsWithLocalData(*sit, structs)))
+                    {
+                        if (f.m_required ==
+                            Parser::Field::RequiredFlag::Optional)
+                        {
+                            ctx.m_out << indent << "if (v." << f.m_name
+                                << "()) {" << ln
+                                << indent << indent
+                                << "for (auto it: toRange(*v.mutable"
+                                << capitalize(f.m_name) << "()) {" << ln
+                                << indent << indent << indent
+                                << "clearLocalIds(it.value());" << ln
+                                << indent << indent << "}" << ln
+                                << indent << "}" << ln;
+                        }
+                        else
+                        {
+                            ctx.m_out << indent << "for (auto it: toRange("
+                                << "v.mutable" << capitalize(f.m_name) << "()))"
+                                << " {" << ln
+                                << indent << indent
+                                << "clearLocalIds(it.value());" << ln
+                                << indent << "}" << ln;
+                        }
+                    }
+                }
+            }
+        }
+
+        ctx.m_out << "}" << ln << ln;
     }
 
     writeNamespaceEnd(ctx.m_out);
@@ -6363,5 +7008,8 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
 
     generateTestRandomDataGeneratorsHeader(parser, outPath);
     generateTestRandomDataGeneratorsCpp(parser, outPath);
+
+    generateTestClearLocalIdsHeader(parser, outPath);
+    generateTestClearLocalIdsCpp(parser, outPath);
 }
 

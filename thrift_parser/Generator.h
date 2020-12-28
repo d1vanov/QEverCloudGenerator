@@ -128,6 +128,12 @@ private:
     void generateTestRandomDataGeneratorsCpp(
         Parser & parser, const QString & outPath);
 
+    void generateTestClearLocalIdsHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateTestClearLocalIdsCpp(
+        Parser & parser, const QString & outPath);
+
     void generateTypeLocalDataAccessoryMethodDeclarations(
         const QString & className, OutputFileContext & ctx,
         QString indent = QString());
@@ -209,6 +215,7 @@ private:
     };
 
     void generateTestServerServiceCall(
+        Parser & parser,
         const Parser::Service & service,
         const Parser::Function & func,
         const ServiceCallKind callKind,
@@ -226,7 +233,8 @@ private:
     void verifyTypeIsValueOrIdentifier(
         const std::shared_ptr<Parser::Type> & type) const;
 
-    QString getGenerateRandomValueFunction(const QString & typeName) const;
+    [[nodiscard]] QString getGenerateRandomValueFunction(
+        const QString & typeName) const;
 
     // Methods for writing header and source files
 
@@ -265,11 +273,11 @@ private:
 
     // Methods for taking a string representation of things
 
-    QString valueToStr(
+    [[nodiscard]] QString valueToStr(
         std::shared_ptr<Parser::ConstValue> value,
         std::shared_ptr<Parser::Type> type,
         const QString & identifier,
-        const QString & offset = QString());
+        const QString & offset = {});
 
     enum class MethodType
     {
@@ -281,21 +289,22 @@ private:
         FuncParamType
     };
 
-    QString typeToStr(
+    [[nodiscard]] QString typeToStr(
         std::shared_ptr<Parser::Type> type,
         const QString & identifier = QString(),
         const MethodType methodType = MethodType::TypeName) const;
 
     // Other auxiliary methods
 
-    QString getIdentifier(const std::shared_ptr<Parser::Type> & type);
+    [[nodiscard]] QString getIdentifier(
+        const std::shared_ptr<Parser::Type> & type);
 
-    QString clearInclude(const QString & s) const;
+    [[nodiscard]] QString clearInclude(const QString & s) const;
 
-    std::optional<Parser::PrimitiveType::Type> aliasedPrimitiveType(
+    [[nodiscard]] std::optional<Parser::PrimitiveType::Type> aliasedPrimitiveType(
         const QString & primitiveTypeAlias) const;
 
-    QString aliasedTypeName(const QString & s) const;
+    [[nodiscard]] QString aliasedTypeName(const QString & s) const;
 
     /**
      * @brief additionalIncludesForFields examines the passed in structure and
@@ -304,7 +313,8 @@ private:
      *
      * @param s     Structure for which additional includes are computed
      */
-    QStringList additionalIncludesForFields(const Parser::Structure & s) const;
+    [[nodiscard]] QStringList additionalIncludesForFields(
+        const Parser::Structure & s) const;
 
     /**
      * @brief dependentTypeNames provides a list of singular types (i.e.
@@ -314,7 +324,8 @@ private:
      *
      * @param s     Structure which fields' dependent type names are computed
      */
-    QStringList dependentTypeNames(const Parser::Structure & s) const;
+    [[nodiscard]] QStringList dependentTypeNames(
+        const Parser::Structure & s) const;
 
     /**
      * @brief loggableFields filters out fields like authentication token,
@@ -325,19 +336,36 @@ private:
      * @return                  The list of non-secret fields which can be put
      *                          into a log entry
      */
-    QList<Parser::Field> loggableFields(const QList<Parser::Field> & fields) const;
+    [[nodiscard]] QList<Parser::Field> loggableFields(
+        const QList<Parser::Field> & fields) const;
 
-    bool shouldGenerateLocalDataMethods(const Parser::Structure & s) const;
+    [[nodiscard]] bool shouldGenerateLocalDataMethods(
+        const Parser::Structure & s) const;
 
-    QString camelCaseToSnakeCase(const QString & input) const;
+    [[nodiscard]] bool structContainsFieldsWithLocalData(
+        const Parser::Structure & s, const Parser::Structures & structs) const;
 
-    QString capitalize(const QString & input) const;
+    /**
+     * @return                  The list of structs which either contain local
+     *                          data themselves or have fields which contain
+     *                          local data
+     */
+    [[nodiscard]] Parser::Structures collectStructsWithLocalData(
+        Parser & parser) const;
 
-    QString decapitalize(const QString & input) const;
+    [[nodiscard]] std::optional<Parser::Structure> structForType(
+        const std::shared_ptr<Parser::Type> & type,
+        const Parser & parser) const;
 
-    QString fieldTypeToStr(const Parser::Field & field) const;
+    [[nodiscard]] QString camelCaseToSnakeCase(const QString & input) const;
 
-    bool isFieldOfPrimitiveType(
+    [[nodiscard]] QString capitalize(const QString & input) const;
+
+    [[nodiscard]] QString decapitalize(const QString & input) const;
+
+    [[nodiscard]] QString fieldTypeToStr(const Parser::Field & field) const;
+
+    [[nodiscard]] bool isFieldOfPrimitiveType(
         const Parser::Field & field, const QString & fieldTypeName) const;
 
     // Write methods for particular parsed fields

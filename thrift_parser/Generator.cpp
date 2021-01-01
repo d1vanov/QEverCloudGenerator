@@ -3967,17 +3967,11 @@ void Generator::generateLocalDataClassDeclaration(
         << ln
         << "     * of the data item being a parent to this data item."
         << ln
-        << "     *"
-        << ln
         << "     * For example, a note is a parent to a resource, a notebook"
         << ln
         << "     * is a parent to a note. So note's id is a parentId for a"
         << ln
-        << "     * resource, notebook's id is a parentId for a note, tag's id"
-        << ln
-        << "     * is a parent to a child tag."
-        << ln
-        << "     *"
+        << "     * resource's, notebook's id is a parentId for a note."
         << ln
         << "     * By default the parentId property is empty"
         << ln

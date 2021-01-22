@@ -45,7 +45,7 @@ constexpr const char * ln = "\n";
 constexpr const char * disclaimer =
     "/**\n"
     " * Original work: Copyright (c) 2014 Sergey Skoblikov\n"
-    " * Modified work: Copyright (c) 2015-2020 Dmitry Ivanov\n"
+    " * Modified work: Copyright (c) 2015-2021 Dmitry Ivanov\n"
     " *\n"
     " * This file is a part of QEverCloud project and is distributed under "
     "the terms\n"
@@ -55,8 +55,18 @@ constexpr const char * disclaimer =
     " * This file was generated from Evernote Thrift API\n"
     " */\n";
 
-constexpr const char * blockSeparator = "/////////////////////////////////////////"
-                                        "///////////////////////////////////////";
+constexpr const char * blockSeparator =
+    "////////////////////////////////////////"
+    "////////////////////////////////////////";
+
+constexpr const char * auxiliaryMethodsDisclaimer =
+    "    /**\n"
+    "     * Methods below correspond to fields which are NOT set by QEverCloud "
+    "itself.\n"
+    "     * They exist for convenience of client code and are intended to be "
+    "called\n"
+    "     * and used by QEverCloud's client code if/when appropriate\n"
+    "     */\n";
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -988,6 +998,57 @@ void Generator::writeTypeImplPrintDefinition(
     constexpr const char * indent = "    ";
 
     out << indent << "strm << \"" << s.m_name << ": {\\n\";" << ln;
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        out << indent << indent << "strm << \"" << indent
+            << "linkedNotebookGuid = \" << m_linkedNotebookGuid << \"\\n\";"
+            << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        out << indent << indent << "strm << \"" << indent
+            << "linkedNotebookGuid = \" << m_linkedNotebookGuid << \"\\n\";"
+            << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        out << indent << indent << "strm << \"" << indent
+            << "notebookLocalId = \" << m_notebookLocalId << \"\\n\";" << ln
+            << indent << indent << "strm << \"" << indent
+            << "tagLocalIds = \" << m_tagLocalIds.join(QStringLiteral(\", \")) "
+            << "<< \"\\n\";" << ln
+            << indent << indent << "strm << \"" << indent
+            << "thumbnail data size = \" << m_thumbnailData.size() "
+            << "<< \"\\n\";" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        out << indent << indent << "strm << \"" << indent
+            << "noteLocalId = \" << m_noteLocalId << \"\\n\";" << ln
+            << indent << indent << "strm << \"" << indent
+            << "indexInNote = \" << (m_indexInNote ? "
+            << "QString::number(*m_indexInNote) : "
+            << "QStringLiteral(\"<not set>\")) << \"\\n\";" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        out << indent << indent << "strm << \"" << indent
+            << "noteGuid = \" << "
+            << "m_noteGuid.value_or(QStringLiteral(\"not set\")) << \"\\n\";"
+            << ln
+            << indent << indent << "strm << \"" << indent
+            << "indexInNote = \" << (m_indexInNote ? "
+            << "QString::number(*m_indexInNote) : "
+            << "QStringLiteral(\"<not set>\")) << \"\\n\";" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNotebook"))
+    {
+        out << indent << indent << "strm << \"" << indent
+            << "indexInNotebook = \" << (m_indexInNotebook ? "
+            << "QString::number(*m_indexInNotebook) : "
+            << "QStringLiteral(\"<not set>\")) << \"\\n\";" << ln;
+    }
 
     if (shouldGenerateLocalDataMethods(s))
     {
@@ -3607,6 +3668,8 @@ void Generator::generateTypeHeader(
         ctx.m_out << ln;
     }
 
+    generateClassAccessoryMethodsForAuxiliaryFields(s, ctx, indent);
+
     ctx.m_out << indent
         << "void print(QTextStream & strm) const override;" << ln;
 
@@ -3735,6 +3798,128 @@ void Generator::generateTypeCpp(
         << indent << "return *this;" << ln
         << "}" << ln << ln;
 
+    if (s.m_name == QStringLiteral("Notebook") ||
+        s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << "QString " << s.m_name << "::linkedNotebookGuid() const"
+            << ln
+            << "{" << ln
+            << indent << "return d->m_linkedNotebookGuid;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setLinkedNotebookGuid("
+            << "QString linkedNotebookGuid)" << ln
+            << "{" << ln
+            << indent << "d->m_linkedNotebookGuid = "
+            << "std::move(linkedNotebookGuid);"
+            << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << "QString " << s.m_name << "::notebookLocalId() const" << ln
+            << "{" << ln
+            << indent << "return d->m_notebookLocalId;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setNotebookLocalId("
+            << "QString notebookLocalId)" << ln
+            << "{" << ln
+            << indent << "d->m_notebookLocalId = std::move(notebookLocalId);"
+            << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "QStringList " << s.m_name << "::tagLocalIds() const" << ln
+            << "{" << ln
+            << indent << "return d->m_tagLocalIds;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setTagLocalIds("
+            << "QStringList tagLocalIds)" << ln
+            << "{" << ln
+            << indent << "d->m_tagLocalIds = std::move(tagLocalIds);" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "QByteArray " << s.m_name << "::thumbnailData() const"
+            << ln
+            << "{" << ln
+            << indent << "return d->m_thumbnailData;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setThumbnailData("
+            << "QByteArray thumbnailData)" << ln
+            << "{" << ln
+            << indent << "d->m_thumbnailData = std::move(thumbnailData);" << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << "QString " << s.m_name << "::noteLocalId() const" << ln
+            << "{" << ln
+            << indent << "return d->m_noteLocalId;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setNoteLocalId("
+            << "QString noteLocalId)" << ln
+            << "{" << ln
+            << indent << "d->m_noteLocalId = std::move(noteLocalId);"
+            << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "const std::optional<int> & " << s.m_name
+            << "::indexInNote() const noexcept" << ln
+            << "{" << ln
+            << indent << "return d->m_indexInNote;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setIndexInNote("
+            << "std::optional<int> indexInNote)" << ln
+            << "{" << ln
+            << indent << "d->m_indexInNote = std::move(indexInNote);" << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << "const std::optional<Guid> & " << s.m_name
+            << "::noteGuid() const noexcept" << ln
+            << "{" << ln
+            << indent << "return d->m_noteGuid;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setNoteGuid("
+            << "std::optional<Guid> noteGuid)" << ln
+            << "{" << ln
+            << indent << "d->m_noteGuid = std::move(noteGuid);" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "const std::optional<int> & " << s.m_name
+            << "::indexInNote() const noexcept" << ln
+            << "{" << ln
+            << indent << "return d->m_indexInNote;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setIndexInNote("
+            << "std::optional<int> indexInNote)" << ln
+            << "{" << ln
+            << indent << "d->m_indexInNote = std::move(indexInNote);" << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNotebook"))
+    {
+        ctx.m_out << "const std::optional<int> & " << s.m_name
+            << "::indexInNotebook() const noexcept" << ln
+            << "{" << ln
+            << indent << "return d->m_indexInNotebook;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "void " << s.m_name << "::setIndexInNotebook("
+            << "std::optional<int> indexInNotebook)" << ln
+            << "{" << ln
+            << indent << "d->m_indexInNotebook = std::move(indexInNotebook);"
+            << ln
+            << "}" << ln << ln;
+    }
+
     if (shouldGenerateLocalDataMethods(s)) {
         generateTypeLocalDataAccessoryMethodDefinitions(s.m_name, ctx);
     }
@@ -3840,6 +4025,35 @@ void Generator::generateTypeImplHeader(
     ctx.m_out << ln
         << indent << "void print(QTextStream & strm) const override;" << ln
         << ln;
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << "QString m_linkedNotebookGuid;" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "QString m_linkedNotebookGuid;" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "QString m_notebookLocalId;" << ln
+            << indent << "QStringList m_tagLocalIds;" << ln
+            << indent << "QByteArray m_thumbnailData;" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "QString m_noteLocalId;" << ln
+            << indent << "std::optional<int> m_indexInNote;" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "std::optional<Guid> m_noteGuid;" << ln
+            << indent << "std::optional<int> m_indexInNote;" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNotebook"))
+    {
+        ctx.m_out << indent << "std::optional<int> m_indexInNotebook;" << ln;
+    }
 
     if (generateLocalData) {
         ctx.m_out << indent << "QString m_localId;" << ln
@@ -4053,6 +4267,45 @@ void Generator::generateTypeImplCpp(
             << indent << indent << "m_localOnly == other.m_localOnly &&" << ln
             << indent << indent
             << "m_locallyFavorited == other.m_locallyFavorited &&" << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << indent << "m_linkedNotebookGuid == "
+            << "other.m_linkedNotebookGuid &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << indent << "m_linkedNotebookGuid == "
+            << "other.m_linkedNotebookGuid &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << indent << "m_notebookLocalId == "
+            << "other.m_notebookLocalId &&" << ln
+            << indent << indent
+            << "m_tagLocalIds == other.m_tagLocalIds &&" << ln
+            << indent << indent
+            << "m_thumbnailData == other.m_thumbnailData &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << indent << "m_noteLocalId == "
+            << "other.m_noteLocalId &&" << ln
+            << indent << indent
+            << "m_indexInNote == other.m_indexInNote &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << indent << "m_noteGuid == "
+            << "other.m_noteGuid &&" << ln
+            << indent << indent
+            << "m_indexInNote == other.m_indexInNote &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNotebook"))
+    {
+        ctx.m_out << indent << indent << "m_indexInNotebook == "
+            << "other.m_indexInNotebook &&" << ln;
     }
 
     for(const auto & f: qAsConst(s.m_fields))
@@ -5517,6 +5770,200 @@ void Generator::generateClassAccessoryMethodsForFieldDeclarations(
     // Setter
     ctx.m_out << indent << "void set" << capitalize(field.m_name) << "("
         << fieldTypeName << " " << field.m_name << ");" << ln;
+}
+
+void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
+    const Parser::Structure & s, OutputFileContext & ctx, QString indent)
+{
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << auxiliaryMethodsDisclaimer << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Guid of linked notebook which this notebook comes from. If"
+            << ln
+            << indent
+            << " * this notebook belongs to user's own content i.e. doesn't"
+            << ln
+            << indent
+            << " * come from any linked notebook, this field would be empty"
+            << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "[[nodiscard]] QString linkedNotebookGuid() const;" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set guid of linked notebook to which this notebook belongs"
+            << ln
+            << indent
+            << " * or empty string if this notebook belongs to user's own "
+            << "content" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "void setLinkedNotebookGuid(QString guid);" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << auxiliaryMethodsDisclaimer << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Guid of linked notebook which this tag comes from. If"
+            << ln
+            << indent
+            << " * this tag belongs to user's own content i.e. doesn't"
+            << ln
+            << indent
+            << " * come from any linked notebook, this field would be empty"
+            << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "[[nodiscard]] QString linkedNotebookGuid() const;" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set guid of linked notebook to which this tag belongs"
+            << ln
+            << indent
+            << " * or empty string if this tag belongs to user's own content"
+            << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "void setLinkedNotebookGuid(QString guid);" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << auxiliaryMethodsDisclaimer << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Local id of a notebook to which this note belongs" << ln
+            << indent << " */" << ln
+            << indent
+            << "[[nodiscard]] QString notebookLocalId() const;" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set local id of a notebook to which this note belongs" << ln
+            << indent << " */" << ln
+            << indent
+            << "void setNotebookLocalId(QString notebookLocalId);" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Local ids of this note's tags" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "[[nodiscard]] QStringList tagLocalIds() const;" << ln
+            << indent
+            << "void setTagLocalIds(QStringList tagLocalIds);" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Thumbnail image data correspondng to the note" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "[[nodiscard]] QByteArray thumbnailData() const;" << ln
+            << indent
+            << "void setThumbnailData(QByteArray data);" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << auxiliaryMethodsDisclaimer << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Local id of a note to which this resource belongs" << ln
+            << indent << " */" << ln
+            << indent
+            << "[[nodiscard]] QString noteLocalId() const;" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set local id of a note to which this resource belongs" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "void setNoteLocalId(QString noteLocalId);" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Index of this resource within the note" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "[[nodiscard]] const std::optional<int> & indexInNote() const "
+            << "noexcept;"
+            << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set index of this resource within the note" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "void setIndexInNote(std::optional<int> index);" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << auxiliaryMethodsDisclaimer << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Guid of a note to which this shared note belongs" << ln
+            << indent << " */" << ln
+            << indent
+            << "[[nodiscard]] const std::optional<Guid> & noteGuid() const "
+            << "noexcept;" << ln
+            << indent
+            << "[[nodiscard]] std::optional<Guid> & mutableNoteGuid();" << ln
+            << indent
+            << "void setNoteGuid(std::optional<Guid> noteGuid);" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Index of this shared note within the note" << ln
+            << indent << " */" << ln
+            << indent
+            << "[[nodiscard]] const std::optional<int> & indexInNote() const "
+            << "noexcept;"
+            << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set index of this shared note within the note" << ln
+            << indent << " */" << ln
+            << indent
+            << "void setIndexInNote(std::optional<int> index);" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNotebook"))
+    {
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Index of this shared notebook within the notebook" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "[[nodiscard]] const std::optional<int> & indexInNotebook() "
+            << "const noexcept;"
+            << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set index of this shared notebook within the notebook" << ln
+            << indent
+            << " */" << ln
+            << indent
+            << "void setIndexInNotebook(std::optional<int> index);" << ln << ln;
+    }
 }
 
 void Generator::generateClassAccessoryMethodsForFieldDefinitions(

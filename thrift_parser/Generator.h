@@ -136,14 +136,18 @@ private:
 
     void generateTypeLocalDataAccessoryMethodDeclarations(
         const QString & className, OutputFileContext & ctx,
-        QString indent = QString());
+        QString indent = QString{});
 
     void generateTypeLocalDataAccessoryMethodDefinitions(
         const QString & className, OutputFileContext & ctx);
 
     void generateClassAccessoryMethodsForFieldDeclarations(
         const Parser::Field & field, OutputFileContext & ctx,
-        QString indent = QString());
+        QString indent = QString{});
+
+    void generateClassAccessoryMethodsForAuxiliaryFields(
+        const Parser::Structure & s, OutputFileContext & ctx,
+        QString indent = QString{});
 
     void generateClassAccessoryMethodsForFieldDefinitions(
         const Parser::Structure & s, const Parser::Field & field,
@@ -291,7 +295,7 @@ private:
 
     [[nodiscard]] QString typeToStr(
         std::shared_ptr<Parser::Type> type,
-        const QString & identifier = QString(),
+        const QString & identifier = QString{},
         const MethodType methodType = MethodType::TypeName) const;
 
     // Other auxiliary methods

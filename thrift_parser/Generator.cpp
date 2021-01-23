@@ -1932,8 +1932,13 @@ void Generator::generateTestServerServiceCall(
         << serviceName << "(" << ln
         << "        new" << service.m_name << "(" << ln
         << "            QStringLiteral(\"http://127.0.0.1:\") + "
-        << "QString::number(port)," << ln
-        << "            nullptr," << ln
+        << "QString::number(port)," << ln;
+
+    if (service.m_name == QStringLiteral("NoteStore")) {
+        ctx.m_out << "            QString{}," << ln;
+    }
+
+    ctx.m_out << "            nullptr," << ln
         << "            nullptr," << ln
         << "            nullRetryPolicy()));" << ln;
 
@@ -4720,8 +4725,14 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
                 << s.m_name << "(" << ln;
 
             ctx.m_out << "    QString " << decapitalize(s.m_name)
-                << "Url = {}," << ln
-                << "    IRequestContextPtr ctx = {}," << ln
+                << "Url = {}," << ln;
+
+            if (s.m_name == QStringLiteral("NoteStore"))
+            {
+                ctx.m_out << "    QString linkedNotebookGuid = {}," << ln;
+            }
+
+            ctx.m_out << "    IRequestContextPtr ctx = {}," << ln
                 << "    QObject * parent = nullptr," << ln
                 << "    IRetryPolicyPtr retryPolicy = {});" << ln << ln;
         }
@@ -4770,15 +4781,28 @@ void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
 
         auto serviceName = decapitalize(s.m_name);
 
-        ctx.m_out << "    QString " << serviceName << "Url," << ln
-            << "    IRequestContextPtr ctx," << ln
+        ctx.m_out << "    QString " << serviceName << "Url," << ln;
+
+        if (s.m_name == QStringLiteral("NoteStore"))
+        {
+            ctx.m_out << "    QString linkedNotebookGuid," << ln;
+        }
+
+        ctx.m_out << "    IRequestContextPtr ctx," << ln
             << "    QObject * parent," << ln
             << "    IRetryPolicyPtr retryPolicy)" << ln
             << "{" << ln
             << "    if (ctx && ctx->maxRequestRetryCount() == 0)" << ln
             << "    {" << ln
-            << "        return new " << s.m_name << "(" << serviceName
-            << "Url, ctx);" << ln
+            << "        return new " << s.m_name << "(std::move(" << serviceName
+            << "Url), ";
+
+        const bool isNoteStore = (s.m_name == QStringLiteral("NoteStore"));
+        if (isNoteStore) {
+            ctx.m_out << "std::move(linkedNotebookGuid), ";
+        }
+
+        ctx.m_out << "ctx);" << ln
             << "    }" << ln
             << "    else" << ln
             << "    {" << ln
@@ -4786,8 +4810,14 @@ void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
             << "            retryPolicy = newRetryPolicy();" << ln
             << "        }" << ln << ln
             << "        return new Durable" << s.m_name << "(" << ln
-            << "            std::make_shared<" << s.m_name << ">("
-            << serviceName << "Url, ctx)," << ln
+            << "            std::make_shared<" << s.m_name << ">(std::move("
+            << serviceName << "Url), ";
+
+        if (isNoteStore) {
+            ctx.m_out << "std::move(linkedNotebookGuid), ";
+        }
+
+        ctx.m_out << "ctx)," << ln
             << "            ctx," << ln
             << "            retryPolicy," << ln
             << "            parent);" << ln
@@ -6062,6 +6092,10 @@ void Generator::generateServiceClassDeclaration(
     if (serviceClassType == ServiceClassType::NonDurable) {
         ctx.m_out << "            QString " << serviceName << "Url = {},"
             << ln;
+
+        if (service.m_name == QStringLiteral("NoteStore")) {
+            ctx.m_out << "            QString linkedNotebookGuid = {}," << ln;
+        }
     }
     else {
         ctx.m_out << "            I" << service.m_name << "Ptr service,"
@@ -6081,6 +6115,12 @@ void Generator::generateServiceClassDeclaration(
     if (serviceClassType == ServiceClassType::NonDurable) {
         ctx.m_out << "        m_url(std::move(" << serviceName << "Url)),"
             << ln;
+
+        if (service.m_name == QStringLiteral("NoteStore"))
+        {
+            ctx.m_out << "        m_linkedNotebookGuid(std::move("
+                << "linkedNotebookGuid))," << ln;
+        }
     }
     else {
         ctx.m_out << "        m_service(std::move(service))," << ln

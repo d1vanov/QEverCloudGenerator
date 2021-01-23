@@ -1095,9 +1095,6 @@ void Generator::writeTypeImplPrintDefinition(
             << "localId = \" << m_localId << \"\\n\";" << ln;
 
         out << indent << indent << "strm << \"" << indent
-            << "parentLocalId = \" << m_parentLocalId" << " << \"\\n\";" << ln;
-
-        out << indent << indent << "strm << \"" << indent
             << "locallyModified = \""
             << " << (m_locallyModified ? \"true\" : \"false\") << \"\\n\";"
             << ln;
@@ -3748,9 +3745,7 @@ void Generator::generateTypeHeader(
     {
         ctx.m_out << indent
             << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)"
-            << ln << indent
-            << "Q_PROPERTY(QString parentLocalId READ parentLocalId "
-            << "WRITE setParentLocalId)" << ln
+            << ln
             << indent
             << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
             << "WRITE setLocallyModified)" << ln
@@ -4108,7 +4103,6 @@ void Generator::generateTypeImplHeader(
 
     if (generateLocalData) {
         ctx.m_out << indent << "QString m_localId;" << ln
-            << indent << "QString m_parentLocalId;" << ln
             << indent << "bool m_locallyModified = false;" << ln
             << indent << "bool m_localOnly = false;" << ln
             << indent << "bool m_locallyFavorited = false;" << ln
@@ -4311,8 +4305,6 @@ void Generator::generateTypeImplCpp(
 
     if (shouldGenerateLocalDataMethods(s)) {
         ctx.m_out << indent << indent << "m_localId == other.m_localId &&" << ln
-            << indent << indent
-            << "m_parentLocalId == other.m_parentLocalId &&" << ln
             << indent << indent
             << "m_locallyModified == other.m_locallyModified &&" << ln
             << indent << indent << "m_localOnly == other.m_localOnly &&" << ln
@@ -5637,27 +5629,6 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
 
     ctx.m_out << indent << "/**" << ln
         << indent
-        << " * @brief parentLocalId can be used as a local unique identifier"
-        << ln << indent
-        << " * of the data item being a parent to this data item." << ln
-        << indent << " *" << ln
-        << indent << " * For example, a note is a parent to a resource, a "
-        << "notebook" << ln << indent
-        << " * is a parent to a note. So note's localId is a parentLocalId "
-        << "for a" << ln << indent
-        << " * resource, notebook's localId is a parentLocalId for a note,"
-        << ln << indent << " * tag's localId is a parentLocalId to a child tag."
-        << ln
-        << indent << " *" << ln
-        << indent << " * By default the parentLocalId property is empty" << ln
-        << indent << " */" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] QString parentLocalId() const "
-        << "noexcept;" << ln
-        << indent << "void setParentLocalId(QString id);" << ln << ln;
-
-    ctx.m_out << indent << "/**" << ln
-        << indent
         << " * @brief locallyModified flag can be used to keep track which"
         << ln
         << indent
@@ -5721,17 +5692,6 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
     ctx.m_out << "void " << className << "::setLocalId(QString id)" << ln
         << "{" << ln
         << indent << "d->m_localId = id;" << ln
-        << "}" << ln << ln;
-
-    ctx.m_out << "QString " << className << "::parentLocalId() const noexcept"
-        << ln
-        << "{" << ln
-        << indent << "return d->m_parentLocalId;" << ln
-        << "}" << ln << ln;
-
-    ctx.m_out << "void " << className << "::setParentLocalId(QString id)" << ln
-        << "{" << ln
-        << indent << "d->m_parentLocalId = id;" << ln
         << "}" << ln << ln;
 
     ctx.m_out << "bool " << className << "::isLocallyModified() const noexcept"

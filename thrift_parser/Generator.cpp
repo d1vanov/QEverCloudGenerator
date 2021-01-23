@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2020 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2021 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -3660,7 +3660,19 @@ void Generator::generateTypeHeader(
         {
             const auto lines = cit.value().split(QChar::fromLatin1('\n'));
             for(const auto & line: qAsConst(lines)) {
-                ctx.m_out << indent << line << ln;
+                if (&line != &lines.front() && &line != &lines.back()) {
+                    const auto simplifiedLine = line.simplified();
+                    if (simplifiedLine != QStringLiteral("<br/>")) {
+                        ctx.m_out << indent << " * " << simplifiedLine << ln;
+                    }
+                }
+                else {
+                    ctx.m_out << indent;
+                    if (&line == &lines.back()) {
+                        ctx.m_out << " ";
+                    }
+                    ctx.m_out << line << ln;
+                }
             }
         }
 

@@ -5669,6 +5669,16 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
         << indent << "void setLocallyFavorited(bool favorited = true);"
         << ln << ln;
 
+    ctx.m_out << indent << "/**" << ln
+        << indent
+        << " * @brief localData property can be used to store any additional"
+        << ln
+        << indent
+        << " * data which might be needed to be set for the type object" << ln
+        << indent
+        << " * by QEverCloud's client code" << ln
+        << indent << " */" << ln;
+
     ctx.m_out << indent << "[[nodiscard]] const QHash<QString, QVariant> & "
         << "localData() const noexcept;" << ln;
 

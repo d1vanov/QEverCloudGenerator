@@ -4619,6 +4619,14 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
         ctx.m_out << "    virtual void set" << s.m_name << "Url(QString url) = 0;"
             << ln << ln;
 
+        if (s.m_name == QStringLiteral("NoteStore"))
+        {
+            ctx.m_out << "    virtual QString linkedNotebookGuid() const = 0;"
+                << ln
+                << "    virtual void setLinkedNotebookGuid("
+                << "QString linkedNotebookGuid) = 0;" << ln << ln;
+        }
+
         for(const auto & func: qAsConst(s.m_functions))
         {
             if (func.m_isOneway) {
@@ -6063,8 +6071,8 @@ void Generator::generateServiceClassDeclaration(
     ctx.m_out << "            IRequestContextPtr ctx = {}," << ln;
 
     if (serviceClassType == ServiceClassType::Durable) {
-        ctx.m_out << "            IRetryPolicyPtr retryPolicy = newRetryPolicy(),"
-            << ln;
+        ctx.m_out << "            "
+            << "IRetryPolicyPtr retryPolicy = newRetryPolicy()," << ln;
     }
 
     ctx.m_out << "            QObject * parent = nullptr) :" << ln
@@ -6104,19 +6112,36 @@ void Generator::generateServiceClassDeclaration(
             << "    }" << ln
             << ln;
 
-        ctx.m_out << "    virtual void set" << service.m_name
+        ctx.m_out << "    void set" << service.m_name
             << "Url(QString " << serviceName << "Url) override" << ln
             << "    {" << ln
             << "        m_url = std::move(" << serviceName << "Url);" << ln
             << "    }"
             << ln << ln;
 
-        ctx.m_out << "    virtual QString " << serviceName
+        ctx.m_out << "    QString " << serviceName
             << "Url() const override" << ln
             << "    {" << ln
             << "        return m_url;" << ln
             << "    }"
             << ln << ln;
+
+        if (service.m_name == QStringLiteral("NoteStore"))
+        {
+            ctx.m_out << "    QString linkedNotebookGuid() const override" << ln
+                << "    {" << ln
+                << "        return m_linkedNotebookGuid;" << ln
+                << "    }" << ln
+                << ln;
+
+            ctx.m_out << "    void setLinkedNotebookGuid("
+                << "QString linkedNotebookGuid) override" << ln
+                << "    {" << ln
+                << "        m_linkedNotebookGuid = "
+                << "std::move(linkedNotebookGuid);" << ln
+                << "    }" << ln
+                << ln;
+        }
     }
     else
     {
@@ -6127,7 +6152,7 @@ void Generator::generateServiceClassDeclaration(
             << "        m_service->setParent(nullptr);" << ln
             << "    }" << ln << ln;
 
-        ctx.m_out << "    virtual void set" << service.m_name
+        ctx.m_out << "    void set" << service.m_name
             << "Url(QString " << serviceName << "Url) override" << ln
             << "    {" << ln
             << "        m_service->set" << service.m_name << "Url("
@@ -6135,12 +6160,29 @@ void Generator::generateServiceClassDeclaration(
             << "    }"
             << ln << ln;
 
-        ctx.m_out << "    virtual QString " << serviceName
+        ctx.m_out << "    QString " << serviceName
             << "Url() const override" << ln
             << "    {" << ln
             << "        return m_service->" << serviceName << "Url();" << ln
             << "    }"
             << ln << ln;
+
+        if (service.m_name == QStringLiteral("NoteStore"))
+        {
+            ctx.m_out << "    QString linkedNotebookGuid() const override" << ln
+                << "    {" << ln
+                << "        return m_service->linkedNotebookGuid();" << ln
+                << "    }"
+                << ln << ln;
+
+            ctx.m_out << "    void setLinkedNotebookGuid("
+                << "QString linkedNotebookGuid) override" << ln
+                << "    {" << ln
+                << "        m_service->setLinkedNotebookGuid("
+                << "std::move(linkedNotebookGuid));" << ln
+                << "    }"
+                << ln << ln;
+        }
     }
 
     for(const auto & func: qAsConst(service.m_functions))
@@ -6149,7 +6191,7 @@ void Generator::generateServiceClassDeclaration(
             throw std::runtime_error("oneway functions are not supported");
         }
 
-        ctx.m_out << "    virtual " << typeToStr(func.m_type, func.m_name) << " "
+        ctx.m_out << "    " << typeToStr(func.m_type, func.m_name) << " "
             << func.m_name << "(";
         if (!func.m_params.isEmpty()) {
             ctx.m_out << ln;
@@ -6179,7 +6221,7 @@ void Generator::generateServiceClassDeclaration(
         ctx.m_out << "        IRequestContextPtr ctx = {}";
         ctx.m_out << ") override;" << ln << ln;
 
-        ctx.m_out << "    virtual AsyncResult * " << func.m_name
+        ctx.m_out << "    AsyncResult * " << func.m_name
             << "Async(" << ln;
         for(const auto & param: qAsConst(func.m_params))
         {
@@ -6211,6 +6253,10 @@ void Generator::generateServiceClassDeclaration(
 
     if (serviceClassType == ServiceClassType::NonDurable) {
         ctx.m_out << "    QString m_url;" << ln;
+
+        if (service.m_name == QStringLiteral("NoteStore")) {
+            ctx.m_out << "    QString m_linkedNotebookGuid;" << ln;
+        }
     }
     else {
         ctx.m_out << "    I" << service.m_name << "Ptr m_service;" << ln;

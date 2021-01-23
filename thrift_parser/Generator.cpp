@@ -899,6 +899,45 @@ void Generator::writeTypeProperties(
             << " " << f.m_name << " READ " << f.m_name
             << " WRITE set" << capitalize(f.m_name) << ")" << ln;
     }
+
+    if (s.m_name == QStringLiteral("Notebook") ||
+        s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "Q_PROPERTY(QString linkedNotebookGuid READ "
+            << "linkedNotebookGuid WRITE setLinkedNotebookGuid)" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "Q_PROPERTY(QString notebookLocalId "
+            << "READ notebookLocalId WRITE setNotebookLocalId)" << ln;
+
+        ctx.m_out << indent << "Q_PROPERTY(QStringList tagLocalIds "
+            << "READ tagLocalIds WRITE setTagLocalIds)" << ln;
+
+        ctx.m_out << indent << "Q_PROPERTY(QByteArray thumbnailData "
+            << "READ thumbnailData WRITE setThumbnailData)" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "Q_PROPERTY(QString noteLocalId "
+            << "READ noteLocalId WRITE setNoteLocalId)" << ln;
+
+        ctx.m_out << indent << "Q_PROPERTY(std::optional<int> indexInNote "
+            << "READ indexInNote WRITE setIndexInNote)" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "Q_PROPERTY(std::optional<Guid> noteGuid "
+            << "READ noteGuid WRITE setNoteGuid)" << ln;
+
+        ctx.m_out << indent << "Q_PROPERTY(std::optional<int> indexInNote "
+            << "READ indexInNote WRITE setIndexInNote)" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNotebook"))
+    {
+        ctx.m_out << indent << "Q_PROPERTY(std::optional<int> indexInNotebook "
+            << "READ indexInNotebook WRITE setIndexInNotebook)" << ln;
+    }
 }
 
 void Generator::writeNamespaceBegin(OutputFileContext & ctx)

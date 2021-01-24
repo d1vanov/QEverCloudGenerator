@@ -905,6 +905,11 @@ void Generator::writeTypeProperties(
     {
         ctx.m_out << indent << "Q_PROPERTY(QString linkedNotebookGuid READ "
             << "linkedNotebookGuid WRITE setLinkedNotebookGuid)" << ln;
+
+        if (s.m_name == QStringLiteral("Tag")) {
+            ctx.m_out << indent << "Q_PROPERTY(QString parentTagLocalId READ "
+            << "parentTagLocalId WRITE setParentTagLocalId)" << ln;
+        }
     }
     else if (s.m_name == QStringLiteral("Note"))
     {
@@ -1048,6 +1053,10 @@ void Generator::writeTypeImplPrintDefinition(
     {
         out << indent << indent << "strm << \"" << indent
             << "linkedNotebookGuid = \" << m_linkedNotebookGuid << \"\\n\";"
+            << ln;
+
+        out << indent << indent << "strm << \"" << indent
+            << "parentTagLocalId = \" << m_parentTagLocalId << \"\\n\";"
             << ln;
     }
     else if (s.m_name == QStringLiteral("Note"))
@@ -3865,6 +3874,23 @@ void Generator::generateTypeCpp(
             << "std::move(linkedNotebookGuid);"
             << ln
             << "}" << ln << ln;
+
+        if (s.m_name == QStringLiteral("Tag"))
+        {
+            ctx.m_out << "QString " << s.m_name << "::parentTagLocalId() const"
+                << ln
+                << "{" << ln
+                << indent << "return d->m_parentTagLocalId;" << ln
+                << "}" << ln << ln;
+
+            ctx.m_out << "void " << s.m_name << "::setParentTagLocalId("
+                << "QString parentTagLocalId)" << ln
+                << "{" << ln
+                << indent << "d->m_parentTagLocalId = "
+                << "std::move(parentTagLocalId);"
+                << ln
+                << "}" << ln << ln;
+        }
     }
     else if (s.m_name == QStringLiteral("Note"))
     {
@@ -4083,7 +4109,8 @@ void Generator::generateTypeImplHeader(
     }
     else if (s.m_name == QStringLiteral("Tag"))
     {
-        ctx.m_out << indent << "QString m_linkedNotebookGuid;" << ln << ln;
+        ctx.m_out << indent << "QString m_linkedNotebookGuid;" << ln
+            << indent << "QString m_parentTagLocalId;" << ln << ln;
     }
     else if (s.m_name == QStringLiteral("Note"))
     {
@@ -4325,7 +4352,9 @@ void Generator::generateTypeImplCpp(
     else if (s.m_name == QStringLiteral("Tag"))
     {
         ctx.m_out << indent << indent << "m_linkedNotebookGuid == "
-            << "other.m_linkedNotebookGuid &&" << ln;
+            << "other.m_linkedNotebookGuid &&" << ln
+            << indent << indent
+            << "m_parentTagLocalId == other.m_parentTagLocalId &&" << ln;
     }
     else if (s.m_name == QStringLiteral("Note"))
     {
@@ -5895,6 +5924,20 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << " */" << ln
             << indent
             << "void setLinkedNotebookGuid(QString guid);" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Local id of a tag which is this tag's parent" << ln
+            << indent
+            << " */" << ln
+            << "[[nodiscard]] QString parentTagLocalId() const;" << ln << ln;
+
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * Set local id of a parent tag to this tag" << ln
+            << " */" << ln
+            << "void setParentTagLocalId(QString parentTagLocalId);" << ln
+            << ln;
     }
     else if (s.m_name == QStringLiteral("Note"))
     {

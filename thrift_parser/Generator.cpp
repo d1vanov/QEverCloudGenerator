@@ -903,8 +903,9 @@ void Generator::writeTypeProperties(
     if (s.m_name == QStringLiteral("Notebook") ||
         s.m_name == QStringLiteral("Tag"))
     {
-        ctx.m_out << indent << "Q_PROPERTY(QString linkedNotebookGuid READ "
-            << "linkedNotebookGuid WRITE setLinkedNotebookGuid)" << ln;
+        ctx.m_out << indent << "Q_PROPERTY(std::optional<QString> "
+            << "linkedNotebookGuid READ linkedNotebookGuid "
+            << "WRITE setLinkedNotebookGuid)" << ln;
 
         if (s.m_name == QStringLiteral("Tag")) {
             ctx.m_out << indent << "Q_PROPERTY(QString parentTagLocalId READ "
@@ -1046,13 +1047,17 @@ void Generator::writeTypeImplPrintDefinition(
     if (s.m_name == QStringLiteral("Notebook"))
     {
         out << indent << indent << "strm << \"" << indent
-            << "linkedNotebookGuid = \" << m_linkedNotebookGuid << \"\\n\";"
+            << "linkedNotebookGuid = \" << "
+            << "m_linkedNotebookGuid.value_or(QStringLiteral(\"<not set>\")) "
+            << "<< \"\\n\";"
             << ln;
     }
     else if (s.m_name == QStringLiteral("Tag"))
     {
         out << indent << indent << "strm << \"" << indent
-            << "linkedNotebookGuid = \" << m_linkedNotebookGuid << \"\\n\";"
+            << "linkedNotebookGuid = \" << "
+            << "m_linkedNotebookGuid.value_or(QStringLiteral(\"<not set>\")) "
+            << "<< \"\\n\";"
             << ln;
 
         out << indent << indent << "strm << \"" << indent
@@ -3861,14 +3866,15 @@ void Generator::generateTypeCpp(
     if (s.m_name == QStringLiteral("Notebook") ||
         s.m_name == QStringLiteral("Tag"))
     {
-        ctx.m_out << "QString " << s.m_name << "::linkedNotebookGuid() const"
+        ctx.m_out << "const std::optional<QString> & " << s.m_name
+            << "::linkedNotebookGuid() const"
             << ln
             << "{" << ln
             << indent << "return d->m_linkedNotebookGuid;" << ln
             << "}" << ln << ln;
 
         ctx.m_out << "void " << s.m_name << "::setLinkedNotebookGuid("
-            << "QString linkedNotebookGuid)" << ln
+            << "std::optional<QString> linkedNotebookGuid)" << ln
             << "{" << ln
             << indent << "d->m_linkedNotebookGuid = "
             << "std::move(linkedNotebookGuid);"
@@ -4105,12 +4111,13 @@ void Generator::generateTypeImplHeader(
 
     if (s.m_name == QStringLiteral("Notebook"))
     {
-        ctx.m_out << indent << "QString m_linkedNotebookGuid;" << ln << ln;
+        ctx.m_out << indent << "std::optional<QString> m_linkedNotebookGuid;"
+            << ln << ln;
     }
     else if (s.m_name == QStringLiteral("Tag"))
     {
-        ctx.m_out << indent << "QString m_linkedNotebookGuid;" << ln
-            << indent << "QString m_parentTagLocalId;" << ln << ln;
+        ctx.m_out << indent << "std::optional<QString> m_linkedNotebookGuid;"
+            << ln << indent << "QString m_parentTagLocalId;" << ln << ln;
     }
     else if (s.m_name == QStringLiteral("Note"))
     {
@@ -4655,10 +4662,12 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
 
         if (s.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    virtual QString linkedNotebookGuid() const = 0;"
+            ctx.m_out << "    virtual const std::optional<QString> & "
+                << "linkedNotebookGuid() const = 0;"
                 << ln
                 << "    virtual void setLinkedNotebookGuid("
-                << "QString linkedNotebookGuid) = 0;" << ln << ln;
+                << "std::optional<QString> linkedNotebookGuid) = 0;"
+                << ln << ln;
         }
 
         for(const auto & func: qAsConst(s.m_functions))
@@ -4758,7 +4767,8 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
 
             if (s.m_name == QStringLiteral("NoteStore"))
             {
-                ctx.m_out << "    QString linkedNotebookGuid = {}," << ln;
+                ctx.m_out << "    std::optional<QString> linkedNotebookGuid"
+                    << " = {}," << ln;
             }
 
             ctx.m_out << "    IRequestContextPtr ctx = {}," << ln
@@ -4814,7 +4824,7 @@ void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
 
         if (s.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    QString linkedNotebookGuid," << ln;
+            ctx.m_out << "    std::optional<QString> linkedNotebookGuid," << ln;
         }
 
         ctx.m_out << "    IRequestContextPtr ctx," << ln
@@ -5880,7 +5890,8 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << indent
             << " */" << ln
             << indent
-            << "[[nodiscard]] QString linkedNotebookGuid() const;" << ln << ln;
+            << "[[nodiscard]] const std::optional<QString> & "
+            << "linkedNotebookGuid() const;" << ln << ln;
 
         ctx.m_out << indent << "/**" << ln
             << indent
@@ -5892,7 +5903,8 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << indent
             << " */" << ln
             << indent
-            << "void setLinkedNotebookGuid(QString guid);" << ln << ln;
+            << "void setLinkedNotebookGuid(std::optional<QString> guid);"
+            << ln << ln;
     }
     else if (s.m_name == QStringLiteral("Tag"))
     {
@@ -5911,7 +5923,8 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << indent
             << " */" << ln
             << indent
-            << "[[nodiscard]] QString linkedNotebookGuid() const;" << ln << ln;
+            << "[[nodiscard]] const std::optional<QString> & "
+            << "linkedNotebookGuid() const;" << ln << ln;
 
         ctx.m_out << indent << "/**" << ln
             << indent
@@ -5923,7 +5936,8 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << indent
             << " */" << ln
             << indent
-            << "void setLinkedNotebookGuid(QString guid);" << ln << ln;
+            << "void setLinkedNotebookGuid(std::optional<QString> guid);"
+            << ln << ln;
 
         ctx.m_out << indent << "/**" << ln
             << indent
@@ -6137,7 +6151,8 @@ void Generator::generateServiceClassDeclaration(
             << ln;
 
         if (service.m_name == QStringLiteral("NoteStore")) {
-            ctx.m_out << "            QString linkedNotebookGuid = {}," << ln;
+            ctx.m_out << "            std::optional<QString> "
+                << "linkedNotebookGuid = {}," << ln;
         }
     }
     else {
@@ -6211,14 +6226,15 @@ void Generator::generateServiceClassDeclaration(
 
         if (service.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    QString linkedNotebookGuid() const override" << ln
+            ctx.m_out << "    const std::optional<QString> & "
+                << "linkedNotebookGuid() const override" << ln
                 << "    {" << ln
                 << "        return m_linkedNotebookGuid;" << ln
                 << "    }" << ln
                 << ln;
 
             ctx.m_out << "    void setLinkedNotebookGuid("
-                << "QString linkedNotebookGuid) override" << ln
+                << "std::optional<QString> linkedNotebookGuid) override" << ln
                 << "    {" << ln
                 << "        m_linkedNotebookGuid = "
                 << "std::move(linkedNotebookGuid);" << ln
@@ -6252,14 +6268,15 @@ void Generator::generateServiceClassDeclaration(
 
         if (service.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    QString linkedNotebookGuid() const override" << ln
+            ctx.m_out << "    const std::optional<QString> & "
+                << "linkedNotebookGuid() const override" << ln
                 << "    {" << ln
                 << "        return m_service->linkedNotebookGuid();" << ln
                 << "    }"
                 << ln << ln;
 
             ctx.m_out << "    void setLinkedNotebookGuid("
-                << "QString linkedNotebookGuid) override" << ln
+                << "std::optional<QString> linkedNotebookGuid) override" << ln
                 << "    {" << ln
                 << "        m_service->setLinkedNotebookGuid("
                 << "std::move(linkedNotebookGuid));" << ln
@@ -6338,7 +6355,8 @@ void Generator::generateServiceClassDeclaration(
         ctx.m_out << "    QString m_url;" << ln;
 
         if (service.m_name == QStringLiteral("NoteStore")) {
-            ctx.m_out << "    QString m_linkedNotebookGuid;" << ln;
+            ctx.m_out << "    std::optional<QString> m_linkedNotebookGuid;"
+                << ln;
         }
     }
     else {

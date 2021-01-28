@@ -3917,6 +3917,12 @@ void Generator::generateTypeCpp(
             << indent << "return d->m_tagLocalIds;" << ln
             << "}" << ln << ln;
 
+        ctx.m_out << "QStringList & " << s.m_name << "::mutableTagLocalIds()"
+            << ln
+            << "{" << ln
+            << indent << "return d->m_tagLocalIds;" << ln
+            << "}" << ln << ln;
+
         ctx.m_out << "void " << s.m_name << "::setTagLocalIds("
             << "QStringList tagLocalIds)" << ln
             << "{" << ln
@@ -5978,6 +5984,8 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << " */" << ln
             << indent
             << "[[nodiscard]] QStringList tagLocalIds() const;" << ln
+            << indent
+            << "[[nodiscard]] QStringList & mutableTagLocalIds();" << ln
             << indent
             << "void setTagLocalIds(QStringList tagLocalIds);" << ln << ln;
 

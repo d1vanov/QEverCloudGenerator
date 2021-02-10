@@ -135,11 +135,11 @@ private:
         Parser & parser, const QString & outPath);
 
     void generateTypeLocalDataAccessoryMethodDeclarations(
-        const QString & className, OutputFileContext & ctx,
+        const Parser::Structure & s, OutputFileContext & ctx,
         QString indent = QString{});
 
     void generateTypeLocalDataAccessoryMethodDefinitions(
-        const QString & className, OutputFileContext & ctx);
+        const Parser::Structure & s, OutputFileContext & ctx);
 
     void generateClassAccessoryMethodsForFieldDeclarations(
         const Parser::Field & field, OutputFileContext & ctx,
@@ -346,15 +346,17 @@ private:
     [[nodiscard]] bool shouldGenerateLocalDataMethods(
         const Parser::Structure & s) const;
 
-    [[nodiscard]] bool structContainsFieldsWithLocalData(
+    [[nodiscard]] bool shouldGenerateLocalId(const Parser::Structure & s) const;
+
+    [[nodiscard]] bool structContainsFieldsWithLocalId(
         const Parser::Structure & s, const Parser::Structures & structs) const;
 
     /**
      * @return                  The list of structs which either contain local
-     *                          data themselves or have fields which contain
-     *                          local data
+     *                          id themselves or have fields which contain
+     *                          local id
      */
-    [[nodiscard]] Parser::Structures collectStructsWithLocalData(
+    [[nodiscard]] Parser::Structures collectStructsWithLocalId(
         Parser & parser) const;
 
     [[nodiscard]] std::optional<Parser::Structure> structForType(

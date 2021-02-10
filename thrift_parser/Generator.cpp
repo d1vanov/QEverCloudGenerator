@@ -344,7 +344,19 @@ bool Generator::shouldGenerateLocalDataMethods(const Parser::Structure & s) cons
     return false;
 }
 
-bool Generator::structContainsFieldsWithLocalData(
+bool Generator::shouldGenerateLocalId(const Parser::Structure & s) const
+{
+    if (s.m_name == QStringLiteral("LinkedNotebook") ||
+        s.m_name == QStringLiteral("SharedNote") ||
+        s.m_name == QStringLiteral("SharedNotebook"))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool Generator::structContainsFieldsWithLocalId(
     const Parser::Structure & s, const Parser::Structures & structs) const
 {
     for (const auto & f: s.m_fields)
@@ -396,11 +408,13 @@ bool Generator::structContainsFieldsWithLocalData(
             continue;
         }
 
-        if (shouldGenerateLocalDataMethods(*sit)) {
+        if (shouldGenerateLocalDataMethods(*sit) &&
+            shouldGenerateLocalId(*sit))
+        {
             return true;
         }
 
-        if (structContainsFieldsWithLocalData(*sit, structs)) {
+        if (structContainsFieldsWithLocalId(*sit, structs)) {
             return true;
         }
     }
@@ -408,19 +422,19 @@ bool Generator::structContainsFieldsWithLocalData(
     return false;
 }
 
-Parser::Structures Generator::collectStructsWithLocalData(
+Parser::Structures Generator::collectStructsWithLocalId(
     Parser & parser) const
 {
     Parser::Structures relevantStructs;
     const auto & structs = parser.structures();
     for (const auto & s: qAsConst(structs))
     {
-        if (shouldGenerateLocalDataMethods(s)) {
+        if (shouldGenerateLocalDataMethods(s) && shouldGenerateLocalId(s)) {
             relevantStructs.push_back(s);
             continue;
         }
 
-        if (structContainsFieldsWithLocalData(s, structs)) {
+        if (structContainsFieldsWithLocalId(s, structs)) {
             relevantStructs.push_back(s);
             continue;
         }
@@ -1105,8 +1119,10 @@ void Generator::writeTypeImplPrintDefinition(
 
     if (shouldGenerateLocalDataMethods(s))
     {
-        out << indent << indent << "strm << \"" << indent
-            << "localId = \" << m_localId << \"\\n\";" << ln;
+        if (shouldGenerateLocalId(s)) {
+            out << indent << indent << "strm << \"" << indent
+                << "localId = \" << m_localId << \"\\n\";" << ln;
+        }
 
         out << indent << indent << "strm << \"" << indent
             << "locallyModified = \""
@@ -1759,8 +1775,8 @@ void Generator::generateTestServerHelperLambda(
         }
 
         if (const auto s = structForType(param.m_type, parser); s &&
-            (shouldGenerateLocalDataMethods(*s) ||
-             structContainsFieldsWithLocalData(*s, parser.structures())))
+            ((shouldGenerateLocalDataMethods(*s) && shouldGenerateLocalId(*s))
+             || structContainsFieldsWithLocalId(*s, parser.structures())))
         {
             ctx.m_out << indent << indent << indent
                 << "compareValuesWithoutLocalIds("
@@ -1771,8 +1787,9 @@ void Generator::generateTestServerHelperLambda(
         {
             if (const auto s =
                 structForType(listType->m_valueType, parser); s &&
-                (shouldGenerateLocalDataMethods(*s) ||
-                    structContainsFieldsWithLocalData(*s, parser.structures())))
+                ((shouldGenerateLocalDataMethods(*s) &&
+                  shouldGenerateLocalId(*s)) ||
+                    structContainsFieldsWithLocalId(*s, parser.structures())))
             {
                 ctx.m_out << indent << indent << indent
                     << "compareListValuesWithoutLocalIds("
@@ -1790,8 +1807,9 @@ void Generator::generateTestServerHelperLambda(
         {
             if (const auto s =
                 structForType(setType->m_valueType, parser); s &&
-                (shouldGenerateLocalDataMethods(*s) ||
-                    structContainsFieldsWithLocalData(*s, parser.structures())))
+                ((shouldGenerateLocalDataMethods(*s) &&
+                  shouldGenerateLocalId(*s)) ||
+                    structContainsFieldsWithLocalId(*s, parser.structures())))
             {
                 ctx.m_out << indent << indent << indent
                     << "compareSetValuesWithoutLocalIds("
@@ -1809,8 +1827,9 @@ void Generator::generateTestServerHelperLambda(
         {
             if (const auto s =
                 structForType(setType->m_valueType, parser); s &&
-                (shouldGenerateLocalDataMethods(*s) ||
-                    structContainsFieldsWithLocalData(*s, parser.structures())))
+                ((shouldGenerateLocalDataMethods(*s) &&
+                  shouldGenerateLocalId(*s)) ||
+                    structContainsFieldsWithLocalId(*s, parser.structures())))
             {
                 ctx.m_out << indent << indent << indent
                     << "compareMapValuesWithoutLocalIds("
@@ -2029,8 +2048,9 @@ void Generator::generateTestServerServiceCall(
         {
             if (funcReturnTypeName != QStringLiteral("void")) {
                 if (const auto s = structForType(func.m_type, parser); s &&
-                    (shouldGenerateLocalDataMethods(*s) ||
-                     structContainsFieldsWithLocalData(*s, parser.structures())))
+                    ((shouldGenerateLocalDataMethods(*s) &&
+                      shouldGenerateLocalId(*s)) ||
+                     structContainsFieldsWithLocalId(*s, parser.structures())))
                 {
                     ctx.m_out << indent
                         << "compareValuesWithoutLocalIds("
@@ -2041,8 +2061,9 @@ void Generator::generateTestServerServiceCall(
                 {
                     if (const auto s =
                         structForType(listType->m_valueType, parser); s &&
-                        (shouldGenerateLocalDataMethods(*s) ||
-                         structContainsFieldsWithLocalData(*s, parser.structures())))
+                        ((shouldGenerateLocalDataMethods(*s) &&
+                          shouldGenerateLocalId(*s)) ||
+                         structContainsFieldsWithLocalId(*s, parser.structures())))
                     {
                         ctx.m_out << indent
                             << "compareListValuesWithoutLocalIds("
@@ -2061,7 +2082,7 @@ void Generator::generateTestServerServiceCall(
                     if (const auto s =
                         structForType(setType->m_valueType, parser); s &&
                         (shouldGenerateLocalDataMethods(*s) ||
-                         structContainsFieldsWithLocalData(*s, parser.structures())))
+                         structContainsFieldsWithLocalId(*s, parser.structures())))
                     {
                         ctx.m_out << indent
                             << "compareSetValuesWithoutLocalIds("
@@ -2080,7 +2101,7 @@ void Generator::generateTestServerServiceCall(
                     if (const auto s =
                         structForType(mapType->m_valueType, parser); s &&
                         (shouldGenerateLocalDataMethods(*s) ||
-                         structContainsFieldsWithLocalData(*s, parser.structures())))
+                         structContainsFieldsWithLocalId(*s, parser.structures())))
                     {
                         ctx.m_out << indent
                             << "compareMapValuesWithoutLocalIds("
@@ -2135,8 +2156,9 @@ void Generator::generateTestServerServiceCall(
         (funcReturnTypeName != QStringLiteral("void")))
     {
         if (const auto s = structForType(func.m_type, parser); s &&
-            (shouldGenerateLocalDataMethods(*s) ||
-             structContainsFieldsWithLocalData(*s, parser.structures())))
+            ((shouldGenerateLocalDataMethods(*s) &&
+              shouldGenerateLocalId(*s)) ||
+             structContainsFieldsWithLocalId(*s, parser.structures())))
         {
             ctx.m_out << indent
                 << "compareValuesWithoutLocalIds(res, response);" << ln;
@@ -2146,8 +2168,9 @@ void Generator::generateTestServerServiceCall(
         {
             if (const auto s =
                 structForType(listType->m_valueType, parser); s &&
-                (shouldGenerateLocalDataMethods(*s) ||
-                 structContainsFieldsWithLocalData(*s, parser.structures())))
+                ((shouldGenerateLocalDataMethods(*s) &&
+                  shouldGenerateLocalId(*s)) ||
+                 structContainsFieldsWithLocalId(*s, parser.structures())))
             {
                 ctx.m_out << indent
                     << "compareListValuesWithoutLocalIds(res, response);" << ln;
@@ -2163,8 +2186,9 @@ void Generator::generateTestServerServiceCall(
         {
             if (const auto s =
                 structForType(setType->m_valueType, parser); s &&
-                (shouldGenerateLocalDataMethods(*s) ||
-                 structContainsFieldsWithLocalData(*s, parser.structures())))
+                ((shouldGenerateLocalDataMethods(*s) &&
+                  shouldGenerateLocalId(*s)) ||
+                 structContainsFieldsWithLocalId(*s, parser.structures())))
             {
                 ctx.m_out << indent
                     << "compareSetValuesWithoutLocalIds(res, response);" << ln;
@@ -2180,8 +2204,9 @@ void Generator::generateTestServerServiceCall(
         {
             if (const auto s =
                 structForType(mapType->m_valueType, parser); s &&
-                (shouldGenerateLocalDataMethods(*s) ||
-                 structContainsFieldsWithLocalData(*s, parser.structures())))
+                ((shouldGenerateLocalDataMethods(*s) &&
+                  shouldGenerateLocalId(*s)) ||
+                 structContainsFieldsWithLocalId(*s, parser.structures())))
             {
                 ctx.m_out << indent
                     << "compareMapValuesWithoutLocalIds(res, response);" << ln;
@@ -3705,7 +3730,7 @@ void Generator::generateTypeHeader(
         << " && other) noexcept;" << ln << ln;
 
     if (generateLocalData) {
-        generateTypeLocalDataAccessoryMethodDeclarations(s.m_name, ctx, indent);
+        generateTypeLocalDataAccessoryMethodDeclarations(s, ctx, indent);
     }
 
     for(const auto & f: qAsConst(s.m_fields))
@@ -3762,10 +3787,14 @@ void Generator::generateTypeHeader(
 
     if (generateLocalData)
     {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << indent
+                << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)"
+                << ln;
+        }
+
         ctx.m_out << indent
-            << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)"
-            << ln
-            << indent
             << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
             << "WRITE setLocallyModified)" << ln
             << indent
@@ -4010,7 +4039,7 @@ void Generator::generateTypeCpp(
     }
 
     if (shouldGenerateLocalDataMethods(s)) {
-        generateTypeLocalDataAccessoryMethodDefinitions(s.m_name, ctx);
+        generateTypeLocalDataAccessoryMethodDefinitions(s, ctx);
     }
 
     for(const auto & f: qAsConst(s.m_fields)) {
@@ -4147,8 +4176,11 @@ void Generator::generateTypeImplHeader(
     }
 
     if (generateLocalData) {
-        ctx.m_out << indent << "QString m_localId;" << ln
-            << indent << "bool m_locallyModified = false;" << ln
+        if (shouldGenerateLocalId(s)) {
+            ctx.m_out << indent << "QString m_localId;" << ln;
+        }
+
+        ctx.m_out << indent << "bool m_locallyModified = false;" << ln
             << indent << "bool m_localOnly = false;" << ln
             << indent << "bool m_locallyFavorited = false;" << ln
             << indent << "QHash<QString, QVariant> m_localData;" << ln << ln;
@@ -4329,12 +4361,17 @@ void Generator::generateTypeImplCpp(
 
     if (isTypeWithLocalData) {
         ctx.m_out << s.m_name << "::Impl::Impl()" << ln
-            << "{" << ln
-            << indent << "m_localId = QUuid::createUuid().toString();" << ln
-            << indent << "// Remove curvy braces" << ln
-            << indent << "m_localId.remove(m_localId.size() - 1, 1);" << ln
-            << indent << "m_localId.remove(0, 1);" << ln
-            << "}" << ln << ln;
+            << "{" << ln;
+
+        if (shouldGenerateLocalId(s)) {
+            ctx.m_out << indent << "m_localId = QUuid::createUuid().toString();"
+                << ln
+                << indent << "// Remove curvy braces" << ln
+                << indent << "m_localId.remove(m_localId.size() - 1, 1);" << ln
+                << indent << "m_localId.remove(0, 1);" << ln;
+        }
+
+        ctx.m_out << "}" << ln << ln;
     }
 
     ctx.m_out << "bool " << s.m_name
@@ -4349,8 +4386,12 @@ void Generator::generateTypeImplCpp(
     ctx.m_out << indent << "return" << ln;
 
     if (shouldGenerateLocalDataMethods(s)) {
-        ctx.m_out << indent << indent << "m_localId == other.m_localId &&" << ln
-            << indent << indent
+        if (shouldGenerateLocalId(s)) {
+            ctx.m_out << indent << indent << "m_localId == other.m_localId &&"
+                << ln;
+        }
+
+        ctx.m_out << indent << indent
             << "m_locallyModified == other.m_locallyModified &&" << ln
             << indent << indent << "m_localOnly == other.m_localOnly &&" << ln
             << indent << indent
@@ -5475,7 +5516,7 @@ void Generator::generateTestClearLocalIdsHeader(
 
     writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
 
-    const auto relevantStructs = collectStructsWithLocalData(parser);
+    const auto relevantStructs = collectStructsWithLocalId(parser);
     for (const auto & s: qAsConst(relevantStructs))
     {
         ctx.m_out << "void clearLocalIds(" << s.m_name << " & v);" << ln;
@@ -5501,14 +5542,14 @@ void Generator::generateTestClearLocalIdsCpp(
         HeaderKind::Test);
 
     const auto & structs = parser.structures();
-    const auto relevantStructs = collectStructsWithLocalData(parser);
+    const auto relevantStructs = collectStructsWithLocalId(parser);
     constexpr const char * indent = "    ";
     for (const auto & s: qAsConst(relevantStructs))
     {
         ctx.m_out << "void clearLocalIds(" << s.m_name << " & v)" << ln
             << "{" << ln;
 
-        if (shouldGenerateLocalDataMethods(s)) {
+        if (shouldGenerateLocalDataMethods(s) && shouldGenerateLocalId(s)) {
             ctx.m_out << indent << "v.setLocalId(QString{});" << ln;
         }
 
@@ -5530,7 +5571,7 @@ void Generator::generateTestClearLocalIdsCpp(
 
                 if ((sit != structs.constEnd()) &&
                     (shouldGenerateLocalDataMethods(*sit) ||
-                     structContainsFieldsWithLocalData(*sit, structs)))
+                     structContainsFieldsWithLocalId(*sit, structs)))
                 {
                     if (f.m_required == Parser::Field::RequiredFlag::Optional) {
                         ctx.m_out << indent << "if (v." << f.m_name << "()) {"
@@ -5564,8 +5605,9 @@ void Generator::generateTestClearLocalIdsCpp(
                         });
 
                     if ((sit != structs.constEnd()) &&
-                        (shouldGenerateLocalDataMethods(*sit) ||
-                         structContainsFieldsWithLocalData(*sit, structs)))
+                        ((shouldGenerateLocalDataMethods(*sit) &&
+                          shouldGenerateLocalId(*sit)) ||
+                         structContainsFieldsWithLocalId(*sit, structs)))
                     {
                         if (f.m_required ==
                             Parser::Field::RequiredFlag::Optional)
@@ -5609,8 +5651,9 @@ void Generator::generateTestClearLocalIdsCpp(
                         });
 
                     if ((sit != structs.constEnd()) &&
-                        (shouldGenerateLocalDataMethods(*sit) ||
-                         structContainsFieldsWithLocalData(*sit, structs)))
+                        ((shouldGenerateLocalDataMethods(*sit) &&
+                          shouldGenerateLocalId(*sit)) ||
+                         structContainsFieldsWithLocalId(*sit, structs)))
                     {
                         if (f.m_required ==
                             Parser::Field::RequiredFlag::Optional)
@@ -5654,8 +5697,9 @@ void Generator::generateTestClearLocalIdsCpp(
                         });
 
                     if ((sit != structs.constEnd()) &&
-                        (shouldGenerateLocalDataMethods(*sit) ||
-                         structContainsFieldsWithLocalData(*sit, structs)))
+                        ((shouldGenerateLocalDataMethods(*sit) &&
+                          shouldGenerateLocalId(*sit)) ||
+                         structContainsFieldsWithLocalId(*sit, structs)))
                     {
                         if (f.m_required ==
                             Parser::Field::RequiredFlag::Optional)
@@ -5691,24 +5735,27 @@ void Generator::generateTestClearLocalIdsCpp(
 }
 
 void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
-    const QString & className, OutputFileContext & ctx, QString indent)
+    const Parser::Structure & s, OutputFileContext & ctx, QString indent)
 {
-    ctx.m_out << indent << "/**" << ln
-        << indent
-        << " * @brief localId can be used as a local unique identifier" << ln
-        << indent
-        << " * for any data item before it has been synchronized with" << ln
-        << indent
-        << " * Evernote and thus before it can be identified using its guid."
-        << ln
-        << indent << " *" << ln
-        << indent << " * localId is generated automatically on" << ln
-        << indent << " * construction for convenience but can be overridden "
-        << "manually" << ln
-        << indent << " */" << ln;
+    if (shouldGenerateLocalId(s))
+    {
+        ctx.m_out << indent << "/**" << ln
+            << indent
+            << " * @brief localId can be used as a local unique identifier"
+            << ln << indent
+            << " * for any data item before it has been synchronized with" << ln
+            << indent
+            << " * Evernote and thus before it can be identified using its "
+            << "guid." << ln
+            << indent << " *" << ln
+            << indent << " * localId is generated automatically on" << ln
+            << indent << " * construction for convenience but can be "
+            << "overridden manually" << ln
+            << indent << " */" << ln;
 
-    ctx.m_out << indent << "[[nodiscard]] QString localId() const noexcept;"
-        << ln << indent << "void setLocalId(QString id);" << ln << ln;
+        ctx.m_out << indent << "[[nodiscard]] QString localId() const noexcept;"
+            << ln << indent << "void setLocalId(QString id);" << ln << ln;
+    }
 
     ctx.m_out << indent << "/**" << ln
         << indent
@@ -5773,69 +5820,73 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
 }
 
 void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
-    const QString & className, OutputFileContext & ctx)
+    const Parser::Structure & s, OutputFileContext & ctx)
 {
     constexpr const char * indent = "    ";
 
-    ctx.m_out << "QString " << className << "::localId() const noexcept" << ln
-        << "{" << ln
-        << indent << "return d->m_localId;" << ln
-        << "}" << ln << ln;
+    if (shouldGenerateLocalId(s))
+    {
+        ctx.m_out << "QString " << s.m_name << "::localId() const noexcept"
+            << ln
+            << "{" << ln
+            << indent << "return d->m_localId;" << ln
+            << "}" << ln << ln;
 
-    ctx.m_out << "void " << className << "::setLocalId(QString id)" << ln
-        << "{" << ln
-        << indent << "d->m_localId = id;" << ln
-        << "}" << ln << ln;
+        ctx.m_out << "void " << s.m_name << "::setLocalId(QString id)" << ln
+            << "{" << ln
+            << indent << "d->m_localId = id;" << ln
+            << "}" << ln << ln;
+    }
 
-    ctx.m_out << "bool " << className << "::isLocallyModified() const noexcept"
+    ctx.m_out << "bool " << s.m_name << "::isLocallyModified() const noexcept"
         << ln
         << "{" << ln
         << indent << "return d->m_locallyModified;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "void " << className << "::setLocallyModified("
+    ctx.m_out << "void " << s.m_name << "::setLocallyModified("
         << "const bool modified)" << ln
         << "{" << ln
         << indent << "d->m_locallyModified = modified;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "bool " << className << "::isLocalOnly() const noexcept" << ln
+    ctx.m_out << "bool " << s.m_name << "::isLocalOnly() const noexcept" << ln
         << "{" << ln
         << indent << "return d->m_localOnly;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "void " << className << "::setLocalOnly(const bool localOnly)"
+    ctx.m_out << "void " << s.m_name << "::setLocalOnly(const bool localOnly)"
         << ln
         << "{" << ln
         << indent << "d->m_localOnly = localOnly;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "bool " << className << "::isLocallyFavorited() const noexcept"
+    ctx.m_out << "bool " << s.m_name << "::isLocallyFavorited() const noexcept"
         << ln
         << "{" << ln
         << indent << "return d->m_locallyFavorited;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "void " << className << "::setLocallyFavorited("
+    ctx.m_out << "void " << s.m_name << "::setLocallyFavorited("
         << "const bool favorited)" << ln
         << "{" << ln
         << indent << "d->m_locallyFavorited = favorited;" << ln
         << "}" << ln << ln;
 
     ctx.m_out << "const QHash<QString, QVariant> & "
-        << className << "::localData() const noexcept"
+        << s.m_name << "::localData() const noexcept"
         << ln
         << "{" << ln
         << indent << "return d->m_localData;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "QHash<QString, QVariant> & " << className
+    ctx.m_out << "QHash<QString, QVariant> & " << s.m_name
         << "::mutableLocalData()" << ln
         << "{" << ln
         << indent << "return d->m_localData;" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "void " << className
+    ctx.m_out << "void " << s.m_name
         << "::setLocalData(QHash<QString, QVariant> localData)" << ln
         << "{" << ln
         << indent << "d->m_localData = std::move(localData);" << ln

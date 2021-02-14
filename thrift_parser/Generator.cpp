@@ -5753,7 +5753,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
             << "overridden manually" << ln
             << indent << " */" << ln;
 
-        ctx.m_out << indent << "[[nodiscard]] QString localId() const noexcept;"
+        ctx.m_out << indent
+            << "[[nodiscard]] const QString & localId() const noexcept;"
             << ln << indent << "void setLocalId(QString id);" << ln << ln;
     }
 
@@ -5826,7 +5827,8 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
 
     if (shouldGenerateLocalId(s))
     {
-        ctx.m_out << "QString " << s.m_name << "::localId() const noexcept"
+        ctx.m_out << "const QString & " << s.m_name
+            << "::localId() const noexcept"
             << ln
             << "{" << ln
             << indent << "return d->m_localId;" << ln
@@ -5834,7 +5836,7 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
 
         ctx.m_out << "void " << s.m_name << "::setLocalId(QString id)" << ln
             << "{" << ln
-            << indent << "d->m_localId = id;" << ln
+            << indent << "d->m_localId = std::move(id);" << ln
             << "}" << ln << ln;
     }
 

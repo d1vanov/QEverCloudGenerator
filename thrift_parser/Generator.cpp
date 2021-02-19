@@ -348,7 +348,8 @@ bool Generator::shouldGenerateLocalId(const Parser::Structure & s) const
 {
     if (s.m_name == QStringLiteral("LinkedNotebook") ||
         s.m_name == QStringLiteral("SharedNote") ||
-        s.m_name == QStringLiteral("SharedNotebook"))
+        s.m_name == QStringLiteral("SharedNotebook") ||
+        s.m_name == QStringLiteral("User"))
     {
         return false;
     }
@@ -5570,7 +5571,8 @@ void Generator::generateTestClearLocalIdsCpp(
                     });
 
                 if ((sit != structs.constEnd()) &&
-                    (shouldGenerateLocalDataMethods(*sit) ||
+                    ((shouldGenerateLocalDataMethods(*sit) &&
+                      shouldGenerateLocalId(*sit)) ||
                      structContainsFieldsWithLocalId(*sit, structs)))
                 {
                     if (f.m_required == Parser::Field::RequiredFlag::Optional) {

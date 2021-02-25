@@ -942,22 +942,11 @@ void Generator::writeTypeProperties(
     {
         ctx.m_out << indent << "Q_PROPERTY(QString noteLocalId "
             << "READ noteLocalId WRITE setNoteLocalId)" << ln;
-
-        ctx.m_out << indent << "Q_PROPERTY(std::optional<int> indexInNote "
-            << "READ indexInNote WRITE setIndexInNote)" << ln;
     }
     else if (s.m_name == QStringLiteral("SharedNote"))
     {
         ctx.m_out << indent << "Q_PROPERTY(std::optional<Guid> noteGuid "
             << "READ noteGuid WRITE setNoteGuid)" << ln;
-
-        ctx.m_out << indent << "Q_PROPERTY(std::optional<int> indexInNote "
-            << "READ indexInNote WRITE setIndexInNote)" << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNotebook"))
-    {
-        ctx.m_out << indent << "Q_PROPERTY(std::optional<int> indexInNotebook "
-            << "READ indexInNotebook WRITE setIndexInNotebook)" << ln;
     }
 }
 
@@ -1094,28 +1083,14 @@ void Generator::writeTypeImplPrintDefinition(
     {
         out << indent << indent << "strm << \"" << indent
             << "noteLocalId = \" << m_noteLocalId << \"\\n\";" << ln
-            << indent << indent << "strm << \"" << indent
-            << "indexInNote = \" << (m_indexInNote ? "
-            << "QString::number(*m_indexInNote) : "
-            << "QStringLiteral(\"<not set>\")) << \"\\n\";" << ln;
+            << indent << indent << "strm << \"\\n\";" << ln;
     }
     else if (s.m_name == QStringLiteral("SharedNote"))
     {
         out << indent << indent << "strm << \"" << indent
             << "noteGuid = \" << "
             << "m_noteGuid.value_or(QStringLiteral(\"not set\")) << \"\\n\";"
-            << ln
-            << indent << indent << "strm << \"" << indent
-            << "indexInNote = \" << (m_indexInNote ? "
-            << "QString::number(*m_indexInNote) : "
-            << "QStringLiteral(\"<not set>\")) << \"\\n\";" << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNotebook"))
-    {
-        out << indent << indent << "strm << \"" << indent
-            << "indexInNotebook = \" << (m_indexInNotebook ? "
-            << "QString::number(*m_indexInNotebook) : "
-            << "QStringLiteral(\"<not set>\")) << \"\\n\";" << ln;
+            << ln << indent << indent << "strm << \"\\n\";" << ln;
     }
 
     if (shouldGenerateLocalDataMethods(s))
@@ -3984,18 +3959,6 @@ void Generator::generateTypeCpp(
             << indent << "d->m_noteLocalId = std::move(noteLocalId);"
             << ln
             << "}" << ln << ln;
-
-        ctx.m_out << "const std::optional<int> & " << s.m_name
-            << "::indexInNote() const noexcept" << ln
-            << "{" << ln
-            << indent << "return d->m_indexInNote;" << ln
-            << "}" << ln << ln;
-
-        ctx.m_out << "void " << s.m_name << "::setIndexInNote("
-            << "std::optional<int> indexInNote)" << ln
-            << "{" << ln
-            << indent << "d->m_indexInNote = std::move(indexInNote);" << ln
-            << "}" << ln << ln;
     }
     else if (s.m_name == QStringLiteral("SharedNote"))
     {
@@ -4009,33 +3972,6 @@ void Generator::generateTypeCpp(
             << "std::optional<Guid> noteGuid)" << ln
             << "{" << ln
             << indent << "d->m_noteGuid = std::move(noteGuid);" << ln
-            << "}" << ln << ln;
-
-        ctx.m_out << "const std::optional<int> & " << s.m_name
-            << "::indexInNote() const noexcept" << ln
-            << "{" << ln
-            << indent << "return d->m_indexInNote;" << ln
-            << "}" << ln << ln;
-
-        ctx.m_out << "void " << s.m_name << "::setIndexInNote("
-            << "std::optional<int> indexInNote)" << ln
-            << "{" << ln
-            << indent << "d->m_indexInNote = std::move(indexInNote);" << ln
-            << "}" << ln << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNotebook"))
-    {
-        ctx.m_out << "const std::optional<int> & " << s.m_name
-            << "::indexInNotebook() const noexcept" << ln
-            << "{" << ln
-            << indent << "return d->m_indexInNotebook;" << ln
-            << "}" << ln << ln;
-
-        ctx.m_out << "void " << s.m_name << "::setIndexInNotebook("
-            << "std::optional<int> indexInNotebook)" << ln
-            << "{" << ln
-            << indent << "d->m_indexInNotebook = std::move(indexInNotebook);"
-            << ln
             << "}" << ln << ln;
     }
 
@@ -4163,17 +4099,11 @@ void Generator::generateTypeImplHeader(
     }
     else if (s.m_name == QStringLiteral("Resource"))
     {
-        ctx.m_out << indent << "QString m_noteLocalId;" << ln
-            << indent << "std::optional<int> m_indexInNote;" << ln;
+        ctx.m_out << indent << "QString m_noteLocalId;" << ln;
     }
     else if (s.m_name == QStringLiteral("SharedNote"))
     {
-        ctx.m_out << indent << "std::optional<Guid> m_noteGuid;" << ln
-            << indent << "std::optional<int> m_indexInNote;" << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNotebook"))
-    {
-        ctx.m_out << indent << "std::optional<int> m_indexInNotebook;" << ln;
+        ctx.m_out << indent << "std::optional<Guid> m_noteGuid;" << ln;
     }
 
     if (generateLocalData) {
@@ -4423,21 +4353,12 @@ void Generator::generateTypeImplCpp(
     else if (s.m_name == QStringLiteral("Resource"))
     {
         ctx.m_out << indent << indent << "m_noteLocalId == "
-            << "other.m_noteLocalId &&" << ln
-            << indent << indent
-            << "m_indexInNote == other.m_indexInNote &&" << ln;
+            << "other.m_noteLocalId &&" << ln;
     }
     else if (s.m_name == QStringLiteral("SharedNote"))
     {
         ctx.m_out << indent << indent << "m_noteGuid == "
-            << "other.m_noteGuid &&" << ln
-            << indent << indent
-            << "m_indexInNote == other.m_indexInNote &&" << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNotebook"))
-    {
-        ctx.m_out << indent << indent << "m_indexInNotebook == "
-            << "other.m_indexInNotebook &&" << ln;
+            << "other.m_noteGuid &&" << ln;
     }
 
     for(const auto & f: qAsConst(s.m_fields))
@@ -6072,24 +5993,6 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << " */" << ln
             << indent
             << "void setNoteLocalId(QString noteLocalId);" << ln << ln;
-
-        ctx.m_out << indent << "/**" << ln
-            << indent
-            << " * Index of this resource within the note" << ln
-            << indent
-            << " */" << ln
-            << indent
-            << "[[nodiscard]] const std::optional<int> & indexInNote() const "
-            << "noexcept;"
-            << ln << ln;
-
-        ctx.m_out << indent << "/**" << ln
-            << indent
-            << " * Set index of this resource within the note" << ln
-            << indent
-            << " */" << ln
-            << indent
-            << "void setIndexInNote(std::optional<int> index);" << ln << ln;
     }
     else if (s.m_name == QStringLiteral("SharedNote"))
     {
@@ -6106,42 +6009,6 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << "[[nodiscard]] std::optional<Guid> & mutableNoteGuid();" << ln
             << indent
             << "void setNoteGuid(std::optional<Guid> noteGuid);" << ln << ln;
-
-        ctx.m_out << indent << "/**" << ln
-            << indent
-            << " * Index of this shared note within the note" << ln
-            << indent << " */" << ln
-            << indent
-            << "[[nodiscard]] const std::optional<int> & indexInNote() const "
-            << "noexcept;"
-            << ln << ln;
-
-        ctx.m_out << indent << "/**" << ln
-            << indent
-            << " * Set index of this shared note within the note" << ln
-            << indent << " */" << ln
-            << indent
-            << "void setIndexInNote(std::optional<int> index);" << ln << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNotebook"))
-    {
-        ctx.m_out << indent << "/**" << ln
-            << indent
-            << " * Index of this shared notebook within the notebook" << ln
-            << indent
-            << " */" << ln
-            << indent
-            << "[[nodiscard]] const std::optional<int> & indexInNotebook() "
-            << "const noexcept;"
-            << ln << ln;
-
-        ctx.m_out << indent << "/**" << ln
-            << indent
-            << " * Set index of this shared notebook within the notebook" << ln
-            << indent
-            << " */" << ln
-            << indent
-            << "void setIndexInNotebook(std::optional<int> index);" << ln << ln;
     }
 }
 

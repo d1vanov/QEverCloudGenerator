@@ -3753,13 +3753,6 @@ void Generator::generateTypeHeader(
     }
 
     ctx.m_out << ln;
-    ctx.m_out << indent << "[[nodiscard]] bool operator==(const " << s.m_name
-        << " & other) const noexcept;" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] bool operator!=(const " << s.m_name
-        << " & other) const noexcept;" << ln;
-
-    ctx.m_out << ln;
 
     if (generateLocalData)
     {
@@ -3788,6 +3781,13 @@ void Generator::generateTypeHeader(
         << indent << "class Impl;" << ln
         << indent << "QSharedDataPointer<Impl> d;" << ln
         << "};" << ln << ln;
+
+    ctx.m_out << "[[nodiscard]] bool operator==(const " << s.m_name
+        << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln;
+
+    ctx.m_out << "[[nodiscard]] bool operator!=(const " << s.m_name
+        << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln
+        << ln;
 
     const bool isException = m_allExceptions.contains(s.m_name);
     if (isException) {
@@ -3990,18 +3990,6 @@ void Generator::generateTypeCpp(
         << indent << "d->print(strm);" << ln
         << "}" << ln << ln;
 
-    ctx.m_out << "bool " << s.m_name << "::operator==(const " << s.m_name
-        << " & other) const noexcept" << ln
-        << "{" << ln
-        << indent << "return *d == *other.d;" << ln
-        << "}" << ln << ln;
-
-    ctx.m_out << "bool " << s.m_name << "::operator!=(const " << s.m_name
-        << " & other) const noexcept" << ln
-        << "{" << ln
-        << indent << "return !(*this == other);" << ln
-        << "}" << ln << ln;
-
     if (isException)
     {
         generateExceptionClassWhatMethodDefinition(s, ctx);
@@ -4011,6 +3999,83 @@ void Generator::generateTypeCpp(
         generateExceptionDataClassDestructorDefinition(s, ctx);
         generateExceptionDataClassThrowExceptionMethodDefinition(s, ctx);
     }
+
+    ctx.m_out << "bool operator==(const " << s.m_name
+        << " & lhs, const " << s.m_name << " & rhs) noexcept" << ln
+        << "{" << ln;
+
+    ctx.m_out << indent << "if (&lhs == &rhs) {" << ln
+        << indent << indent << "return true;" << ln
+        << indent << "}" << ln << ln;
+
+    ctx.m_out << indent << "return" << ln;
+
+    if (shouldGenerateLocalDataMethods(s)) {
+        if (shouldGenerateLocalId(s)) {
+            ctx.m_out << indent << indent << "lhs.localId() == rhs.localId() &&"
+                << ln;
+        }
+
+        ctx.m_out << indent << indent
+            << "lhs.isLocallyModified() == rhs.isLocallyModified() &&" << ln
+            << indent << indent << "lhs.isLocalOnly() == rhs.isLocalOnly() &&"
+            << ln
+            << indent << indent
+            << "lhs.isLocallyFavorited() == rhs.isLocallyFavorited() &&" << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << indent << "lhs.linkedNotebookGuid() == "
+            << "rhs.linkedNotebookGuid() &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << indent << "lhs.linkedNotebookGuid() == "
+            << "rhs.linkedNotebookGuid() &&" << ln
+            << indent << indent
+            << "lhs.parentTagLocalId() == rhs.parentTagLocalId() &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << indent << "lhs.notebookLocalId() == "
+            << "rhs.notebookLocalId() &&" << ln
+            << indent << indent
+            << "lhs.tagLocalIds() == rhs.tagLocalIds() &&" << ln
+            << indent << indent
+            << "lhs.thumbnailData() == rhs.thumbnailData() &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << indent << "lhs.noteLocalId() == "
+            << "rhs.noteLocalId() &&" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << indent << "lhs.noteGuid() == "
+            << "rhs.noteGuid() &&" << ln;
+    }
+
+    for(const auto & f: qAsConst(s.m_fields))
+    {
+        ctx.m_out << indent << indent << "lhs." << f.m_name << "() == rhs."
+            << f.m_name << "()";
+
+        if (&f != &(s.m_fields.constLast())) {
+            ctx.m_out << " &&" << ln;
+        }
+        else {
+            ctx.m_out << ";" << ln;
+        }
+    }
+
+    ctx.m_out << "}" << ln << ln;
+
+    ctx.m_out << "bool operator!=(const " << s.m_name
+        << " & lhs, const " << s.m_name << " & rhs) noexcept" << ln
+        << "{" << ln
+        << indent << "return !operator==(lhs, rhs);" << ln
+        << "}" << ln << ln;
 
     writeNamespaceEnd(ctx.m_out);
 }
@@ -4070,13 +4135,6 @@ void Generator::generateTypeImplHeader(
         << "::Impl && other) = delete;" << ln << ln;
 
     ctx.m_out << indent << "~Impl() noexcept override = default;" << ln;
-
-    ctx.m_out << ln;
-    ctx.m_out << indent << "[[nodiscard]] bool operator==(const " << s.m_name
-        << "::Impl & other) const noexcept;" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] bool operator!=(const " << s.m_name
-        << "::Impl & other) const noexcept;" << ln;
 
     ctx.m_out << ln
         << indent << "void print(QTextStream & strm) const override;" << ln
@@ -4305,84 +4363,6 @@ void Generator::generateTypeImplCpp(
 
         ctx.m_out << "}" << ln << ln;
     }
-
-    ctx.m_out << "bool " << s.m_name
-        << "::Impl::operator==(" << ln << indent << "const " << s.m_name
-        << "::Impl & other) const noexcept" << ln
-        << "{" << ln;
-
-    ctx.m_out << indent << "if (this == &other) {" << ln
-        << indent << indent << "return true;" << ln
-        << indent << "}" << ln << ln;
-
-    ctx.m_out << indent << "return" << ln;
-
-    if (shouldGenerateLocalDataMethods(s)) {
-        if (shouldGenerateLocalId(s)) {
-            ctx.m_out << indent << indent << "m_localId == other.m_localId &&"
-                << ln;
-        }
-
-        ctx.m_out << indent << indent
-            << "m_locallyModified == other.m_locallyModified &&" << ln
-            << indent << indent << "m_localOnly == other.m_localOnly &&" << ln
-            << indent << indent
-            << "m_locallyFavorited == other.m_locallyFavorited &&" << ln;
-    }
-
-    if (s.m_name == QStringLiteral("Notebook"))
-    {
-        ctx.m_out << indent << indent << "m_linkedNotebookGuid == "
-            << "other.m_linkedNotebookGuid &&" << ln;
-    }
-    else if (s.m_name == QStringLiteral("Tag"))
-    {
-        ctx.m_out << indent << indent << "m_linkedNotebookGuid == "
-            << "other.m_linkedNotebookGuid &&" << ln
-            << indent << indent
-            << "m_parentTagLocalId == other.m_parentTagLocalId &&" << ln;
-    }
-    else if (s.m_name == QStringLiteral("Note"))
-    {
-        ctx.m_out << indent << indent << "m_notebookLocalId == "
-            << "other.m_notebookLocalId &&" << ln
-            << indent << indent
-            << "m_tagLocalIds == other.m_tagLocalIds &&" << ln
-            << indent << indent
-            << "m_thumbnailData == other.m_thumbnailData &&" << ln;
-    }
-    else if (s.m_name == QStringLiteral("Resource"))
-    {
-        ctx.m_out << indent << indent << "m_noteLocalId == "
-            << "other.m_noteLocalId &&" << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNote"))
-    {
-        ctx.m_out << indent << indent << "m_noteGuid == "
-            << "other.m_noteGuid &&" << ln;
-    }
-
-    for(const auto & f: qAsConst(s.m_fields))
-    {
-        ctx.m_out << indent << indent << "m_" << f.m_name << " == other.m_"
-            << f.m_name;
-
-        if (&f != &(s.m_fields.constLast())) {
-            ctx.m_out << " &&" << ln;
-        }
-        else {
-            ctx.m_out << ";" << ln;
-        }
-    }
-
-    ctx.m_out << "}" << ln << ln;
-
-    ctx.m_out << "bool " << s.m_name
-        << "::Impl::operator!=(" << ln << indent << "const " << s.m_name
-        << "::Impl & other) const noexcept" << ln
-        << "{" << ln
-        << indent << "return !(*this == other);" << ln
-        << "}" << ln << ln;
 
     writeTypeImplPrintDefinition(ctx.m_out, s);
     writeNamespaceEnd(ctx.m_out);

@@ -2204,13 +2204,12 @@ void Generator::generateTestServerServiceCall(
 void Generator::writeHeaderHeader(
     OutputFileContext & ctx, const QString & fileName,
     const QStringList & additionalIncludes,
-    const HeaderKind headerKind)
+    const HeaderKind headerKind,
+    const QString & section)
 {
     ctx.m_out << disclaimer << ln;
 
-    QString guard =
-        QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H")
-        .arg(fileName.split(QChar::fromLatin1('.'))[0].toUpper());
+    const QString guard = getIncludeGuard(fileName, section);
 
     ctx.m_out << "#ifndef " << guard << ln;
     ctx.m_out << "#define " << guard << ln;
@@ -2240,7 +2239,7 @@ void Generator::writeHeaderHeader(
 void Generator::writeHeaderBody(
     OutputFileContext & ctx, const QString & headerFileName,
     const QStringList & additionalIncludes,
-    const HeaderKind headerKind)
+    const HeaderKind headerKind, const int depth)
 {
     ctx.m_out << disclaimer << ln;
 
@@ -2252,10 +2251,24 @@ void Generator::writeHeaderBody(
     }
 
     if (headerKind == HeaderKind::Test) {
-        ctx.m_out << "#include \"../src/Impl.h\"" << ln;
+        ctx.m_out << "#include \"";
+
+        for (int i = 0; i < depth; ++i)
+        {
+            ctx.m_out << "../";
+        }
+
+        ctx.m_out << "../src/Impl.h\"" << ln;
     }
     else {
-        ctx.m_out << "#include \"Impl.h\"" << ln;
+        ctx.m_out << "#include \"";
+
+        for (int i = 0; i < depth; ++i)
+        {
+            ctx.m_out << "../";
+        }
+
+        ctx.m_out << "Impl.h\"" << ln;
     }
 
     for(const auto & include: additionalIncludes)
@@ -2275,7 +2288,8 @@ void Generator::writeHeaderBody(
 void Generator::writeHeaderFooter(
     QTextStream & out, const QString & fileName,
     const QStringList & extraLinesInsideNamespace,
-    const QStringList & extraLinesOutsideNamespace)
+    const QStringList & extraLinesOutsideNamespace,
+    const QString & section)
 {
     for(const auto & line: extraLinesInsideNamespace) {
         out << line << ln;
@@ -2295,9 +2309,7 @@ void Generator::writeHeaderFooter(
         out << line << ln;
     }
 
-    QString guard =
-        QString::fromUtf8("QEVERCLOUD_GENERATED_%1_H")
-        .arg(fileName.split(QChar::fromLatin1('.'))[0].toUpper());
+    const QString guard = getIncludeGuard(fileName, section);
 
     out << ln;
     out << "#endif // " << guard << ln;
@@ -2879,6 +2891,22 @@ void Generator::generateConstantsCpp(Parser & parser, const QString & outPath)
     writeNamespaceEnd(ctx.m_out);
 }
 
+QString Generator::getIncludeGuard(
+    const QString & fileName, const QString & section) const
+{
+    QString guard;
+    QTextStream strm(&guard);
+
+    strm << "QEVERCLOUD_GENERATED_";
+    if (!section.isEmpty()) {
+        strm << section.toUpper();
+        strm << QStringLiteral("_");
+    }
+    strm << fileName.split(QChar::fromLatin1('.'))[0].toUpper();
+    strm.flush();
+    return guard;
+}
+
 QString Generator::getIdentifier(const std::shared_ptr<Parser::Type> & type)
 {
     auto it = std::dynamic_pointer_cast<Parser::IdentifierType>(type);
@@ -3352,10 +3380,16 @@ void Generator::generateErrorsCpp(Parser & parser, const QString & outPath)
 void Generator::generateTypesIOHeader(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("Types_io.h");
-    OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation,
+        QStringLiteral("types"));
 
     auto additionalIncludes = QStringList()
-        << QStringLiteral("<qevercloud/Types.h>") << QStringLiteral("Impl.h");
+        << QStringLiteral("<qevercloud/exceptions/All.h>")
+        << QStringLiteral("<qevercloud/types/All.h>")
+        << QStringLiteral("../Impl.h");
+
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
@@ -3392,58 +3426,25 @@ void Generator::generateTypesIOHeader(Parser & parser, const QString & outPath)
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
-void Generator::generateTypesHeader(Parser & parser, const QString & outPath)
+void Generator::generateTypesIOCpp(Parser & parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("Types.h");
-    OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
+    const QString fileName = QStringLiteral("Types_io.cpp");
 
-    ctx.m_out << disclaimer << ln;
-    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_TYPES_H" << ln;
-    ctx.m_out << "#define QEVERCLOUD_GENERATED_TYPES_H" << ln << ln;
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation,
+        QStringLiteral("types"));
 
-    const auto & structures = parser.structures();
-    QStringList typesIncludes;
-    typesIncludes.reserve(structures.size());
-    for (const auto & s: structures) {
-        typesIncludes << s.m_name;
-    }
-
-    std::sort(typesIncludes.begin(), typesIncludes.end());
-
-    for (const auto & include: qAsConst(typesIncludes)) {
-        ctx.m_out << "#include \"types/" << include << ".h\"" << ln;
-    }
-
-    ctx.m_out << ln;
-
-    const auto & exceptions = parser.exceptions();
-    QStringList exceptionIncludes;
-    exceptionIncludes.reserve(exceptions.size());
-    for (const auto & s: exceptions) {
-        exceptionIncludes << s.m_name;
-    }
-
-    std::sort(exceptionIncludes.begin(), exceptionIncludes.end());
-
-    for (const auto & include: qAsConst(exceptionIncludes)) {
-        ctx.m_out << "#include \"exceptions/" << include << ".h\"" << ln;
-    }
-
-    ctx.m_out << ln;
-    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_H" << ln;
-}
-
-void Generator::generateTypesCpp(Parser & parser, const QString & outPath)
-{
-    const QString fileName = QStringLiteral("Types.cpp");
-    OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
-
-    auto additionalIncludes = QStringList() << QStringLiteral("Impl.h")
-        << QStringLiteral("Types_io.h") << QStringLiteral("<QUuid>")
-        << QStringLiteral("<QDebug>") << QStringLiteral("<optional>");
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("<qevercloud/exceptions/All.h>")
+        << QStringLiteral("<qevercloud/types/All.h>")
+        << QStringLiteral("<QUuid>") << QStringLiteral("<QDebug>")
+        << QStringLiteral("<optional>");
 
     sortIncludes(additionalIncludes);
-    writeHeaderBody(ctx, QStringLiteral("Types.h"), additionalIncludes);
+
+    writeHeaderBody(
+        ctx, QStringLiteral("Types_io.h"), additionalIncludes,
+        HeaderKind::Private, 1);
 
     ctx.m_out << blockSeparator << ln << ln;
     ctx.m_out << "/** @cond HIDDEN_SYMBOLS  */" << ln << ln;
@@ -3576,6 +3577,66 @@ void Generator::generateTypesCpp(Parser & parser, const QString & outPath)
     ctx.m_out << "/** @endcond */" << ln << ln;
 
     writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateAllExceptionsHeader(
+    Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("All.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("exceptions"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_EXCEPTIONS_ALL_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_EXCEPTIONS_ALL_H" << ln << ln;
+
+    const auto & exceptions = parser.exceptions();
+    QStringList exceptionIncludes;
+    exceptionIncludes.reserve(exceptions.size());
+    for (const auto & s: exceptions) {
+        exceptionIncludes << s.m_name;
+    }
+
+    std::sort(exceptionIncludes.begin(), exceptionIncludes.end());
+
+    for (const auto & include: qAsConst(exceptionIncludes)) {
+        ctx.m_out << "#include \"" << include << ".h\"" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_EXCEPTIONS_ALL_H" << ln;
+}
+
+void Generator::generateAllTypesHeader(Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("All.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface, QStringLiteral("types"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_TYPES_ALL_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_TYPES_ALL_H" << ln << ln;
+
+    const auto & structures = parser.structures();
+    QStringList typesIncludes;
+    typesIncludes.reserve(structures.size());
+    for (const auto & s: structures) {
+        typesIncludes << s.m_name;
+    }
+
+    typesIncludes << QStringLiteral("TypeAliases");
+
+    std::sort(typesIncludes.begin(), typesIncludes.end());
+
+    for (const auto & include: qAsConst(typesIncludes)) {
+        ctx.m_out << "#include \"" << include << ".h\"" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_ALL_H" << ln;
 }
 
 void Generator::generateTypeAliasesHeader(
@@ -4567,10 +4628,15 @@ void Generator::generateExceptionClassExceptionDataMethodDefinition(
     ctx.m_out << "}" << ln << ln;
 }
 
-void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
+void Generator::generateServiceHeader(
+    const Parser::Service & service, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("Services.h");
-    OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
+    const QString fileName = QStringLiteral("I") + service.m_name +
+        QStringLiteral(".h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("services"));
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("<qevercloud/AsyncResult.h>")
@@ -4581,250 +4647,274 @@ void Generator::generateServicesHeader(Parser & parser, const QString & outPath)
         << QStringLiteral("<QObject>");
     sortIncludes(additionalIncludes);
 
-    writeHeaderHeader(ctx, fileName, additionalIncludes);
+    writeHeaderHeader(
+        ctx, fileName, additionalIncludes, HeaderKind::Public);
 
-    const auto & services = parser.services();
-    for(const auto & s: services)
+    if (!service.m_extends.isEmpty()) {
+        throw std::runtime_error("extending services is not supported");
+    }
+
+    ctx.m_out << blockSeparator << ln << ln;
+
+    if (!service.m_docComment.isEmpty()) {
+        ctx.m_out << service.m_docComment << ln;
+    }
+
+    ctx.m_out << "class QEVERCLOUD_EXPORT I" << service.m_name
+        << ": public QObject" << ln << "{" << ln;
+    ctx.m_out << "    Q_OBJECT" << ln;
+    ctx.m_out << "    Q_DISABLE_COPY(I" << service.m_name << ")" << ln;
+    ctx.m_out << "protected:"<< ln;
+    ctx.m_out << "    I" << service.m_name << "(QObject * parent) :" << ln;
+    ctx.m_out << "        QObject(parent)" << ln;
+    ctx.m_out << "    {}" << ln << ln;
+    ctx.m_out << "public:" << ln;
+    ctx.m_out << "    virtual QString " << decapitalize(service.m_name)
+        << "Url() const = 0;" << ln;
+    ctx.m_out << "    virtual void set" << service.m_name
+        << "Url(QString url) = 0;" << ln << ln;
+
+    if (service.m_name == QStringLiteral("NoteStore"))
     {
-        if (!s.m_extends.isEmpty()) {
-            throw std::runtime_error("extending services is not supported");
-        }
-
-        ctx.m_out << blockSeparator << ln << ln;
-
-        if (!s.m_docComment.isEmpty()) {
-            ctx.m_out << s.m_docComment << ln;
-        }
-
-        ctx.m_out << "class QEVERCLOUD_EXPORT I" << s.m_name
-            << ": public QObject" << ln << "{" << ln;
-        ctx.m_out << "    Q_OBJECT" << ln;
-        ctx.m_out << "    Q_DISABLE_COPY(I" << s.m_name << ")" << ln;
-        ctx.m_out << "protected:"<< ln;
-        ctx.m_out << "    I" << s.m_name << "(QObject * parent) :" << ln;
-        ctx.m_out << "        QObject(parent)" << ln;
-        ctx.m_out << "    {}" << ln << ln;
-        ctx.m_out << "public:" << ln;
-        ctx.m_out << "    virtual QString " << decapitalize(s.m_name)
-            << "Url() const = 0;" << ln;
-        ctx.m_out << "    virtual void set" << s.m_name << "Url(QString url) = 0;"
+        ctx.m_out << "    virtual const std::optional<QString> & "
+            << "linkedNotebookGuid() const = 0;"
+            << ln
+            << "    virtual void setLinkedNotebookGuid("
+            << "std::optional<QString> linkedNotebookGuid) = 0;"
             << ln << ln;
-
-        if (s.m_name == QStringLiteral("NoteStore"))
-        {
-            ctx.m_out << "    virtual const std::optional<QString> & "
-                << "linkedNotebookGuid() const = 0;"
-                << ln
-                << "    virtual void setLinkedNotebookGuid("
-                << "std::optional<QString> linkedNotebookGuid) = 0;"
-                << ln << ln;
-        }
-
-        for(const auto & func: qAsConst(s.m_functions))
-        {
-            if (func.m_isOneway) {
-                throw std::runtime_error("oneway functions are not supported");
-            }
-
-            if (!func.m_docComment.isEmpty())
-            {
-                QStringList lines = func.m_docComment.split(
-                    QChar::fromLatin1('\n'));
-
-                for(const auto & line: qAsConst(lines)) {
-                    ctx.m_out << "    " << line << ln;
-                }
-            }
-
-            ctx.m_out << "    virtual " << typeToStr(func.m_type, func.m_name) << " "
-                 << func.m_name << "(";
-            if (!func.m_params.isEmpty()) {
-                ctx.m_out << ln;
-            }
-
-            for(const auto & param: qAsConst(func.m_params))
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                ctx.m_out << "        " << typeToStr(
-                    param.m_type,
-                    func.m_name + QStringLiteral(", ") + param.m_name,
-                    MethodType::FuncParamType);
-                ctx.m_out << " " << param.m_name;
-                if (param.m_initializer) {
-                    ctx.m_out << " = " << valueToStr(
-                        param.m_initializer, param.m_type,
-                        func.m_name + QStringLiteral(", ") + param.m_name);
-                }
-
-                ctx.m_out << "," << ln;
-            }
-
-            if (!func.m_params.isEmpty()) {
-                ctx.m_out << "        ";
-            }
-            ctx.m_out << "IRequestContextPtr ctx = {}";
-            ctx.m_out << ") = 0;" << ln << ln;
-
-            ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
-                << " @endlink */" << ln;
-            ctx.m_out << "    virtual AsyncResult * " << func.m_name << "Async(" << ln;
-            for(const auto & param: qAsConst(func.m_params))
-            {
-                if (param.m_name == QStringLiteral("authenticationToken")) {
-                    // Auth token is a part of IRequestContext interface
-                    continue;
-                }
-
-                ctx.m_out << "        " << typeToStr(
-                    param.m_type,
-                    func.m_name + QStringLiteral(", ") + param.m_name,
-                    MethodType::FuncParamType);
-                ctx.m_out << " " << param.m_name;
-                if (param.m_initializer) {
-                    ctx.m_out << " = " << valueToStr(
-                        param.m_initializer,
-                        param.m_type,
-                        func.m_name + QStringLiteral(", ") + param.m_name);
-                }
-
-                ctx.m_out << "," << ln;
-            }
-
-            ctx.m_out << "        IRequestContextPtr ctx = {}";
-            ctx.m_out << ") = 0;" << ln << ln;
-        }
-
-        ctx.m_out << "};" << ln << ln;
-        ctx.m_out << "using I" << s.m_name << "Ptr = std::shared_ptr<I"
-            << s.m_name << ">;" << ln << ln;
     }
 
-    if (!services.isEmpty())
+    for(const auto & func: qAsConst(service.m_functions))
     {
-        ctx.m_out << blockSeparator << ln << ln;
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
 
-        for(const auto & s: services)
+        if (!func.m_docComment.isEmpty())
         {
-            ctx.m_out << "QEVERCLOUD_EXPORT I" << s.m_name << " * new"
-                << s.m_name << "(" << ln;
+            const QStringList lines = func.m_docComment.split(
+                QChar::fromLatin1('\n'));
 
-            ctx.m_out << "    QString " << decapitalize(s.m_name)
-                << "Url = {}," << ln;
+            for(const auto & line: qAsConst(lines)) {
+                ctx.m_out << "    " << line << ln;
+            }
+        }
 
-            if (s.m_name == QStringLiteral("NoteStore"))
-            {
-                ctx.m_out << "    std::optional<QString> linkedNotebookGuid"
-                    << " = {}," << ln;
+        ctx.m_out << "    virtual " << typeToStr(func.m_type, func.m_name)
+            << " " << func.m_name << "(";
+
+        if (!func.m_params.isEmpty()) {
+            ctx.m_out << ln;
+        }
+
+        for(const auto & param: qAsConst(func.m_params))
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                continue;
             }
 
-            ctx.m_out << "    IRequestContextPtr ctx = {}," << ln
-                << "    QObject * parent = nullptr," << ln
-                << "    IRetryPolicyPtr retryPolicy = {});" << ln << ln;
+            ctx.m_out << "        " << typeToStr(
+                param.m_type,
+                func.m_name + QStringLiteral(", ") + param.m_name,
+                MethodType::FuncParamType);
+            ctx.m_out << " " << param.m_name;
+            if (param.m_initializer) {
+                ctx.m_out << " = " << valueToStr(
+                    param.m_initializer, param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name);
+            }
+
+            ctx.m_out << "," << ln;
         }
+
+        if (!func.m_params.isEmpty()) {
+            ctx.m_out << "        ";
+        }
+        ctx.m_out << "IRequestContextPtr ctx = {}";
+        ctx.m_out << ") = 0;" << ln << ln;
+
+        ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
+            << " @endlink */" << ln;
+        ctx.m_out << "    virtual AsyncResult * " << func.m_name << "Async(" << ln;
+        for(const auto & param: qAsConst(func.m_params))
+        {
+            if (param.m_name == QStringLiteral("authenticationToken")) {
+                // Auth token is a part of IRequestContext interface
+                continue;
+            }
+
+            ctx.m_out << "        " << typeToStr(
+                param.m_type,
+                func.m_name + QStringLiteral(", ") + param.m_name,
+                MethodType::FuncParamType);
+            ctx.m_out << " " << param.m_name;
+            if (param.m_initializer) {
+                ctx.m_out << " = " << valueToStr(
+                    param.m_initializer,
+                    param.m_type,
+                    func.m_name + QStringLiteral(", ") + param.m_name);
+            }
+
+            ctx.m_out << "," << ln;
+        }
+
+        ctx.m_out << "        IRequestContextPtr ctx = {}";
+        ctx.m_out << ") = 0;" << ln << ln;
     }
+
+    ctx.m_out << "};" << ln << ln;
+    ctx.m_out << "using I" << service.m_name << "Ptr = std::shared_ptr<I"
+        << service.m_name << ">;" << ln << ln;
+
+    ctx.m_out << blockSeparator << ln << ln;
+
+    ctx.m_out << "QEVERCLOUD_EXPORT I" << service.m_name << " * new"
+        << service.m_name << "(" << ln;
+
+    ctx.m_out << "    QString " << decapitalize(service.m_name)
+        << "Url = {}," << ln;
+
+    if (service.m_name == QStringLiteral("NoteStore"))
+    {
+        ctx.m_out << "    std::optional<QString> linkedNotebookGuid"
+            << " = {}," << ln;
+    }
+
+    ctx.m_out << "    IRequestContextPtr ctx = {}," << ln
+        << "    QObject * parent = nullptr," << ln
+        << "    IRetryPolicyPtr retryPolicy = {});" << ln << ln;
 
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
-void Generator::generateServicesCpp(Parser & parser, const QString & outPath)
+void Generator::generateServiceCpp(
+    const Parser::Service & service, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("Services.cpp");
-    OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
+    const QString fileName = service.m_name + QStringLiteral(".cpp");
 
-    auto additionalIncludes = QStringList() << QStringLiteral("Impl.h")
-        << QStringLiteral("Types_io.h")
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation,
+        QStringLiteral("services"));
+
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("../Types_io.h")
         << QStringLiteral("<qevercloud/utility/Log.h>")
         << QStringLiteral("<qevercloud/DurableService.h>")
         << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
 
     sortIncludes(additionalIncludes);
-    writeHeaderBody(ctx, QStringLiteral("Services.h"), additionalIncludes);
 
-    const auto & services = parser.services();
+    writeHeaderBody(
+        ctx,
+        QStringLiteral("services/I") + service.m_name + QStringLiteral(".h"),
+        additionalIncludes, HeaderKind::Public, 1);
 
-    for(const auto & s: services) {
-        ctx.m_out << blockSeparator << ln << ln;
-        generateServiceClassDeclaration(s, ServiceClassType::NonDurable, ctx);
-        generateServiceClassDefinition(s, ctx);
-    }
+    ctx.m_out << blockSeparator << ln << ln;
+    generateServiceClassDeclaration(service, ServiceClassType::NonDurable, ctx);
+    generateServiceClassDefinition(service, ctx);
 
-    for(const auto & s: services) {
-        ctx.m_out << blockSeparator << ln << ln;
-        generateServiceClassDeclaration(s, ServiceClassType::Durable, ctx);
-    }
-
-    for(const auto & s: services) {
-        ctx.m_out << blockSeparator << ln << ln;
-        generateDurableServiceClassDefinition(s, ctx);
-    }
+    ctx.m_out << blockSeparator << ln << ln;
+    generateServiceClassDeclaration(service, ServiceClassType::Durable, ctx);
+    generateDurableServiceClassDefinition(service, ctx);
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    for(const auto & s: services)
+    ctx.m_out << "I" << service.m_name << " * new" << service.m_name << "("
+        << ln;
+
+    auto serviceName = decapitalize(service.m_name);
+
+    ctx.m_out << "    QString " << serviceName << "Url," << ln;
+
+    const bool isNoteStore = (service.m_name == QStringLiteral("NoteStore"));
+    if (isNoteStore)
     {
-        ctx.m_out << "I" << s.m_name << " * new" << s.m_name << "(" << ln;
-
-        auto serviceName = decapitalize(s.m_name);
-
-        ctx.m_out << "    QString " << serviceName << "Url," << ln;
-
-        if (s.m_name == QStringLiteral("NoteStore"))
-        {
-            ctx.m_out << "    std::optional<QString> linkedNotebookGuid," << ln;
-        }
-
-        ctx.m_out << "    IRequestContextPtr ctx," << ln
-            << "    QObject * parent," << ln
-            << "    IRetryPolicyPtr retryPolicy)" << ln
-            << "{" << ln
-            << "    if (ctx && ctx->maxRequestRetryCount() == 0)" << ln
-            << "    {" << ln
-            << "        return new " << s.m_name << "(std::move(" << serviceName
-            << "Url), ";
-
-        const bool isNoteStore = (s.m_name == QStringLiteral("NoteStore"));
-        if (isNoteStore) {
-            ctx.m_out << "std::move(linkedNotebookGuid), ";
-        }
-
-        ctx.m_out << "ctx);" << ln
-            << "    }" << ln
-            << "    else" << ln
-            << "    {" << ln
-            << "        if (!retryPolicy) {" << ln
-            << "            retryPolicy = newRetryPolicy();" << ln
-            << "        }" << ln << ln
-            << "        return new Durable" << s.m_name << "(" << ln
-            << "            std::make_shared<" << s.m_name << ">(std::move("
-            << serviceName << "Url), ";
-
-        if (isNoteStore) {
-            ctx.m_out << "std::move(linkedNotebookGuid), ";
-        }
-
-        ctx.m_out << "ctx)," << ln
-            << "            ctx," << ln
-            << "            retryPolicy," << ln
-            << "            parent);" << ln
-            << "    }" << ln
-            << "}" << ln
-            << ln;
+        ctx.m_out << "    std::optional<QString> linkedNotebookGuid," << ln;
     }
+
+    ctx.m_out << "    IRequestContextPtr ctx," << ln
+        << "    QObject * parent," << ln
+        << "    IRetryPolicyPtr retryPolicy)" << ln
+        << "{" << ln
+        << "    if (ctx && ctx->maxRequestRetryCount() == 0)" << ln
+        << "    {" << ln
+        << "        return new " << service.m_name << "(std::move("
+        << serviceName << "Url), ";
+
+    if (isNoteStore) {
+        ctx.m_out << "std::move(linkedNotebookGuid), ";
+    }
+
+    ctx.m_out << "ctx);" << ln
+        << "    }" << ln
+        << "    else" << ln
+        << "    {" << ln
+        << "        if (!retryPolicy) {" << ln
+        << "            retryPolicy = newRetryPolicy();" << ln
+        << "        }" << ln << ln
+        << "        return new Durable" << service.m_name << "(" << ln
+        << "            std::make_shared<" << service.m_name << ">(std::move("
+        << serviceName << "Url), ";
+
+    if (isNoteStore) {
+        ctx.m_out << "std::move(linkedNotebookGuid), ";
+    }
+
+    ctx.m_out << "ctx)," << ln
+        << "            ctx," << ln
+        << "            retryPolicy," << ln
+        << "            parent);" << ln
+        << "    }" << ln
+        << "}" << ln
+        << ln;
 
     writeNamespaceEnd(ctx.m_out);
 
     ctx.m_out << ln;
-    ctx.m_out << "#include <Services.moc>" << ln;
+    ctx.m_out << "#include <" << service.m_name << ".moc>" << ln;
 }
 
-void Generator::generateServerHeader(Parser & parser, const QString & outPath)
+void Generator::generateAllServicesHeader(
+    Parser & parser, const QString & outPath)
 {
-    const QString fileName = QStringLiteral("Servers.h");
-    OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
+    const QString fileName = QStringLiteral("All.h");
+    const QString section = QStringLiteral("services");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface, section);
+
+    ctx.m_out << disclaimer << ln;
+
+    const QString guard = getIncludeGuard(fileName, section);
+
+    ctx.m_out << "#ifndef " << guard << ln;
+    ctx.m_out << "#define " << guard << ln;
+    ctx.m_out << ln;
+
+    const auto & services = parser.services();
+    for (const auto & service: qAsConst(services)) {
+        ctx.m_out << "#include <qevercloud/services/I"
+            << service.m_name << ".h>" << ln;
+    }
+
+    for (const auto & service: qAsConst(services)) {
+        ctx.m_out << "#include <qevercloud/services/"
+            << service.m_name << "Server.h>" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // " << guard << ln;
+}
+
+void Generator::generateServerHeader(
+    const Parser::Service & service, const QString & outPath)
+{
+    const QString fileName = service.m_name + QStringLiteral("Server.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("services"));
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("<qevercloud/RequestContext.h>")
@@ -4835,395 +4925,396 @@ void Generator::generateServerHeader(Parser & parser, const QString & outPath)
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(ctx, fileName, additionalIncludes);
+    generateServerClassDeclaration(service, ctx);
+    writeHeaderFooter(ctx.m_out, fileName);
+}
 
-    const auto & services = parser.services();
-    for(const auto & s: services) {
-        generateServerClassDeclaration(s, ctx);
+void Generator::generateServerCpp(
+    const Parser::Service & service, const QString & outPath)
+{
+    const QString fileName = service.m_name + QStringLiteral("Server.cpp");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation,
+        QStringLiteral("services"));
+
+    auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
+        << QStringLiteral("../Types_io.h")
+        << QStringLiteral("<qevercloud/utility/Log.h>");
+
+    sortIncludes(additionalIncludes);
+
+    writeHeaderBody(
+        ctx,
+        QStringLiteral("services/") + service.m_name +
+        QStringLiteral("Server.h"),
+        additionalIncludes, HeaderKind::Public, 1);
+
+    ctx.m_out << "namespace {" << ln << ln;
+    generateServerHelperFunctions(service, ctx);
+    ctx.m_out << "} // namespace" << ln << ln;
+
+    generateServerClassDefinition(service, ctx);
+    writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateTestServerHeader(
+    const Parser::Service & service, const QString & outPath)
+{
+    auto additionalIncludes = QStringList()
+        << QStringLiteral("../SocketHelpers.h") << QStringLiteral("<QObject>");
+
+    sortIncludes(additionalIncludes);
+
+    if (!service.m_extends.isEmpty()) {
+        throw std::runtime_error("extending services is not supported");
     }
+
+    const QString fileName = QStringLiteral("Test") + service.m_name +
+        QStringLiteral(".h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Test, QStringLiteral("services"));
+
+    writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
+
+    ctx.m_out << blockSeparator << ln << ln;
+
+    ctx.m_out << "class " << service.m_name << "Tester: public QObject" << ln
+        << "{" << ln
+        << "    Q_OBJECT" << ln
+        << "public:" << ln
+        << "    explicit " << service.m_name
+        << "Tester(QObject * parent = nullptr);" << ln << ln
+        << "private Q_SLOTS:" << ln;
+
+    for(const auto & func: service.m_functions)
+    {
+        if (func.m_isOneway) {
+            throw std::runtime_error("oneway functions are not supported");
+        }
+
+        auto funcName = capitalize(func.m_name);
+
+        // Tests for synchronous methods
+
+        ctx.m_out << "    void shouldExecute" << funcName << "();" << ln;
+
+        for(const auto & e: func.m_throws)
+        {
+            auto exceptionTypeName = typeToStr(
+                e.m_type,
+                {},
+                MethodType::TypeName);
+
+            ctx.m_out << "    void shouldDeliver" << exceptionTypeName
+                << "In" << funcName << "();" << ln;
+        }
+
+        ctx.m_out << "    void shouldDeliverThriftExceptionIn" << funcName
+            << "();" << ln;
+
+        // Tests for asynchronous methods
+
+        ctx.m_out << "    void shouldExecute" << funcName << "Async();"
+            << ln;
+
+        for(const auto & e: func.m_throws)
+        {
+            auto exceptionTypeName = typeToStr(
+                e.m_type,
+                {},
+                MethodType::TypeName);
+
+            ctx.m_out << "    void shouldDeliver" << exceptionTypeName
+                << "In" << funcName << "Async();" << ln;
+        }
+
+        ctx.m_out << "    void shouldDeliverThriftExceptionIn" << funcName
+            << "Async();" << ln;
+    }
+
+    ctx.m_out << "};" << ln << ln;
 
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
-void Generator::generateServerCpp(Parser & parser, const QString & outPath)
-{
-    const QString fileName = QStringLiteral("Servers.cpp");
-    OutputFileContext ctx(fileName, outPath, OutputFileType::Implementation);
-
-    auto additionalIncludes = QStringList() << QStringLiteral("Thrift.h")
-        << QStringLiteral("Types_io.h")
-        << QStringLiteral("<qevercloud/utility/Log.h>");
-
-    sortIncludes(additionalIncludes);
-    writeHeaderBody(ctx, QStringLiteral("Servers.h"), additionalIncludes);
-
-    // First generate some helper functions
-
-    ctx.m_out << "namespace {" << ln << ln;
-
-    const auto & services = parser.services();
-    for(const auto & s: services) {
-        generateServerHelperFunctions(s, ctx);
-    }
-
-    ctx.m_out << "} // namespace" << ln << ln;
-
-    // Now generate actual server classes
-
-    for(const auto & s: services) {
-        generateServerClassDefinition(s, ctx);
-    }
-
-    writeNamespaceEnd(ctx.m_out);
-}
-
-void Generator::generateTestServerHeaders(
-    Parser & parser, const QString & outPath)
+void Generator::generateTestServerCpp(
+    const Parser::Service & service, const QString & outPath,
+    Parser & parser)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("SocketHelpers.h") << QStringLiteral("<QObject>");
-    sortIncludes(additionalIncludes);
+        << QStringLiteral("../RandomDataGenerators.h")
+        << QStringLiteral("../SocketHelpers.h");
 
-    const auto & services = parser.services();
-    for(const auto & s: services)
-    {
-        if (!s.m_extends.isEmpty()) {
-            throw std::runtime_error("extending services is not supported");
-        }
+    additionalIncludes
+        << (QStringLiteral("<qevercloud/services/I") + service.m_name +
+            QStringLiteral(".h>"))
+        << (QStringLiteral("<qevercloud/services/") + service.m_name +
+            QStringLiteral("Server.h>"));
 
-        const QString fileName = QStringLiteral("Test") + s.m_name +
-            QStringLiteral(".h");
-
-        OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
-
-        writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
-
-        ctx.m_out << blockSeparator << ln << ln;
-
-        ctx.m_out << "class " << s.m_name << "Tester: public QObject" << ln
-            << "{" << ln
-            << "    Q_OBJECT" << ln
-            << "public:" << ln
-            << "    explicit " << s.m_name << "Tester(QObject * parent = nullptr);"
-            << ln << ln
-            << "private Q_SLOTS:" << ln;
-
-        for(const auto & func: s.m_functions)
-        {
-            if (func.m_isOneway) {
-                throw std::runtime_error("oneway functions are not supported");
-            }
-
-            auto funcName = capitalize(func.m_name);
-
-            // Tests for synchronous methods
-
-            ctx.m_out << "    void shouldExecute" << funcName << "();" << ln;
-
-            for(const auto & e: func.m_throws)
-            {
-                auto exceptionTypeName = typeToStr(
-                    e.m_type,
-                    {},
-                    MethodType::TypeName);
-
-                ctx.m_out << "    void shouldDeliver" << exceptionTypeName
-                    << "In" << funcName << "();" << ln;
-            }
-
-            ctx.m_out << "    void shouldDeliverThriftExceptionIn" << funcName
-                << "();" << ln;
-
-            // Tests for asynchronous methods
-
-            ctx.m_out << "    void shouldExecute" << funcName << "Async();"
-                << ln;
-
-            for(const auto & e: func.m_throws)
-            {
-                auto exceptionTypeName = typeToStr(
-                    e.m_type,
-                    {},
-                    MethodType::TypeName);
-
-                ctx.m_out << "    void shouldDeliver" << exceptionTypeName
-                    << "In" << funcName << "Async();" << ln;
-            }
-
-            ctx.m_out << "    void shouldDeliverThriftExceptionIn" << funcName
-                << "Async();" << ln;
-        }
-
-        ctx.m_out << "};" << ln << ln;
-
-        writeHeaderFooter(ctx.m_out, fileName);
-    }
-}
-
-void Generator::generateTestServerCpps(Parser & parser, const QString & outPath)
-{
-    auto additionalIncludes = QStringList()
-        << QStringLiteral("RandomDataGenerators.h")
-        << QStringLiteral("SocketHelpers.h")
-        << QStringLiteral("<qevercloud/Servers.h>")
-        << QStringLiteral("<qevercloud/Services.h>")
-        << QStringLiteral("<QTcpServer>")
+    additionalIncludes << QStringLiteral("<QTcpServer>")
         << QStringLiteral("<QtTest/QtTest>")
-        << QStringLiteral("ClearLocalIds.h");
+        << QStringLiteral("../ClearLocalIds.h");
 
     sortIncludes(additionalIncludes);
 
     constexpr const char * indent = "    ";
+
+    if (!service.m_extends.isEmpty()) {
+        throw std::runtime_error("extending services is not supported");
+    }
+
+    const QString fileName = QStringLiteral("Test") + service.m_name +
+        QStringLiteral(".cpp");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Test, QStringLiteral("services"));
+
+    writeHeaderBody(
+        ctx,
+        QStringLiteral("Test") + service.m_name + QStringLiteral(".h"),
+        additionalIncludes,
+        HeaderKind::Test, 1);
+
+    ctx.m_out << blockSeparator << ln << ln;
+
+    ctx.m_out << "namespace {" << ln << ln
+        << blockSeparator << ln << ln;
+
+    ctx.m_out << "template <class T>" << ln
+        << "void compareValuesWithoutLocalIds(const T & lhs, const T & rhs)"
+        << ln << "{" << ln
+        << indent << "T lhsCopy = lhs;" << ln
+        << indent << "clearLocalIds(lhsCopy);" << ln << ln
+        << indent << "T rhsCopy = rhs;" << ln
+        << indent << "clearLocalIds(rhsCopy);" << ln << ln
+        << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "template <class T>" << ln
+        << "void compareListValuesWithoutLocalIds("
+        << "const QList<T> & lhs, const QList<T> & rhs)" << ln
+        << "{" << ln
+        << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
+        << indent << "QList<T> lhsCopy = lhs;" << ln
+        << indent << "for (auto & v: lhsCopy) {" << ln
+        << indent << indent << "clearLocalIds(v);" << ln
+        << indent << "}" << ln << ln
+        << indent << "QList<T> rhsCopy = rhs;" << ln
+        << indent << "for (auto & v: rhsCopy) {" << ln
+        << indent << indent << "clearLocalIds(v);" << ln
+        << indent << "}" << ln << ln
+        << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "template <class T>" << ln
+        << "void compareSetValuesWithoutLocalIds("
+        << "const QSet<T> & lhs, const QSet<T> & rhs)" << ln
+        << "{" << ln
+        << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
+        << indent << "QSet<T> lhsCopy = lhs;" << ln
+        << indent << "for (auto & v: lhsCopy) {" << ln
+        << indent << indent << "clearLocalIds(v);" << ln
+        << indent << "}" << ln << ln
+        << indent << "QSet<T> rhsCopy = rhs;" << ln
+        << indent << "for (auto & v: rhsCopy) {" << ln
+        << indent << indent << "clearLocalIds(v);" << ln
+        << indent << "}" << ln << ln
+        << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "template <class K, class V>" << ln
+        << "void compareMapValuesWithoutLocalIds("
+        << "const QMap<K, V> & lhs, const QMap<K, V> & rhs)" << ln
+        << "{" << ln
+        << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
+        << indent << "QMap<K, V> lhsCopy = lhs;" << ln
+        << indent << "for (auto it = lhsCopy.begin(); it != lhsCopy.end();"
+        << " ++it) {" << ln
+        << indent << indent << "clearLocalIds(it.value());" << ln
+        << indent << "}" << ln << ln
+        << indent << "QMap<K, V> rhsCopy = rhs;" << ln
+        << indent << "for (auto it = rhsCopy.begin(); it != rhsCopy.end();"
+        << " ++it) {" << ln
+        << indent << indent << "clearLocalIds(it.value());" << ln
+        << indent << "}" << ln << ln
+        << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "} // namespace" << ln << ln
+        << blockSeparator << ln << ln;
+
+    ctx.m_out << service.m_name << "Tester::" << service.m_name << "Tester"
+        << "(QObject * parent) :" << ln
+        << "    QObject(parent)" << ln
+        << "{}" << ln << ln;
+
+    generateTestServerHelperClassDefinition(service, ctx);
+    generateTestServerAsyncValueFetcherClassDefinition(service, ctx);
+
     const auto & enumerations = parser.enumerations();
-    const auto & services = parser.services();
-    for(const auto & s: services)
+    for(const auto & func: service.m_functions)
     {
-        if (!s.m_extends.isEmpty()) {
-            throw std::runtime_error("extending services is not supported");
-        }
-
-        const QString fileName = QStringLiteral("Test") + s.m_name +
-            QStringLiteral(".cpp");
-
-        OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
-
-        writeHeaderBody(
-            ctx,
-            QStringLiteral("Test") + s.m_name + QStringLiteral(".h"),
-            additionalIncludes,
-            HeaderKind::Test);
-
         ctx.m_out << blockSeparator << ln << ln;
 
-        ctx.m_out << "namespace {" << ln << ln
-            << blockSeparator << ln << ln;
+        auto funcName = capitalize(func.m_name);
 
-        ctx.m_out << "template <class T>" << ln
-            << "void compareValuesWithoutLocalIds(const T & lhs, const T & rhs)"
-            << ln << "{" << ln
-            << indent << "T lhsCopy = lhs;" << ln
-            << indent << "clearLocalIds(lhsCopy);" << ln << ln
-            << indent << "T rhsCopy = rhs;" << ln
-            << indent << "clearLocalIds(rhsCopy);" << ln << ln
-            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
-            << "}" << ln << ln;
+        // Should deliver request and response for successful synchronous
+        // calls
 
-        ctx.m_out << "template <class T>" << ln
-            << "void compareListValuesWithoutLocalIds("
-            << "const QList<T> & lhs, const QList<T> & rhs)" << ln
-            << "{" << ln
-            << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
-            << indent << "QList<T> lhsCopy = lhs;" << ln
-            << indent << "for (auto & v: lhsCopy) {" << ln
-            << indent << indent << "clearLocalIds(v);" << ln
-            << indent << "}" << ln << ln
-            << indent << "QList<T> rhsCopy = rhs;" << ln
-            << indent << "for (auto & v: rhsCopy) {" << ln
-            << indent << indent << "clearLocalIds(v);" << ln
-            << indent << "}" << ln << ln
-            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
-            << "}" << ln << ln;
+        ctx.m_out << "void " << service.m_name << "Tester::shouldExecute"
+            << funcName << "()" << ln;
 
-        ctx.m_out << "template <class T>" << ln
-            << "void compareSetValuesWithoutLocalIds("
-            << "const QSet<T> & lhs, const QSet<T> & rhs)" << ln
-            << "{" << ln
-            << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
-            << indent << "QSet<T> lhsCopy = lhs;" << ln
-            << indent << "for (auto & v: lhsCopy) {" << ln
-            << indent << indent << "clearLocalIds(v);" << ln
-            << indent << "}" << ln << ln
-            << indent << "QSet<T> rhsCopy = rhs;" << ln
-            << indent << "for (auto & v: rhsCopy) {" << ln
-            << indent << indent << "clearLocalIds(v);" << ln
-            << indent << "}" << ln << ln
-            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
-            << "}" << ln << ln;
+        ctx.m_out << "{" << ln;
 
-        ctx.m_out << "template <class K, class V>" << ln
-            << "void compareMapValuesWithoutLocalIds("
-            << "const QMap<K, V> & lhs, const QMap<K, V> & rhs)" << ln
-            << "{" << ln
-            << indent << "Q_ASSERT(lhs.size() == rhs.size());" << ln << ln
-            << indent << "QMap<K, V> lhsCopy = lhs;" << ln
-            << indent << "for (auto it = lhsCopy.begin(); it != lhsCopy.end();"
-            << " ++it) {" << ln
-            << indent << indent << "clearLocalIds(it.value());" << ln
-            << indent << "}" << ln << ln
-            << indent << "QMap<K, V> rhsCopy = rhs;" << ln
-            << indent << "for (auto it = rhsCopy.begin(); it != rhsCopy.end();"
-            << " ++it) {" << ln
-            << indent << indent << "clearLocalIds(it.value());" << ln
-            << indent << "}" << ln << ln
-            << indent << "Q_ASSERT(lhsCopy == rhsCopy);" << ln
-            << "}" << ln << ln;
+        generateTestServerPrepareRequestParams(func, enumerations, ctx);
+        generateTestServerPrepareRequestResponse(func, enumerations, ctx);
+        generateTestServerHelperLambda(service, func, parser, ctx);
+        generateTestServerSocketSetup(service, func, ctx);
 
-        ctx.m_out << "} // namespace" << ln << ln
-            << blockSeparator << ln << ln;
+        generateTestServerServiceCall(
+            parser, service, func, ServiceCallKind::Sync, ctx);
 
-        ctx.m_out << s.m_name << "Tester::" << s.m_name << "Tester"
-            << "(QObject * parent) :" << ln
-            << "    QObject(parent)" << ln
-            << "{}" << ln << ln;
+        ctx.m_out << "}" << ln << ln;
 
-        generateTestServerHelperClassDefinition(s, ctx);
-        generateTestServerAsyncValueFetcherClassDefinition(s, ctx);
+        // Should deliver exceptions for synchronous calls
 
-        for(const auto & func: s.m_functions)
+        for(const auto & e: func.m_throws)
         {
-            ctx.m_out << blockSeparator << ln << ln;
+            auto exceptionTypeName = typeToStr(
+                e.m_type,
+                {},
+                MethodType::TypeName);
 
-            auto funcName = capitalize(func.m_name);
-
-            // Should deliver request and response for successful synchronous
-            // calls
-
-            ctx.m_out << "void " << s.m_name << "Tester::shouldExecute"
-                << funcName << "()" << ln;
+            ctx.m_out << "void " << service.m_name << "Tester::shouldDeliver"
+                << exceptionTypeName << "In" << funcName << "()" << ln;
 
             ctx.m_out << "{" << ln;
 
             generateTestServerPrepareRequestParams(func, enumerations, ctx);
-            generateTestServerPrepareRequestResponse(func, enumerations, ctx);
-            generateTestServerHelperLambda(s, func, parser, ctx);
-            generateTestServerSocketSetup(s, func, ctx);
-
-            generateTestServerServiceCall(
-                parser, s, func, ServiceCallKind::Sync, ctx);
-
-            ctx.m_out << "}" << ln << ln;
-
-            // Should deliver exceptions for synchronous calls
-
-            for(const auto & e: func.m_throws)
-            {
-                auto exceptionTypeName = typeToStr(
-                    e.m_type,
-                    {},
-                    MethodType::TypeName);
-
-                ctx.m_out << "void " << s.m_name << "Tester::shouldDeliver"
-                    << exceptionTypeName << "In" << funcName << "()" << ln;
-
-                ctx.m_out << "{" << ln;
-
-                generateTestServerPrepareRequestParams(func, enumerations, ctx);
-                generateTestServerPrepareRequestExceptionResponse(parser, e, ctx);
-                generateTestServerHelperLambda(s, func, parser, ctx, e.m_name);
-                generateTestServerSocketSetup(s, func, ctx);
-
-                generateTestServerServiceCall(
-                    parser, s, func, ServiceCallKind::Sync, ctx,
-                    exceptionTypeName, e.m_name);
-
-                ctx.m_out << "}" << ln << ln;
-            }
-
-            // Should also properly deliver ThriftExceptions in synchronous
-            // calls
-
-            ctx.m_out << "void " << s.m_name
-                << "Tester::shouldDeliverThriftExceptionIn" << funcName
-                << "()" << ln;
-
-            ctx.m_out << "{" << ln;
-
-            Parser::Field exceptionField;
-            exceptionField.m_name = QStringLiteral("thriftException");
-
-            auto type = std::make_shared<Parser::IdentifierType>();
-            type->m_identifier = QStringLiteral("ThriftException");
-
-            exceptionField.m_type = type;
-
-            generateTestServerPrepareRequestParams(func, enumerations, ctx);
-            generateTestServerPrepareRequestExceptionResponse(
-                parser, exceptionField, ctx);
+            generateTestServerPrepareRequestExceptionResponse(parser, e, ctx);
 
             generateTestServerHelperLambda(
-                s, func, parser, ctx, exceptionField.m_name);
+                service, func, parser, ctx, e.m_name);
 
-            generateTestServerSocketSetup(s, func, ctx);
-
-            generateTestServerServiceCall(
-                parser, s, func, ServiceCallKind::Sync, ctx,
-                QStringLiteral("ThriftException"), exceptionField.m_name);
-
-            ctx.m_out << "}" << ln << ln;
-
-            // Should deliver request and response for successful asynchonous
-            // calls
-
-            ctx.m_out << "void " << s.m_name << "Tester::shouldExecute"
-                << funcName << "Async()" << ln;
-
-            ctx.m_out << "{" << ln;
-
-            generateTestServerPrepareRequestParams(func, enumerations, ctx);
-            generateTestServerPrepareRequestResponse(func, enumerations, ctx);
-            generateTestServerHelperLambda(s, func, parser, ctx);
-            generateTestServerSocketSetup(s, func, ctx);
+            generateTestServerSocketSetup(service, func, ctx);
 
             generateTestServerServiceCall(
-                parser, s, func, ServiceCallKind::Async, ctx);
-
-            ctx.m_out << "}" << ln << ln;
-
-            // Should deliver exceptions for asynchronous calls
-
-            for(const auto & e: func.m_throws)
-            {
-                auto exceptionTypeName = typeToStr(
-                    e.m_type,
-                    {},
-                    MethodType::TypeName);
-
-                ctx.m_out << "void " << s.m_name << "Tester::shouldDeliver"
-                    << exceptionTypeName << "In" << funcName << "Async()" << ln;
-
-                ctx.m_out << "{" << ln;
-
-                generateTestServerPrepareRequestParams(func, enumerations, ctx);
-                generateTestServerPrepareRequestExceptionResponse(parser, e, ctx);
-                generateTestServerHelperLambda(s, func, parser, ctx, e.m_name);
-                generateTestServerSocketSetup(s, func, ctx);
-
-                generateTestServerServiceCall(
-                    parser, s, func, ServiceCallKind::Async, ctx,
-                    exceptionTypeName, e.m_name);
-
-                ctx.m_out << "}" << ln << ln;
-            }
-
-            // Should also properly deliver ThriftExceptions in synchronous
-            // calls
-
-            ctx.m_out << "void " << s.m_name
-                << "Tester::shouldDeliverThriftExceptionIn" << funcName
-                << "Async()" << ln;
-
-            ctx.m_out << "{" << ln;
-
-            generateTestServerPrepareRequestParams(func, enumerations, ctx);
-            generateTestServerPrepareRequestExceptionResponse(
-                parser, exceptionField, ctx);
-
-            generateTestServerHelperLambda(
-                s, func, parser, ctx, exceptionField.m_name);
-
-            generateTestServerSocketSetup(s, func, ctx);
-
-            generateTestServerServiceCall(
-                parser, s, func, ServiceCallKind::Async, ctx,
-                QStringLiteral("ThriftException"), exceptionField.m_name);
+                parser, service, func, ServiceCallKind::Sync, ctx,
+                exceptionTypeName, e.m_name);
 
             ctx.m_out << "}" << ln << ln;
         }
 
-        writeNamespaceEnd(ctx.m_out);
+        // Should also properly deliver ThriftExceptions in synchronous
+        // calls
 
-        ctx.m_out << ln
-            << "#include <Test" << s.m_name << ".moc>" << ln;
+        ctx.m_out << "void " << service.m_name
+            << "Tester::shouldDeliverThriftExceptionIn" << funcName
+            << "()" << ln;
+
+        ctx.m_out << "{" << ln;
+
+        Parser::Field exceptionField;
+        exceptionField.m_name = QStringLiteral("thriftException");
+
+        auto type = std::make_shared<Parser::IdentifierType>();
+        type->m_identifier = QStringLiteral("ThriftException");
+
+        exceptionField.m_type = type;
+
+        generateTestServerPrepareRequestParams(func, enumerations, ctx);
+        generateTestServerPrepareRequestExceptionResponse(
+            parser, exceptionField, ctx);
+
+        generateTestServerHelperLambda(
+            service, func, parser, ctx, exceptionField.m_name);
+
+        generateTestServerSocketSetup(service, func, ctx);
+
+        generateTestServerServiceCall(
+            parser, service, func, ServiceCallKind::Sync, ctx,
+            QStringLiteral("ThriftException"), exceptionField.m_name);
+
+        ctx.m_out << "}" << ln << ln;
+
+        // Should deliver request and response for successful asynchonous
+        // calls
+
+        ctx.m_out << "void " << service.m_name << "Tester::shouldExecute"
+            << funcName << "Async()" << ln;
+
+        ctx.m_out << "{" << ln;
+
+        generateTestServerPrepareRequestParams(func, enumerations, ctx);
+        generateTestServerPrepareRequestResponse(func, enumerations, ctx);
+        generateTestServerHelperLambda(service, func, parser, ctx);
+        generateTestServerSocketSetup(service, func, ctx);
+
+        generateTestServerServiceCall(
+            parser, service, func, ServiceCallKind::Async, ctx);
+
+        ctx.m_out << "}" << ln << ln;
+
+        // Should deliver exceptions for asynchronous calls
+
+        for(const auto & e: func.m_throws)
+        {
+            auto exceptionTypeName = typeToStr(
+                e.m_type,
+                {},
+                MethodType::TypeName);
+
+            ctx.m_out << "void " << service.m_name << "Tester::shouldDeliver"
+                << exceptionTypeName << "In" << funcName << "Async()" << ln;
+
+            ctx.m_out << "{" << ln;
+
+            generateTestServerPrepareRequestParams(func, enumerations, ctx);
+            generateTestServerPrepareRequestExceptionResponse(parser, e, ctx);
+
+            generateTestServerHelperLambda(
+                service, func, parser, ctx, e.m_name);
+
+            generateTestServerSocketSetup(service, func, ctx);
+
+            generateTestServerServiceCall(
+                parser, service, func, ServiceCallKind::Async, ctx,
+                exceptionTypeName, e.m_name);
+
+            ctx.m_out << "}" << ln << ln;
+        }
+
+        // Should also properly deliver ThriftExceptions in synchronous
+        // calls
+
+        ctx.m_out << "void " << service.m_name
+            << "Tester::shouldDeliverThriftExceptionIn" << funcName
+            << "Async()" << ln;
+
+        ctx.m_out << "{" << ln;
+
+        generateTestServerPrepareRequestParams(func, enumerations, ctx);
+        generateTestServerPrepareRequestExceptionResponse(
+            parser, exceptionField, ctx);
+
+        generateTestServerHelperLambda(
+            service, func, parser, ctx, exceptionField.m_name);
+
+        generateTestServerSocketSetup(service, func, ctx);
+
+        generateTestServerServiceCall(
+            parser, service, func, ServiceCallKind::Async, ctx,
+            QStringLiteral("ThriftException"), exceptionField.m_name);
+
+        ctx.m_out << "}" << ln << ln;
     }
+
+    writeNamespaceEnd(ctx.m_out);
+
+    ctx.m_out << ln
+        << "#include <Test" << service.m_name << ".moc>" << ln;
 }
 
 void Generator::generateTestRandomDataGeneratorsHeader(
@@ -7501,8 +7592,10 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     generateErrorsCpp(parser, outPath);
 
     generateTypesIOHeader(parser, outPath);
-    generateTypesHeader(parser, outPath);
-    generateTypesCpp(parser, outPath);
+    generateTypesIOCpp(parser, outPath);
+
+    generateAllExceptionsHeader(parser, outPath);
+    generateAllTypesHeader(parser, outPath);
 
     generateTypeAliasesHeader(parser.typeAliases(), outPath);
 
@@ -7524,14 +7617,19 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
         generateTypeImplCpp(s, outPath, exceptionsSection);
     }
 
-    generateServicesHeader(parser, outPath);
-    generateServicesCpp(parser, outPath);
+    for (const auto & s: parser.services())
+    {
+        generateServiceHeader(s, outPath);
+        generateServiceCpp(s, outPath);
 
-    generateServerHeader(parser, outPath);
-    generateServerCpp(parser, outPath);
+        generateServerHeader(s, outPath);
+        generateServerCpp(s, outPath);
 
-    generateTestServerHeaders(parser, outPath);
-    generateTestServerCpps(parser, outPath);
+        generateTestServerHeader(s, outPath);
+        generateTestServerCpp(s, outPath, parser);
+    }
+
+    generateAllServicesHeader(parser, outPath);
 
     generateTestRandomDataGeneratorsHeader(parser, outPath);
     generateTestRandomDataGeneratorsCpp(parser, outPath);

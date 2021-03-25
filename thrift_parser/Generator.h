@@ -72,9 +72,10 @@ private:
     void generateErrorsCpp(Parser & parser, const QString & outPath);
 
     void generateTypesIOHeader(Parser & parser, const QString & outPath);
+    void generateTypesIOCpp(Parser & parser, const QString & outPath);
 
-    void generateTypesHeader(Parser & parser, const QString & outPath);
-    void generateTypesCpp(Parser & parser, const QString & outPath);
+    void generateAllExceptionsHeader(Parser & parser, const QString & outPath);
+    void generateAllTypesHeader(Parser & parser, const QString & outPath);
 
     void generateTypeAliasesHeader(
         const Parser::TypeAliases & typeAliases, const QString & outPath);
@@ -113,14 +114,27 @@ private:
     void generateExceptionClassExceptionDataMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 
-    void generateServicesHeader(Parser & parser, const QString & outPath);
-    void generateServicesCpp(Parser & parser, const QString & outPath);
+    void generateServiceHeader(
+        const Parser::Service & service, const QString & outPath);
 
-    void generateServerHeader(Parser & parser, const QString & outPath);
-    void generateServerCpp(Parser & parser, const QString & outPath);
+    void generateServiceCpp(
+        const Parser::Service & service, const QString & outPath);
 
-    void generateTestServerHeaders(Parser & parser, const QString & outPath);
-    void generateTestServerCpps(Parser & parser, const QString & outPath);
+    void generateAllServicesHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateServerHeader(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateServerCpp(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateTestServerHeader(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateTestServerCpp(
+        const Parser::Service & service, const QString & outPath,
+        Parser & parser);
 
     void generateTestRandomDataGeneratorsHeader(
         Parser & parser, const QString & outPath);
@@ -251,18 +265,21 @@ private:
 
     void writeHeaderHeader(
         OutputFileContext & ctx, const QString & fileName,
-        const QStringList & additionalIncludes = QStringList(),
-        const HeaderKind headerKind = HeaderKind::Public);
+        const QStringList & additionalIncludes = {},
+        const HeaderKind headerKind = HeaderKind::Public,
+        const QString & section = {});
 
     void writeHeaderBody(
         OutputFileContext & ctx, const QString & headerFileName,
-        const QStringList & additionalIncludes = QStringList(),
-        const HeaderKind headerKind = HeaderKind::Public);
+        const QStringList & additionalIncludes = {},
+        const HeaderKind headerKind = HeaderKind::Public,
+        const int depth = 0);
 
     void writeHeaderFooter(
         QTextStream & out, const QString & fileName,
-        const QStringList & extraLinesInsideNamespace = QStringList(),
-        const QStringList & extraLinesOutsideNamespace = QStringList());
+        const QStringList & extraLinesInsideNamespace = {},
+        const QStringList & extraLinesOutsideNamespace = {},
+        const QString & section = {});
 
     void writeThriftWriteFields(
         QTextStream & out, const QList<Parser::Field> & fields,
@@ -299,6 +316,9 @@ private:
         const MethodType methodType = MethodType::TypeName) const;
 
     // Other auxiliary methods
+
+    [[nodiscard]] QString getIncludeGuard(
+        const QString & fileName, const QString & section) const;
 
     [[nodiscard]] QString getIdentifier(
         const std::shared_ptr<Parser::Type> & type);

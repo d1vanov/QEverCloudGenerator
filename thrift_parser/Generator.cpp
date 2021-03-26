@@ -3594,10 +3594,17 @@ void Generator::generateAllExceptionsHeader(
 
     const auto & exceptions = parser.exceptions();
     QStringList exceptionIncludes;
-    exceptionIncludes.reserve(exceptions.size());
+    exceptionIncludes.reserve(exceptions.size() + 6);
     for (const auto & s: exceptions) {
         exceptionIncludes << s.m_name;
     }
+
+    exceptionIncludes << QStringLiteral("EDAMSystemExceptionAuthExpired")
+        << QStringLiteral("EDAMSystemExceptionRateLimitReached")
+        << QStringLiteral("EverCloudException")
+        << QStringLiteral("EvernoteException")
+        << QStringLiteral("NetworkException")
+        << QStringLiteral("ThriftException");
 
     std::sort(exceptionIncludes.begin(), exceptionIncludes.end());
 
@@ -3679,7 +3686,6 @@ void Generator::generateTypeHeader(
         fileName, outPath, OutputFileType::Interface, fileSection);
 
     QStringList additionalIncludes = QStringList()
-        << QStringLiteral("<qevercloud/EverCloudException.h>")
         << QStringLiteral("<qevercloud/utility/Printable.h>")
         << QStringLiteral("<qevercloud/EDAMErrorCode.h>")
         << QStringLiteral("<qevercloud/types/TypeAliases.h>")
@@ -3688,6 +3694,15 @@ void Generator::generateTypeHeader(
 
     const bool isExceptionsSection =
         (fileSection == QStringLiteral("exceptions"));
+
+    if (isExceptionsSection) {
+        additionalIncludes
+            << QStringLiteral("<qevercloud/exceptions/EvernoteException.h>");
+    }
+    else {
+        additionalIncludes
+            << QStringLiteral("<qevercloud/exceptions/EverCloudException.h>");
+    }
 
     const bool generateLocalData =
         !isExceptionsSection && shouldGenerateLocalDataMethods(s);

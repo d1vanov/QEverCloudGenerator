@@ -75,7 +75,10 @@ private:
     void generateTypesIOCpp(Parser & parser, const QString & outPath);
 
     void generateAllExceptionsHeader(Parser & parser, const QString & outPath);
+    void generateExceptionsFwdHeader(Parser & parser, const QString & outPath);
+
     void generateAllTypesHeader(Parser & parser, const QString & outPath);
+    void generateTypesFwdHeader(Parser & parser, const QString & outPath);
 
     void generateTypeAliasesHeader(
         const Parser::TypeAliases & typeAliases, const QString & outPath);
@@ -122,6 +125,11 @@ private:
 
     void generateAllServicesHeader(
         Parser & parser, const QString & outPath);
+
+    void generateServicesFwdHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateFwdHeader(const QString & outPath);
 
     void generateServerHeader(
         const Parser::Service & service, const QString & outPath);

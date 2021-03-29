@@ -3616,6 +3616,43 @@ void Generator::generateAllExceptionsHeader(
     ctx.m_out << "#endif // QEVERCLOUD_GENERATED_EXCEPTIONS_ALL_H" << ln;
 }
 
+void Generator::generateExceptionsFwdHeader(
+    Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Fwd.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("exceptions"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_EXCEPTIONS_FWD_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_EXCEPTIONS_FWD_H" << ln << ln;
+
+    const auto & exceptions = parser.exceptions();
+    QStringList exceptionClasses;
+    exceptionClasses.reserve(exceptions.size() + 6);
+    for (const auto & s: exceptions) {
+        exceptionClasses << s.m_name;
+    }
+
+    exceptionClasses << QStringLiteral("EDAMSystemExceptionAuthExpired")
+        << QStringLiteral("EDAMSystemExceptionRateLimitReached")
+        << QStringLiteral("EverCloudException")
+        << QStringLiteral("EvernoteException")
+        << QStringLiteral("NetworkException")
+        << QStringLiteral("ThriftException");
+
+    std::sort(exceptionClasses.begin(), exceptionClasses.end());
+
+    for (const auto & exceptionClass: qAsConst(exceptionClasses)) {
+        ctx.m_out << "class " << exceptionClass << ";" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_EXCEPTIONS_FWD_H" << ln;
+}
+
 void Generator::generateAllTypesHeader(Parser & parser, const QString & outPath)
 {
     const QString fileName = QStringLiteral("All.h");
@@ -3644,6 +3681,34 @@ void Generator::generateAllTypesHeader(Parser & parser, const QString & outPath)
 
     ctx.m_out << ln;
     ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_ALL_H" << ln;
+}
+
+void Generator::generateTypesFwdHeader(Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Fwd.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface, QStringLiteral("types"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_TYPES_FWD_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_TYPES_FWD_H" << ln << ln;
+
+    const auto & structures = parser.structures();
+    QStringList types;
+    types.reserve(structures.size());
+    for (const auto & s: structures) {
+        types<< s.m_name;
+    }
+
+    std::sort(types.begin(), types.end());
+
+    for (const auto & type: qAsConst(types)) {
+        ctx.m_out << "class " << type << ";" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_FWD_H" << ln;
 }
 
 void Generator::generateTypeAliasesHeader(
@@ -4917,6 +4982,62 @@ void Generator::generateAllServicesHeader(
         ctx.m_out << "#include <qevercloud/services/"
             << service.m_name << "Server.h>" << ln;
     }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // " << guard << ln;
+}
+
+void Generator::generateServicesFwdHeader(
+    Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Fwd.h");
+    const QString section = QStringLiteral("services");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface, section);
+
+    ctx.m_out << disclaimer << ln;
+
+    const QString guard = getIncludeGuard(fileName, section);
+
+    ctx.m_out << "#ifndef " << guard << ln;
+    ctx.m_out << "#define " << guard << ln;
+    ctx.m_out << ln;
+
+    const auto & services = parser.services();
+    QStringList serviceClasses;
+    serviceClasses.reserve(services.size() * 2);
+    for (const auto & service: qAsConst(services)) {
+        serviceClasses << (QStringLiteral("I") + service.m_name);
+        serviceClasses << (service.m_name + QStringLiteral("Server"));
+    }
+
+    std::sort(serviceClasses.begin(), serviceClasses.end());
+
+    for (const auto & serviceClass: qAsConst(serviceClasses)) {
+        ctx.m_out << "class " << serviceClass << ";" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // " << guard << ln;
+}
+
+void Generator::generateFwdHeader(const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Fwd.h");
+
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
+
+    ctx.m_out << disclaimer << ln;
+
+    const QString guard = getIncludeGuard(fileName, QString{});
+
+    ctx.m_out << "#ifndef " << guard << ln;
+    ctx.m_out << "#define " << guard << ln;
+    ctx.m_out << ln;
+    ctx.m_out << "#include \"exceptions/Fwd.h\"" << ln;
+    ctx.m_out << "#include \"services/Fwd.h\"" << ln;
+    ctx.m_out << "#include \"types/Fwd.h\"" << ln;
 
     ctx.m_out << ln;
     ctx.m_out << "#endif // " << guard << ln;
@@ -7610,7 +7731,10 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     generateTypesIOCpp(parser, outPath);
 
     generateAllExceptionsHeader(parser, outPath);
+    generateExceptionsFwdHeader(parser, outPath);
+
     generateAllTypesHeader(parser, outPath);
+    generateTypesFwdHeader(parser, outPath);
 
     generateTypeAliasesHeader(parser.typeAliases(), outPath);
 
@@ -7645,6 +7769,9 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     }
 
     generateAllServicesHeader(parser, outPath);
+    generateServicesFwdHeader(parser, outPath);
+
+    generateFwdHeader(outPath);
 
     generateTestRandomDataGeneratorsHeader(parser, outPath);
     generateTestRandomDataGeneratorsCpp(parser, outPath);

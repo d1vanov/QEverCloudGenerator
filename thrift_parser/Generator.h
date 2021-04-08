@@ -114,6 +114,12 @@ private:
     void generateExceptionClassWhatMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 
+    void generateExceptionClassRaiseMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateExceptionClassCloneMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
     void generateExceptionClassExceptionDataMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 

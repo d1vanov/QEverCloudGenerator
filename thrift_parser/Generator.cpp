@@ -3888,6 +3888,10 @@ void Generator::generateTypeHeader(
             << "[[nodiscard]] const char * what() const noexcept override;"
             << ln;
 
+        ctx.m_out << indent << "void raise() const override;" << ln;
+        ctx.m_out << indent << "[[nodiscard]] " << s.m_name << " * clone() "
+            << "const override;" << ln;
+
         ctx.m_out << indent
             << "[[nodiscard]] EverCloudExceptionDataPtr exceptionData() const "
             << "override;" << ln;
@@ -3962,10 +3966,14 @@ void Generator::generateTypeCpp(
 
     ctx.m_out  << "#include \"impl/" << s.m_name << "Impl.h\"" << ln << ln;
 
-    writeNamespaceBegin(ctx);
-
     constexpr const char * indent = "    ";
     const bool isException = m_allExceptions.contains(s.m_name);
+
+    if (isException) {
+        ctx.m_out << "#include <memory>" << ln << ln;
+    }
+
+    writeNamespaceBegin(ctx);
 
     ctx.m_out << s.m_name << "::" << s.m_name << "() :" << ln;
 
@@ -4134,6 +4142,8 @@ void Generator::generateTypeCpp(
     if (isException)
     {
         generateExceptionClassWhatMethodDefinition(s, ctx);
+        generateExceptionClassRaiseMethodDefinition(s, ctx);
+        generateExceptionClassCloneMethodDefinition(s, ctx);
         generateExceptionClassExceptionDataMethodDefinition(s, ctx);
 
         generateExceptionDataClassConstructorWithArgsDefinition(s, ctx);
@@ -4680,6 +4690,36 @@ void Generator::generateExceptionClassWhatMethodDefinition(
         << ln << "{" << ln
         << indent << "return EvernoteException::what();" << ln
         << "}" << ln << ln;
+}
+
+void Generator::generateExceptionClassRaiseMethodDefinition(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "void " << s.m_name << "::raise() const" << ln
+        << "{" << ln
+        << indent << "throw *this;" << ln
+        << "}" << ln << ln;
+}
+
+void Generator::generateExceptionClassCloneMethodDefinition(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << s.m_name << " * " << s.m_name << "::clone() const" << ln
+        << "{" << ln
+        << indent << "auto e = std::make_unique<" << s.m_name << ">();" << ln;
+
+    for (const auto & f: s.m_fields) {
+        ctx.m_out << indent << "e->set" << capitalize(f.m_name)
+            << "(d->m_" << f.m_name << ");" << ln;
+    }
+
+    ctx.m_out << indent << "return e.release();" << ln;
+
+    ctx.m_out << "}" << ln << ln;
 }
 
 void Generator::generateExceptionClassExceptionDataMethodDefinition(

@@ -1378,64 +1378,6 @@ void Generator::generateTestServerHelperClassDefinition(
     }
 }
 
-void Generator::generateTestServerAsyncValueFetcherClassDefinition(
-    const Parser::Service & service, OutputFileContext & ctx)
-{
-    for(const auto & func: service.m_functions)
-    {
-        if (func.m_isOneway) {
-            throw std::runtime_error("oneway functions are not supported");
-        }
-
-        ctx.m_out << blockSeparator << ln << ln;
-
-        QString funcName = capitalize(func.m_name);
-
-        ctx.m_out << "class " << service.m_name << funcName
-            << "AsyncValueFetcher: public QObject" << ln
-            << "{" << ln
-            << "    Q_OBJECT" << ln
-            << "public:" << ln
-            << "    explicit " << service.m_name << funcName
-            << "AsyncValueFetcher(QObject * parent = nullptr) :" << ln
-            << "        QObject(parent)" << ln
-            << "    {}" << ln << ln;
-
-        auto responseType = typeToStr(func.m_type, {}, MethodType::TypeName);
-        if (responseType != QStringLiteral("void")) {
-            ctx.m_out << "    " << responseType << " m_value;" << ln;
-        }
-
-        ctx.m_out << "    EverCloudExceptionDataPtr m_exceptionData;"
-            << ln << ln;
-
-        ctx.m_out << "Q_SIGNALS:" << ln
-            << "    void finished();" << ln << ln;
-
-        ctx.m_out << "public Q_SLOTS:" << ln
-            << "    void onFinished(" << ln
-            << "        QVariant value," << ln
-            << "        EverCloudExceptionDataPtr data," << ln
-            << "        IRequestContextPtr ctx)" << ln
-            << "    {" << ln;
-
-        if (responseType != QStringLiteral("void")) {
-            ctx.m_out << "        m_value = qvariant_cast<" << responseType
-                << ">(value);" << ln;
-        }
-        else {
-            ctx.m_out << "        Q_UNUSED(value)" << ln;
-        }
-
-        ctx.m_out << "        Q_UNUSED(ctx)" << ln;
-
-        ctx.m_out << "        m_exceptionData = data;" << ln
-            << "        Q_EMIT finished();" << ln
-            << "    }" << ln
-            << "};" << ln << ln;
-    }
-}
-
 void Generator::generateTestServerPrepareRequestParams(
     const Parser::Function & func,
     const QList<Parser::Enumeration> & enumerations,
@@ -1949,7 +1891,7 @@ void Generator::generateTestServerServiceCall(
 
     ctx.m_out << "            nullptr," << ln
         << "            nullptr," << ln
-        << "            nullRetryPolicy()));" << ln;
+        << "            nullRetryPolicy()));" << ln << ln;
 
     QString indent = QStringLiteral("    ");
     if (!exceptionTypeToCatch.isEmpty())
@@ -1973,7 +1915,7 @@ void Generator::generateTestServerServiceCall(
     }
     else if (callKind == ServiceCallKind::Async)
     {
-        ctx.m_out << indent << "AsyncResult * result = "
+        ctx.m_out << indent << "QFuture<QVariant> result = "
             << serviceName << "->" << func.m_name << "Async(" << ln;
     }
     else
@@ -1993,119 +1935,105 @@ void Generator::generateTestServerServiceCall(
         ctx.m_out << indent << "    " << param.m_name << "," << ln;
     }
 
-    ctx.m_out << indent << "    ctx);" << ln;
+    ctx.m_out << indent << "    ctx);" << ln << ln;
 
     if (callKind == ServiceCallKind::Async)
     {
-        auto funcName = capitalize(func.m_name);
-
-        ctx.m_out << ln << indent << service.m_name << funcName
-            << "AsyncValueFetcher valueFetcher;" << ln;
-
-        ctx.m_out << indent << "QObject::connect(" << ln
-            << indent << "    result," << ln
-            << indent << "    &AsyncResult::finished," << ln
-            << indent << "    &valueFetcher," << ln
-            << indent << "    &"
-            << service.m_name << funcName << "AsyncValueFetcher::onFinished);"
-            << ln << ln;
-
-        ctx.m_out << indent << "QEventLoop loop;" << ln
+        ctx.m_out << indent << "QFutureWatcher<QVariant> watcher;" << ln
+            << indent << "QEventLoop loop;" << ln
             << indent << "QObject::connect(" << ln
-            << indent << "    &valueFetcher," << ln
-            << indent << "    &"
-            << service.m_name << funcName << "AsyncValueFetcher::finished,"
-            << ln
-            << indent << "    &loop," << ln
-            << indent << "    &QEventLoop::quit);" << ln << ln
-            << indent << "loop.exec();" << ln << ln;
+            << indent << indent << "&watcher, "
+            << "&QFutureWatcher<QVariant>::finished, &loop," << ln
+            << indent << indent << "&QEventLoop::quit);" << ln << ln
+            << indent << "watcher.setFuture(result);" << ln
+            << indent << "loop.exec();" << ln;
 
         if (exceptionTypeToCatch.isEmpty())
         {
             if (funcReturnTypeName != QStringLiteral("void")) {
+                ctx.m_out << ln;
                 if (const auto s = structForType(func.m_type, parser); s &&
                     ((shouldGenerateLocalDataMethods(*s) &&
-                      shouldGenerateLocalId(*s)) ||
-                     structContainsFieldsWithLocalId(*s, parser.structures())))
+                        shouldGenerateLocalId(*s)) ||
+                        structContainsFieldsWithLocalId(*s, parser.structures())))
                 {
-                    ctx.m_out << indent
-                        << "compareValuesWithoutLocalIds("
-                        << "valueFetcher.m_value, response);" << ln;
+                    ctx.m_out << indent << "compareValuesWithoutLocalIds("
+                        << "qvariant_cast<" << funcReturnTypeName
+                        << ">(result.result()), response);" << ln;
                 }
                 else if (const auto listType =
-                         std::dynamic_pointer_cast<Parser::ListType>(func.m_type))
+                            std::dynamic_pointer_cast<Parser::ListType>(func.m_type))
                 {
                     if (const auto s =
                         structForType(listType->m_valueType, parser); s &&
                         ((shouldGenerateLocalDataMethods(*s) &&
-                          shouldGenerateLocalId(*s)) ||
-                         structContainsFieldsWithLocalId(*s, parser.structures())))
+                            shouldGenerateLocalId(*s)) ||
+                            structContainsFieldsWithLocalId(*s, parser.structures())))
                     {
                         ctx.m_out << indent
                             << "compareListValuesWithoutLocalIds("
-                            << "valueFetcher.m_value, response);" << ln;
+                            << "qvariant_cast<" << funcReturnTypeName
+                            << ">(result.result()), response);" << ln;
                     }
                     else
                     {
                         ctx.m_out << indent
-                            << "QVERIFY(valueFetcher.m_value == response);"
-                            << ln;
+                            << "QVERIFY(qvariant_cast<" << funcReturnTypeName
+                            << ">(result.result()) == response);" << ln;
                     }
                 }
                 else if (const auto setType =
-                         std::dynamic_pointer_cast<Parser::SetType>(func.m_type))
+                            std::dynamic_pointer_cast<Parser::SetType>(func.m_type))
                 {
                     if (const auto s =
                         structForType(setType->m_valueType, parser); s &&
                         (shouldGenerateLocalDataMethods(*s) ||
-                         structContainsFieldsWithLocalId(*s, parser.structures())))
+                            structContainsFieldsWithLocalId(*s, parser.structures())))
                     {
                         ctx.m_out << indent
                             << "compareSetValuesWithoutLocalIds("
-                            << "valueFetcher.m_value, response);" << ln;
+                            << "qvariant_cast<" << funcReturnTypeName
+                            << ">(result.result()), response);" << ln;
                     }
                     else
                     {
                         ctx.m_out << indent
-                            << "QVERIFY(valueFetcher.m_value == response);"
-                            << ln;
+                            << "QVERIFY(qvariant_cast<" << funcReturnTypeName
+                            << ">(result.result()) == response);" << ln;
                     }
                 }
                 else if (const auto mapType =
-                         std::dynamic_pointer_cast<Parser::MapType>(func.m_type))
+                            std::dynamic_pointer_cast<Parser::MapType>(func.m_type))
                 {
                     if (const auto s =
                         structForType(mapType->m_valueType, parser); s &&
                         (shouldGenerateLocalDataMethods(*s) ||
-                         structContainsFieldsWithLocalId(*s, parser.structures())))
+                            structContainsFieldsWithLocalId(*s, parser.structures())))
                     {
                         ctx.m_out << indent
                             << "compareMapValuesWithoutLocalIds("
-                            << "valueFetcher.m_value, response);" << ln;
+                            << "qvariant_cast<" << funcReturnTypeName
+                            << ">(result.result()), response);" << ln;
                     }
                     else
                     {
                         ctx.m_out << indent
-                            << "QVERIFY(valueFetcher.m_value == response);"
-                            << ln;
+                            << "QVERIFY(qvariant_cast<" << funcReturnTypeName
+                            << ">(result.result()) == response);" << ln;
                     }
                 }
                 else
                 {
                     ctx.m_out << indent
-                        << "QVERIFY(valueFetcher.m_value == response);" << ln;
+                        << "QVERIFY(qvariant_cast<" << funcReturnTypeName
+                        << ">(result.result()) == response);" << ln;
                 }
             }
-
-            ctx.m_out << indent << "QVERIFY(valueFetcher.m_exceptionData.get() == nullptr);"
-                << ln;
         }
         else
         {
-            ctx.m_out << indent << "QVERIFY(valueFetcher.m_exceptionData.get() != nullptr);"
-                << ln;
-            ctx.m_out << indent << "valueFetcher.m_exceptionData->throwException();"
-                << ln;
+            ctx.m_out << ln;
+            ctx.m_out << indent << "result.waitForFinished();" << ln;
         }
     }
 
@@ -4759,12 +4687,13 @@ void Generator::generateServiceHeader(
         QStringLiteral("services"));
 
     QStringList additionalIncludes = QStringList()
-        << QStringLiteral("<qevercloud/AsyncResult.h>")
         << QStringLiteral("<qevercloud/DurableService.h>")
         << QStringLiteral("<qevercloud/RequestContext.h>")
         << QStringLiteral("<qevercloud/Constants.h>")
         << QStringLiteral("<qevercloud/Types.h>")
-        << QStringLiteral("<QObject>");
+        << QStringLiteral("<QFuture>")
+        << QStringLiteral("<QObject>")
+        << QStringLiteral("<QVariant>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
@@ -4856,7 +4785,8 @@ void Generator::generateServiceHeader(
 
         ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
             << " @endlink */" << ln;
-        ctx.m_out << "    virtual AsyncResult * " << func.m_name << "Async(" << ln;
+        ctx.m_out << "    virtual QFuture<QVariant> " << func.m_name << "Async("
+            << ln;
         for(const auto & param: qAsConst(func.m_params))
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
@@ -4919,6 +4849,7 @@ void Generator::generateServiceCpp(
 
     auto additionalIncludes = QStringList()
         << QStringLiteral("../Types_io.h")
+        << QStringLiteral("../Http.h")
         << QStringLiteral("<qevercloud/utility/Log.h>")
         << QStringLiteral("<qevercloud/DurableService.h>")
         << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
@@ -5229,7 +5160,9 @@ void Generator::generateTestServerCpp(
         << (QStringLiteral("<qevercloud/services/") + service.m_name +
             QStringLiteral("Server.h>"));
 
-    additionalIncludes << QStringLiteral("<QTcpServer>")
+    additionalIncludes << QStringLiteral("QEventLoop")
+        << QStringLiteral("<QFutureWatcher>")
+        << QStringLiteral("<QTcpServer>")
         << QStringLiteral("<QtTest/QtTest>")
         << QStringLiteral("../ClearLocalIds.h");
 
@@ -5327,7 +5260,6 @@ void Generator::generateTestServerCpp(
         << "{}" << ln << ln;
 
     generateTestServerHelperClassDefinition(service, ctx);
-    generateTestServerAsyncValueFetcherClassDefinition(service, ctx);
 
     const auto & enumerations = parser.enumerations();
     for(const auto & func: service.m_functions)
@@ -6500,7 +6432,7 @@ void Generator::generateServiceClassDeclaration(
         ctx.m_out << "        IRequestContextPtr ctx = {}";
         ctx.m_out << ") override;" << ln << ln;
 
-        ctx.m_out << "    AsyncResult * " << func.m_name
+        ctx.m_out << "    QFuture<QVariant> " << func.m_name
             << "Async(" << ln;
         for(const auto & param: qAsConst(func.m_params))
         {
@@ -6843,7 +6775,7 @@ void Generator::generateServiceClassDefinition(
 
         ctx.m_out << "}" << ln << ln;
 
-        ctx.m_out << "AsyncResult * " << service.m_name << "::" << f.m_name
+        ctx.m_out << "QFuture<QVariant> " << service.m_name << "::" << f.m_name
             << "Async(" << ln;
         for(const auto & param : f.m_params)
         {
@@ -6905,7 +6837,7 @@ void Generator::generateServiceClassDefinition(
             }
         }
         ctx.m_out << ");" << ln << ln
-            << "    return new AsyncResult(" << ln
+            << "    return sendRequest(" << ln
             << "        m_url," << ln
             << "        params," << ln
             << "        ctx," << ln
@@ -7058,7 +6990,7 @@ void Generator::generateDurableServiceClassDefinition(
 
         // Asynchronous version
 
-        ctx.m_out << "AsyncResult * Durable" << service.m_name << "::"
+        ctx.m_out << "QFuture<QVariant> Durable" << service.m_name << "::"
             << func.m_name << "Async(" << ln;
         for(const auto & param : func.m_params)
         {

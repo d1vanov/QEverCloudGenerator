@@ -210,9 +210,6 @@ private:
     void generateTestServerHelperClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);
 
-    void generateTestServerAsyncValueFetcherClassDefinition(
-        const Parser::Service & service, OutputFileContext & ctx);
-
     void generateTestServerPrepareRequestParams(
         const Parser::Function & func,
         const QList<Parser::Enumeration> & enumerations,

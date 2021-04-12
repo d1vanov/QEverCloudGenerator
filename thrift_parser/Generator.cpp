@@ -1290,8 +1290,7 @@ void Generator::generateTestServerHelperClassDefinition(
         if (responseType != QStringLiteral("void")) {
             ctx.m_out << "        " << responseType << " value," << ln;
         }
-        ctx.m_out << "        EverCloudExceptionDataPtr "
-            << "exceptionData);" << ln << ln;
+        ctx.m_out << "        std::exception_ptr e);" << ln << ln;
 
         ctx.m_out << "public Q_SLOTS:" << ln
             << "    void on" << funcName << "RequestReceived(" << ln;
@@ -1352,10 +1351,10 @@ void Generator::generateTestServerHelperClassDefinition(
         }
 
         ctx.m_out << "                "
-            << "EverCloudExceptionDataPtr());" << ln
+            << "std::exception_ptr{});" << ln
             << "        }" << ln;
 
-        ctx.m_out << "        catch(const EverCloudException & e)" << ln
+        ctx.m_out << "        catch(const std::exception &)" << ln
             << "        {" << ln;
 
         ctx.m_out << "            Q_EMIT " << func.m_name << "RequestReady("
@@ -1366,7 +1365,7 @@ void Generator::generateTestServerHelperClassDefinition(
         }
 
         ctx.m_out << "                "
-            << "e.exceptionData());" << ln
+            << "std::current_exception());" << ln
             << "        }" << ln;
 
         ctx.m_out << "    }" << ln << ln;
@@ -3819,10 +3818,6 @@ void Generator::generateTypeHeader(
         ctx.m_out << indent << "void raise() const override;" << ln;
         ctx.m_out << indent << "[[nodiscard]] " << s.m_name << " * clone() "
             << "const override;" << ln;
-
-        ctx.m_out << indent
-            << "[[nodiscard]] EverCloudExceptionDataPtr exceptionData() const "
-            << "override;" << ln;
     }
 
     ctx.m_out << ln;
@@ -3861,11 +3856,6 @@ void Generator::generateTypeHeader(
     ctx.m_out << "[[nodiscard]] bool operator!=(const " << s.m_name
         << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln
         << ln;
-
-    const bool isException = m_allExceptions.contains(s.m_name);
-    if (isException) {
-        generateExceptionDataClassDeclaration(s, ctx);
-    }
 
     QStringList extraLinesOutsideNamespace;
     extraLinesOutsideNamespace.reserve(1);
@@ -4072,11 +4062,6 @@ void Generator::generateTypeCpp(
         generateExceptionClassWhatMethodDefinition(s, ctx);
         generateExceptionClassRaiseMethodDefinition(s, ctx);
         generateExceptionClassCloneMethodDefinition(s, ctx);
-        generateExceptionClassExceptionDataMethodDefinition(s, ctx);
-
-        generateExceptionDataClassConstructorWithArgsDefinition(s, ctx);
-        generateExceptionDataClassDestructorDefinition(s, ctx);
-        generateExceptionDataClassThrowExceptionMethodDefinition(s, ctx);
     }
 
     ctx.m_out << "bool operator==(const " << s.m_name
@@ -4312,94 +4297,6 @@ void Generator::generateTypeImplHeader(
 
     ctx.m_out << "};" << ln << ln;
 
-    if (m_allExceptions.contains(s.m_name))
-    {
-        ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name
-            << "Data::Impl final:" << ln
-            << indent << "public QSharedData" << ln
-            << "{" << ln
-            << "public:" << ln;
-
-        ctx.m_out << indent << "Impl() = default;" << ln
-            << indent << "Impl(const " << s.m_name << "Data::Impl & other)"
-            << " = default;" << ln
-            << indent << "Impl(" << s.m_name << "Data::Impl && other) noexcept"
-            << " = default;" << ln << ln;
-
-        if (!s.m_fields.isEmpty())
-        {
-            ctx.m_out << indent << "explicit Impl(" << ln;
-
-            for (const auto & f: s.m_fields)
-            {
-                ctx.m_out << indent << indent;
-
-                if (f.m_required == Parser::Field::RequiredFlag::Optional)
-                {
-                    ctx.m_out << "std::optional<";
-                }
-
-                ctx.m_out << typeToStr(f.m_type);
-
-                if (f.m_required == Parser::Field::RequiredFlag::Optional)
-                {
-                    ctx.m_out << ">";
-                }
-
-                ctx.m_out << " " << f.m_name;
-
-                if (&f != &(s.m_fields.back())) {
-                    ctx.m_out << "," << ln;
-                }
-                else {
-                    ctx.m_out << ") :" << ln;
-                }
-            }
-
-            for (const auto & f: s.m_fields)
-            {
-                ctx.m_out << indent << indent << "m_" << f.m_name
-                    << "(std::move(" << f.m_name << "))";
-
-                if (&f != &(s.m_fields.back())) {
-                    ctx.m_out << "," << ln;
-                }
-                else {
-                    ctx.m_out << ln;
-                }
-            }
-
-            ctx.m_out << indent << "{}" << ln << ln;
-        }
-
-        ctx.m_out << indent << s.m_name << "Data::Impl & operator=(const "
-            << s.m_name << "Data::Impl & other) = delete;" << ln
-            << indent << s.m_name << "Data::Impl & operator=("
-            << s.m_name << "Data::Impl && other) = delete;" << ln << ln;
-
-        ctx.m_out << indent << "~Impl() noexcept = default;" << ln
-            << ln;
-
-        for (const auto & f: s.m_fields)
-        {
-            ctx.m_out << indent;
-
-            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                ctx.m_out << "std::optional<";
-            }
-
-            ctx.m_out << typeToStr(f.m_type);
-
-            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                ctx.m_out << ">";
-            }
-
-            ctx.m_out << " m_" << f.m_name << ";" << ln;
-        }
-
-        ctx.m_out << "};" << ln << ln;
-    }
-
     writeHeaderFooter(ctx.m_out, fileName);
 }
 
@@ -4447,168 +4344,6 @@ void Generator::generateTypeImplCpp(
     writeNamespaceEnd(ctx.m_out);
 }
 
-void Generator::generateExceptionDataClassDeclaration(
-    const Parser::Structure & s, OutputFileContext & ctx)
-{
-    const QString indent = QStringLiteral("    ");
-
-    ctx.m_out << "/**" << ln
-        << " * Asynchronous API counterpart of " << s.m_name
-        << ". See EverCloudExceptionData" << ln
-        << " * for more details." << ln
-        << " */" << ln;
-
-    ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name
-        << "Data: public EvernoteExceptionData" << ln
-        << "{" << ln
-        << indent << "Q_OBJECT" << ln
-        << indent << "Q_DISABLE_COPY(" << s.m_name << "Data)" << ln
-        << "public:" << ln;
-
-    ctx.m_out << indent << "explicit " << s.m_name << "Data(";
-
-    if (s.m_fields.isEmpty())
-    {
-        ctx.m_out << "QString error);" << ln;
-    }
-    else
-    {
-        ctx.m_out << ln;
-        ctx.m_out << indent << indent << "QString error," << ln;
-
-        for (const auto & f: s.m_fields)
-        {
-            ctx.m_out << indent << indent;
-
-            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                ctx.m_out << "std::optional<";
-            }
-
-            ctx.m_out << typeToStr(f.m_type);
-
-            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-                ctx.m_out << ">";
-            }
-
-            ctx.m_out << " " << f.m_name;
-
-            if (&f != &(s.m_fields.back())) {
-                ctx.m_out << "," << ln;
-            }
-            else {
-                ctx.m_out << ");" << ln;
-            }
-        }
-    }
-
-    ctx.m_out << ln;
-
-    ctx.m_out << indent << "~" << s.m_name << "Data() noexcept override;" << ln
-        << ln;
-
-    for (const auto & f: s.m_fields) {
-        generateClassAccessoryMethodsForFieldDeclarations(f, ctx, indent);
-        ctx.m_out << ln;
-    }
-
-    ctx.m_out << indent << "virtual void throwException() const override;"
-        << ln << ln;
-
-    ctx.m_out << "private:" << ln
-        << indent << "class Impl;" << ln
-        << indent << "QSharedDataPointer<Impl> d;" << ln;
-
-    ctx.m_out << "};" << ln << ln;
-}
-
-void Generator::generateExceptionDataClassConstructorWithArgsDefinition(
-    const Parser::Structure & s, OutputFileContext & ctx)
-{
-    constexpr const char * indent = "    ";
-
-    ctx.m_out << s.m_name << "Data::" << s.m_name << "Data(";
-
-    if (s.m_fields.isEmpty())
-    {
-        ctx.m_out << "QString error) :" << ln
-            << indent << "EvernoteExceptionData(error)," << ln
-            << indent << "d(new " << s.m_name << "Data::Impl)" << ln
-            << "{}" << ln;
-
-        return;
-    }
-
-    ctx.m_out << ln << indent << "QString error," << ln;
-    for (const auto & f: s.m_fields)
-    {
-        ctx.m_out << indent;
-
-        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-            ctx.m_out << "std::optional<";
-        }
-
-        ctx.m_out << typeToStr(f.m_type);
-
-        if (f.m_required == Parser::Field::RequiredFlag::Optional) {
-            ctx.m_out << ">";
-        }
-
-        ctx.m_out << " " << f.m_name;
-
-        if (&f != &(s.m_fields.back())) {
-            ctx.m_out << "," << ln;
-        }
-        else {
-            ctx.m_out << ")";
-        }
-    }
-
-    ctx.m_out << ":" << ln
-        << indent << "EvernoteExceptionData(error)," << ln
-        << indent << "d(new " << s.m_name << "Data::Impl)" << ln
-        << "{" << ln;
-
-    for (const auto & f: s.m_fields) {
-        ctx.m_out << indent << "d->m_" << f.m_name << " = std::move("
-            << f.m_name << ");" << ln;
-    }
-
-    ctx.m_out << "}" << ln << ln;
-
-    Parser::Structure sData = s;
-    sData.m_name = s.m_name + QStringLiteral("Data");
-
-    for (const auto & f: s.m_fields) {
-        generateClassAccessoryMethodsForFieldDefinitions(
-            sData, f, ctx);
-    }
-}
-
-void Generator::generateExceptionDataClassDestructorDefinition(
-    const Parser::Structure & s, OutputFileContext & ctx)
-{
-    ctx.m_out << s.m_name << "Data::~" << s.m_name << "Data() noexcept {}"
-        << ln << ln;
-}
-
-void Generator::generateExceptionDataClassThrowExceptionMethodDefinition(
-    const Parser::Structure & s, OutputFileContext & ctx)
-{
-    constexpr const char * indent = "    ";
-
-    ctx.m_out << "void " << s.m_name << "Data::throwException() const" << ln
-        << "{" << ln
-        << indent << s.m_name << " e;" << ln;
-
-    for (const auto & f: s.m_fields) {
-        ctx.m_out << indent << "e.set" << capitalize(f.m_name)
-            << "(d->m_" << f.m_name << ");" << ln;
-    }
-
-    ctx.m_out << indent << "throw e;" << ln
-        << "}" << ln << ln;
-}
-
 void Generator::generateExceptionClassWhatMethodDefinition(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
@@ -4646,32 +4381,6 @@ void Generator::generateExceptionClassCloneMethodDefinition(
     }
 
     ctx.m_out << indent << "return e.release();" << ln;
-
-    ctx.m_out << "}" << ln << ln;
-}
-
-void Generator::generateExceptionClassExceptionDataMethodDefinition(
-    const Parser::Structure & s, OutputFileContext & ctx)
-{
-    constexpr const char * indent = "    ";
-
-    ctx.m_out << "EverCloudExceptionDataPtr " << s.m_name
-        << "::exceptionData() const" << ln
-        << "{" << ln
-        << indent << "return std::make_shared<" << s.m_name << "Data>("
-        << ln << indent << indent << "QString::fromUtf8(what())," << ln;
-
-    for (const auto & f: s.m_fields)
-    {
-        ctx.m_out << indent << indent << f.m_name << "()";
-
-        if (&f != &(s.m_fields.back())) {
-            ctx.m_out << "," << ln;
-        }
-        else {
-            ctx.m_out << ");" << ln;
-        }
-    }
 
     ctx.m_out << "}" << ln << ln;
 }
@@ -5028,6 +4737,7 @@ void Generator::generateServerHeader(
         << QStringLiteral("<qevercloud/Constants.h>")
         << QStringLiteral("<qevercloud/Types.h>")
         << QStringLiteral("<QObject>")
+        << QStringLiteral("<exception>")
         << QStringLiteral("<functional>");
     sortIncludes(additionalIncludes);
 
@@ -6963,7 +6673,7 @@ void Generator::generateDurableServiceClassDefinition(
             << "        std::move(request), ctx);" << ln << ln;
 
         ctx.m_out << "    if (result.second) {" << ln
-            << "        result.second->throwException();" << ln
+            << "        std::rethrow_exception(result.second);" << ln
             << "    }" << ln << ln;
 
         ctx.m_out << "    return";
@@ -7165,8 +6875,7 @@ void Generator::generateServerClassDeclaration(
         if (responseType != QStringLiteral("void")) {
             ctx.m_out << "        " << responseType << " value," << ln;
         }
-        ctx.m_out << "        EverCloudExceptionDataPtr "
-            << "exceptionData);" << ln << ln;
+        ctx.m_out << "        std::exception_ptr e);" << ln << ln;
     }
 
     ctx.m_out << "};" << ln << ln;
@@ -7313,7 +7022,7 @@ void Generator::generateServerClassDefinition(
         if (responseTypeName != QStringLiteral("void")) {
             ctx.m_out << "    " << responseTypeName << " value," << ln;
         }
-        ctx.m_out << "    EverCloudExceptionDataPtr exceptionData)"
+        ctx.m_out << "    std::exception_ptr e)"
             << ln;
 
         ctx.m_out << "{" << ln;
@@ -7321,11 +7030,11 @@ void Generator::generateServerClassDefinition(
         ctx.m_out << "    ThriftBinaryBufferWriter writer;" << ln
             << "    qint32 cseqid = 0;" << ln << ln;
 
-        ctx.m_out << "    if (exceptionData)" << ln
+        ctx.m_out << "    if (e)" << ln
             << "    {" << ln
             << "        try" << ln
             << "        {" << ln
-            << "            exceptionData->throwException();" << ln
+            << "            std::rethrow_exception(e);" << ln
             << "        }" << ln
             << "        catch(const ThriftException & exception)" << ln
             << "        {" << ln
@@ -7356,12 +7065,12 @@ void Generator::generateServerClassDefinition(
 
         if (!func.m_throws.isEmpty())
         {
-            ctx.m_out << "    if (exceptionData)" << ln
+            ctx.m_out << "    if (e)" << ln
                 << "    {" << ln;
 
             ctx.m_out << "        try" << ln
                 << "        {" << ln
-                << "            exceptionData->throwException();" << ln
+                << "            std::rethrow_exception(e);" << ln
                 << "        }" << ln;
 
             for(const auto & th: func.m_throws)

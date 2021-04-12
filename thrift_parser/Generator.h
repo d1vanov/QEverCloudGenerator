@@ -99,18 +99,6 @@ private:
         const Parser::Structure & s, const QString & outPath,
         const QString & fileSection);
 
-    void generateExceptionDataClassDeclaration(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
-    void generateExceptionDataClassConstructorWithArgsDefinition(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
-    void generateExceptionDataClassDestructorDefinition(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
-    void generateExceptionDataClassThrowExceptionMethodDefinition(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
     void generateExceptionClassWhatMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 
@@ -118,9 +106,6 @@ private:
         const Parser::Structure & s, OutputFileContext & ctx);
 
     void generateExceptionClassCloneMethodDefinition(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
-    void generateExceptionClassExceptionDataMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 
     void generateServiceHeader(

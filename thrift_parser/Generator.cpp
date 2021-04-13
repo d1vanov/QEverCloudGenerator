@@ -2763,7 +2763,8 @@ void Generator::generateConstantsHeader(
     const QString fileName = QStringLiteral("Constants.h");
     OutputFileContext ctx(fileName, outPath, OutputFileType::Interface);
 
-    writeHeaderHeader(ctx, fileName);
+    writeHeaderHeader(
+        ctx, fileName, QStringList() << QStringLiteral("<QtGlobal>"));
 
     ctx.m_out << blockSeparator << ln << ln;
 
@@ -3850,10 +3851,10 @@ void Generator::generateTypeHeader(
         << indent << "QSharedDataPointer<Impl> d;" << ln
         << "};" << ln << ln;
 
-    ctx.m_out << "[[nodiscard]] bool operator==(const " << s.m_name
+    ctx.m_out << "[[nodiscard]] QEVERCLOUD_EXPORT bool operator==(const " << s.m_name
         << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln;
 
-    ctx.m_out << "[[nodiscard]] bool operator!=(const " << s.m_name
+    ctx.m_out << "[[nodiscard]] QEVERCLOUD_EXPORT bool operator!=(const " << s.m_name
         << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln
         << ln;
 

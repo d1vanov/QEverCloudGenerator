@@ -3557,6 +3557,8 @@ void Generator::generateExceptionsFwdHeader(
     ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_EXCEPTIONS_FWD_H" << ln;
     ctx.m_out << "#define QEVERCLOUD_GENERATED_EXCEPTIONS_FWD_H" << ln << ln;
 
+    ctx.m_out << "namespace qevercloud {" << ln << ln;
+
     const auto & exceptions = parser.exceptions();
     QStringList exceptionClasses;
     exceptionClasses.reserve(exceptions.size() + 6);
@@ -3576,6 +3578,8 @@ void Generator::generateExceptionsFwdHeader(
     for (const auto & exceptionClass: qAsConst(exceptionClasses)) {
         ctx.m_out << "class " << exceptionClass << ";" << ln;
     }
+
+    ctx.m_out << ln << "} // namespace qevercloud" << ln << ln;
 
     ctx.m_out << ln;
     ctx.m_out << "#endif // QEVERCLOUD_GENERATED_EXCEPTIONS_FWD_H" << ln;
@@ -3622,6 +3626,8 @@ void Generator::generateTypesFwdHeader(Parser & parser, const QString & outPath)
     ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_TYPES_FWD_H" << ln;
     ctx.m_out << "#define QEVERCLOUD_GENERATED_TYPES_FWD_H" << ln << ln;
 
+    ctx.m_out << "namespace qevercloud {" << ln << ln;
+
     const auto & structures = parser.structures();
     QStringList types;
     types.reserve(structures.size());
@@ -3634,6 +3640,8 @@ void Generator::generateTypesFwdHeader(Parser & parser, const QString & outPath)
     for (const auto & type: qAsConst(types)) {
         ctx.m_out << "class " << type << ";" << ln;
     }
+
+    ctx.m_out << ln << "} // namespace qevercloud" << ln << ln;
 
     ctx.m_out << ln;
     ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_FWD_H" << ln;

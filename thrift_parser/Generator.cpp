@@ -3816,7 +3816,22 @@ void Generator::generateTypeHeader(
     generateClassAccessoryMethodsForAuxiliaryFields(s, ctx, indent);
 
     ctx.m_out << indent
-        << "void print(QTextStream & strm) const override;" << ln;
+        << "void print(QTextStream & strm) const override;" << ln << ln;
+
+    ctx.m_out << indent
+        << "friend QEVERCLOUD_EXPORT QTextStream & operator<<(" << ln
+        << indent << indent << "QTextStream & strm, const "
+        << s.m_name << " & " << decapitalize(s.m_name) << ");" << ln << ln;
+
+    ctx.m_out << indent
+        << "friend QEVERCLOUD_EXPORT QDebug & operator<<(" << ln
+        << indent << indent << "QDebug & dbg, const "
+        << s.m_name << " & " << decapitalize(s.m_name) << ");" << ln << ln;
+
+    ctx.m_out << indent
+        << "friend QEVERCLOUD_EXPORT std::ostream & operator<<(" << ln
+        << indent << indent << "std::ostream & strm, const "
+        << s.m_name << " & " << decapitalize(s.m_name) << ");" << ln;
 
     if (m_allExceptions.contains(s.m_name)) {
         ctx.m_out << ln;
@@ -4072,6 +4087,30 @@ void Generator::generateTypeCpp(
         generateExceptionClassRaiseMethodDefinition(s, ctx);
         generateExceptionClassCloneMethodDefinition(s, ctx);
     }
+
+    ctx.m_out << "QTextStream & operator<<(QTextStream & strm, const "
+        << s.m_name << " & " << decapitalize(s.m_name) << ")" << ln
+        << "{" << ln
+        << indent << "strm << static_cast<const Printable&>("
+        << decapitalize(s.m_name) << ");" << ln
+        << indent << "return strm;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "QDebug & operator<<(QDebug & dbg, const "
+        << s.m_name << " & " << decapitalize(s.m_name) << ")" << ln
+        << "{" << ln
+        << indent << "dbg << static_cast<const Printable&>("
+        << decapitalize(s.m_name) << ");" << ln
+        << indent << "return dbg;" << ln
+        << "}" << ln << ln;
+
+    ctx.m_out << "std::ostream & operator<<(std::ostream & strm, const "
+        << s.m_name << " & " << decapitalize(s.m_name) << ")" << ln
+        << "{" << ln
+        << indent << "strm << static_cast<const Printable&>("
+        << decapitalize(s.m_name) << ");" << ln
+        << indent << "return strm;" << ln
+        << "}" << ln << ln;
 
     ctx.m_out << "bool operator==(const " << s.m_name
         << " & lhs, const " << s.m_name << " & rhs) noexcept" << ln

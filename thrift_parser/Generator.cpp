@@ -1188,6 +1188,12 @@ void Generator::writeTypeImplPrintDefinition(
                     << "->size() << \" bytes>\" << \"\\n\";" << ln
                     << indent << indent << "}" << ln;
             }
+            else if (s.m_name == QStringLiteral("Note") &&
+                     f.m_name == QStringLiteral("contentHash"))
+            {
+                out << ln << indent << indent << indent << "<< m_"
+                    << f.m_name << "->toHex() << \"\\n\";" << ln;
+            }
             else
             {
                 out << ln << indent << indent << indent << "<< *m_"

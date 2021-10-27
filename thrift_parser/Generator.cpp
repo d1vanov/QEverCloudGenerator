@@ -1168,12 +1168,6 @@ void Generator::writeTypeImplPrintDefinition(
                     << indent << indent << "strm << \"    }\\n\";" << ln;
             }
             else if (s.m_name == QStringLiteral("Data") &&
-                     f.m_name == QStringLiteral("bodyHash"))
-            {
-                out << ln << indent << indent << indent << "<< m_"
-                    << f.m_name << "->toHex() << \"\\n\";" << ln;
-            }
-            else if (s.m_name == QStringLiteral("Data") &&
                      f.m_name == QStringLiteral("body"))
             {
                 out << ";" << ln
@@ -1188,8 +1182,8 @@ void Generator::writeTypeImplPrintDefinition(
                     << "->size() << \" bytes>\" << \"\\n\";" << ln
                     << indent << indent << "}" << ln;
             }
-            else if (s.m_name == QStringLiteral("Note") &&
-                     f.m_name == QStringLiteral("contentHash"))
+            else if (std::dynamic_pointer_cast<Parser::ByteArrayType>(f.m_type) &&
+                     f.m_name.endsWith(QStringLiteral("Hash")))
             {
                 out << ln << indent << indent << indent << "<< m_"
                     << f.m_name << "->toHex() << \"\\n\";" << ln;

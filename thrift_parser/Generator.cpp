@@ -1129,11 +1129,11 @@ void Generator::writeTypeImplPrintDefinition(
 
             out << indent << "if (m_" << f.m_name << ") {" << ln
                 << indent << indent << "strm << \"" << indent << f.m_name
-                << " = \"" << ln;
+                << " = \"";
 
             if (mapType)
             {
-                out << indent << indent << indent << "<< \"QMap<"
+                out << ln << indent << indent << indent << "<< \"QMap<"
                     << typeToStr(mapType->m_keyType, {}) << ", "
                     << typeToStr(mapType->m_valueType, {})
                     << "> {\";" << ln
@@ -1147,7 +1147,7 @@ void Generator::writeTypeImplPrintDefinition(
             }
             else if (setType)
             {
-                out << indent << indent << indent << "<< \"QSet<"
+                out << ln << indent << indent << indent << "<< \"QSet<"
                     << typeToStr(setType->m_valueType, {}) << "> {\";" << ln
                     << indent << indent << "for(const auto & v: *m_" << f.m_name
                     << ") {" << ln
@@ -1158,7 +1158,7 @@ void Generator::writeTypeImplPrintDefinition(
             }
             else if (listType)
             {
-                out << indent << indent << indent << "<< \"QList<"
+                out << ln << indent << indent << indent << "<< \"QList<"
                     << typeToStr(listType->m_valueType, {}) << "> {\";" << ln
                     << indent << indent << "for(const auto & v: *m_" << f.m_name
                     << ") {" << ln
@@ -1167,9 +1167,30 @@ void Generator::writeTypeImplPrintDefinition(
                     << indent << indent << "}" << ln
                     << indent << indent << "strm << \"    }\\n\";" << ln;
             }
+            else if (s.m_name == QStringLiteral("Data") &&
+                     f.m_name == QStringLiteral("bodyHash"))
+            {
+                out << ln << indent << indent << indent << "<< m_"
+                    << f.m_name << "->toHex() << \"\\n\";" << ln;
+            }
+            else if (s.m_name == QStringLiteral("Data") &&
+                     f.m_name == QStringLiteral("body"))
+            {
+                out << ";" << ln
+                    << indent << indent << "if (m_" << f.m_name
+                    << "->size() <= 1024) {" << ln
+                    << indent << indent << indent << "strm << m_"
+                    << f.m_name << "->toHex() << \"\\n\";" << ln
+                    << indent << indent << "}" << ln
+                    << indent << indent << "else {" << ln
+                    << indent << indent << indent
+                    << "strm << \"<binary data, \" << m_" << f.m_name
+                    << "->size() << \" bytes>\" << \"\\n\";" << ln
+                    << indent << indent << "}" << ln;
+            }
             else
             {
-                out << indent << indent << indent << "<< *m_"
+                out << ln << indent << indent << indent << "<< *m_"
                     << f.m_name << " << \"\\n\";" << ln;
             }
 

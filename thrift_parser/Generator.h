@@ -128,6 +128,17 @@ private:
     void generateExceptionBuildersFwdHeader(
         const Parser & parser, const QString & outPath);
 
+    void generateTypeBuildersTestHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateTypeBuildersTestCpp(
+        const Parser & parser, const QString & outPath);
+
+    void generateTypeBuildersTestMethod(
+        const Parser::Structure & s,
+        const QList<Parser::Enumeration> & enumerations,
+        OutputFileContext & ctx, bool isException);
+
     void generateServiceHeader(
         const Parser::Service & service, const QString & outPath);
 

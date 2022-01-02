@@ -5240,6 +5240,396 @@ void Generator::generateExceptionBuildersFwdHeader(
         << ln;
 }
 
+void Generator::generateTypeBuildersTestHeader(
+    const Parser & parser, const QString & outPath)
+{
+    const QString fileName =
+        QStringLiteral("TestTypeBuilders.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Test);
+
+    const auto additionalIncludes =
+        QStringList{} << QStringLiteral("<QObject>");
+
+    writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
+
+    ctx.m_out << blockSeparator << ln << ln;
+
+    ctx.m_out << "class TypeBuildersTester: public QObject" << ln
+        << "{" << ln
+        << "    Q_OBJECT" << ln
+        << "public:" << ln
+        << "    explicit TypeBuildersTester(QObject * parent = "
+        << "nullptr);" << ln << ln;
+
+    ctx.m_out << "private Q_SLOTS:" << ln;
+
+    for (const auto & s: parser.structures()) {
+        ctx.m_out << "    void shouldBuild" << s.m_name << "();" << ln;
+    }
+
+    ctx.m_out << ln;
+
+    for (const auto & s: parser.exceptions()) {
+        ctx.m_out << "    void shouldBuild" << s.m_name << "();" << ln;
+    }
+
+    ctx.m_out << "};" << ln << ln;
+
+    writeHeaderFooter(ctx.m_out, fileName);
+}
+
+void Generator::generateTypeBuildersTestCpp(
+    const Parser & parser, const QString & outPath)
+{
+    auto additionalIncludes = QStringList{}
+        << QStringLiteral("RandomDataGenerators.h")
+        << QStringLiteral("<QtTest/QtTest>");
+
+    for (const auto & s: parser.structures()) {
+        additionalIncludes << QStringLiteral("<qevercloud/types/builders/") +
+            s.m_name + QStringLiteral("Builder.h>");
+    }
+
+    for (const auto & e: parser.exceptions()) {
+        additionalIncludes
+            << QStringLiteral("<qevercloud/exceptions/builders/") + e.m_name +
+            QStringLiteral("Builder.h>");
+    }
+
+    sortIncludes(additionalIncludes);
+
+    const QString fileName =
+        QStringLiteral("TestTypeBuilders.cpp");
+
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+    writeHeaderBody(
+        ctx,
+        QStringLiteral("TestTypeBuilders.h"),
+        additionalIncludes,
+        HeaderKind::Test);
+
+    ctx.m_out << "TypeBuildersTester::TypeBuildersTester(QObject * parent) :"
+        << ln << "    QObject(parent)" << ln
+        << "{}" << ln << ln;
+
+    const auto & enumerations = parser.enumerations();
+
+    for (const auto & s: qAsConst(parser.structures())) {
+        generateTypeBuildersTestMethod(s, enumerations, ctx, false);
+    }
+
+    for (const auto & s: qAsConst(parser.exceptions())) {
+        generateTypeBuildersTestMethod(s, enumerations, ctx, true);
+    }
+
+    writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateTypeBuildersTestMethod(
+    const Parser::Structure & s,
+    const QList<Parser::Enumeration> & enumerations,
+    OutputFileContext & ctx, bool isException)
+{
+    ctx.m_out << "void TypeBuildersTester::shouldBuild" << s.m_name
+        << "()" << ln
+        << "{" << ln;
+
+    constexpr const char * indent = "    ";
+    ctx.m_out << indent << s.m_name << " value;" << ln;
+
+    for (const auto & field: s.m_fields)
+    {
+        if (const auto * mapType =
+            dynamic_cast<Parser::MapType*>(field.m_type.get()))
+        {
+            ctx.m_out << ln;
+
+            QString keyTypeName =
+                typeToStr(mapType->m_keyType, field.m_name);
+
+            if (const auto * identifierType =
+                dynamic_cast<Parser::IdentifierType*>(
+                    mapType->m_keyType.get()))
+            {
+                keyTypeName = clearInclude(identifierType->m_identifier);
+            }
+
+            keyTypeName = aliasedTypeName(keyTypeName);
+
+            QString valueTypeName =
+                typeToStr(mapType->m_valueType, field.m_name);
+
+            if (const auto * identifierType =
+                dynamic_cast<Parser::IdentifierType*>(
+                    mapType->m_valueType.get()))
+            {
+                valueTypeName = clearInclude(identifierType->m_identifier);
+            }
+
+            valueTypeName = aliasedTypeName(valueTypeName);
+
+            ctx.m_out << indent
+                << typeToStr(field.m_type, field.m_name)
+                << " " << field.m_name << ";" << ln;
+
+            ctx.m_out << indent << field.m_name << "[";
+
+            auto enumIt = std::find_if(
+                enumerations.begin(),
+                enumerations.end(),
+                [&] (const Parser::Enumeration & e)
+                {
+                    return e.m_name == keyTypeName;
+                });
+            if (enumIt != enumerations.end())
+            {
+                const Parser::Enumeration & e = *enumIt;
+                if (e.m_values.isEmpty()) {
+                    throw std::runtime_error(
+                        "Detected enumeration without items: " +
+                        e.m_name.toStdString());
+                }
+
+                ctx.m_out << keyTypeName
+                    << "::" << e.m_values[0].first;
+            }
+            else
+            {
+                ctx.m_out << getGenerateRandomValueFunction(keyTypeName);
+            }
+
+            ctx.m_out << "] = ";
+
+            enumIt = std::find_if(
+                enumerations.begin(),
+                enumerations.end(),
+                [&] (const Parser::Enumeration & e)
+                {
+                    return e.m_name == valueTypeName;
+                });
+            if (enumIt != enumerations.end())
+            {
+                const Parser::Enumeration & e = *enumIt;
+                if (e.m_values.isEmpty()) {
+                    throw std::runtime_error(
+                        "Detected enumeration without items: " +
+                        e.m_name.toStdString());
+                }
+
+                ctx.m_out << valueTypeName
+                    << "::" << e.m_values[0].first;
+            }
+            else
+            {
+                ctx.m_out << getGenerateRandomValueFunction(valueTypeName);
+            }
+
+            ctx.m_out << ";" << ln;
+
+            ctx.m_out << indent << "value.set" << capitalize(field.m_name)
+                << "(std::move(" << field.m_name << "));" << ln << ln;
+            continue;
+        }
+
+        QString fieldTypeName;
+        if (const auto * listType =
+            dynamic_cast<Parser::ListType*>(field.m_type.get()))
+        {
+            fieldTypeName =
+                typeToStr(listType->m_valueType, field.m_name);
+
+            if (const auto * identifierType =
+                dynamic_cast<Parser::IdentifierType*>(
+                    listType->m_valueType.get()))
+            {
+                fieldTypeName = clearInclude(identifierType->m_identifier);
+                fieldTypeName = aliasedTypeName(fieldTypeName);
+            }
+
+            ctx.m_out << indent << "value.set" << capitalize(field.m_name)
+                << "(QList<" << fieldTypeName << ">{} << ";
+        }
+        else if (const auto * setType =
+                 dynamic_cast<Parser::SetType*>(field.m_type.get()))
+        {
+            fieldTypeName =
+                typeToStr(setType->m_valueType, field.m_name);
+
+            if (const auto * identifierType =
+                dynamic_cast<Parser::IdentifierType*>(
+                    setType->m_valueType.get()))
+            {
+                fieldTypeName = clearInclude(identifierType->m_identifier);
+            }
+
+            ctx.m_out << indent << "value.set" << capitalize(field.m_name)
+                << "(QSet<" << fieldTypeName << ">{} << ";
+        }
+        else
+        {
+            fieldTypeName = typeToStr(field.m_type, field.m_name);
+            ctx.m_out << indent << "value.set" << capitalize(field.m_name)
+                << "(";
+        }
+
+        fieldTypeName = aliasedTypeName(fieldTypeName);
+
+        const auto enumIt = std::find_if(
+            enumerations.begin(),
+            enumerations.end(),
+            [&] (const Parser::Enumeration & e)
+            {
+                return e.m_name == fieldTypeName;
+            });
+        if (enumIt != enumerations.end())
+        {
+            const Parser::Enumeration & e = *enumIt;
+            if (e.m_values.isEmpty()) {
+                throw std::runtime_error(
+                    "Detected enumeration without items: " +
+                    e.m_name.toStdString());
+            }
+
+            ctx.m_out << fieldTypeName
+                << "::" << e.m_values[0].first;
+        }
+        else
+        {
+            ctx.m_out
+                << getGenerateRandomValueFunction(fieldTypeName);
+        }
+
+        ctx.m_out << ");" << ln;
+    }
+
+    const bool generateLocalData =
+        !isException && shouldGenerateLocalDataMethods(s);
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << "value.setLinkedNotebookGuid("
+            << "generateRandomString());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "value.setLinkedNotebookGuid("
+            << "generateRandomString());" << ln;
+
+        ctx.m_out << indent << "value.setParentTagLocalId("
+            << "generateRandomString());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "value.setNotebookLocalId("
+            << "generateRandomString());" << ln;
+
+        ctx.m_out << indent << "value.setTagLocalIds("
+            << "QStringList{} << generateRandomString());" << ln;
+
+        ctx.m_out << indent << "value.setThumbnailData("
+            << "generateRandomString().toUtf8());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "value.setNoteLocalId("
+            << "generateRandomString());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "value.setNoteGuid("
+            << "generateRandomString());" << ln;
+    }
+
+    if (generateLocalData)
+    {
+        ctx.m_out << ln;
+
+        if (shouldGenerateLocalId(s)) {
+            ctx.m_out << indent << "value.setLocalId(generateRandomString());"
+                << ln;
+        }
+
+        ctx.m_out << indent << "value.setLocallyModified(generateRandomBool());"
+            << ln
+            << indent << "value.setLocalOnly(generateRandomBool());" << ln
+            << indent << "value.setLocallyFavorited(generateRandomBool());"
+            << ln << ln;
+
+        ctx.m_out << indent << "QHash<QString, QVariant> localData;" << ln
+            << indent << "localData[generateRandomString()] = "
+            "generateRandomInt64();" << ln
+            << indent << "value.setLocalData(std::move(localData));" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << indent << s.m_name << "Builder builder;" << ln;
+
+    for (const auto & field: qAsConst(s.m_fields)) {
+        ctx.m_out << indent << "builder.set" << capitalize(field.m_name)
+            << "(value." << field.m_name << "());" << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook")) {
+        ctx.m_out << indent << "builder.setLinkedNotebookGuid("
+            << "value.linkedNotebookGuid());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "builder.setLinkedNotebookGuid("
+            << "value.linkedNotebookGuid());" << ln;
+
+        ctx.m_out << indent << "builder.setParentTagLocalId("
+            << "value.parentTagLocalId());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "builder.setNotebookLocalId("
+            << "value.notebookLocalId());" << ln;
+
+        ctx.m_out << indent << "builder.setTagLocalIds("
+            << "value.tagLocalIds());" << ln;
+
+        ctx.m_out << indent << "builder.setThumbnailData("
+            << "value.thumbnailData());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource")) {
+        ctx.m_out << indent << "builder.setNoteLocalId("
+            << "value.noteLocalId());" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote")) {
+        ctx.m_out << indent << "builder.setNoteGuid("
+            << "value.noteGuid());" << ln;
+    }
+
+    if (generateLocalData)
+    {
+        if (shouldGenerateLocalId(s)) {
+            ctx.m_out << indent << "builder.setLocalId(value.localId());" << ln;
+        }
+
+        ctx.m_out << indent << "builder.setLocallyModified("
+            << "value.isLocallyModified());" << ln;
+
+        ctx.m_out << indent << "builder.setLocalOnly("
+            << "value.isLocalOnly());" << ln;
+
+        ctx.m_out << indent << "builder.setLocallyFavorited("
+            << "value.isLocallyFavorited());" << ln;
+
+        ctx.m_out << indent << "builder.setLocalData("
+            << "value.localData());" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << indent << "auto built = builder.build();" << ln;
+    ctx.m_out << indent << "QVERIFY(built == value);" << ln;
+
+    ctx.m_out << "}" << ln << ln;
+}
+
 void Generator::generateServiceHeader(
     const Parser::Service & service, const QString & outPath)
 {
@@ -6021,10 +6411,13 @@ void Generator::generateTestRandomDataGeneratorsHeader(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    for(const auto & s: parser.structures())
+    auto structsAndExceptions = parser.structures();
+    structsAndExceptions << parser.exceptions();
+
+    for(const auto & s: qAsConst(structsAndExceptions))
     {
-        ctx.m_out << s.m_name << " generateRandom" << s.m_name << "();" << ln
-            << ln;
+        ctx.m_out << "[[nodiscard]] " << s.m_name << " generateRandom"
+            << s.m_name << "();" << ln << ln;
     }
 
     writeHeaderFooter(ctx.m_out, fileName);
@@ -6153,7 +6546,10 @@ void Generator::generateTestRandomDataGeneratorsCpp(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    for(const auto & s: parser.structures())
+    auto structsAndExceptions = parser.structures();
+    structsAndExceptions << parser.exceptions();
+
+    for(const auto & s: qAsConst(structsAndExceptions))
     {
         ctx.m_out << s.m_name << " generateRandom" << s.m_name << "()" << ln
             << "{" << ln;
@@ -6168,6 +6564,8 @@ void Generator::generateTestRandomDataGeneratorsCpp(
         ctx.m_out << "    return result;" << ln
             << "}" << ln << ln;
     }
+
+
 
     writeNamespaceEnd(ctx.m_out);
 }
@@ -8310,6 +8708,9 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
         generateTypeBuilderCpp(s, enumerations, outPath, exceptionsSection);
     }
 
+    generateTypeBuildersTestHeader(parser, outPath);
+    generateTypeBuildersTestCpp(parser, outPath);
+
     for (const auto & s: parser.services())
     {
         generateServiceHeader(s, outPath);
@@ -8333,4 +8734,3 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     generateTestClearLocalIdsHeader(parser, outPath);
     generateTestClearLocalIdsCpp(parser, outPath);
 }
-

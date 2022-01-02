@@ -108,6 +108,26 @@ private:
     void generateExceptionClassCloneMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 
+    void generateAllTypeBuildersHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateTypeBuildersFwdHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateTypeBuilderHeader(
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
+
+    void generateTypeBuilderCpp(
+        const Parser::Structure & s, const Parser::Enumerations & enumerations,
+        const QString & outPath, const QString & fileSection);
+
+    void generateAllExceptionBuildersHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateExceptionBuildersFwdHeader(
+        const Parser & parser, const QString & outPath);
+
     void generateServiceHeader(
         const Parser::Service & service, const QString & outPath);
 

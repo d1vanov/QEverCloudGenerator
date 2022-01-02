@@ -45,7 +45,7 @@ constexpr const char * ln = "\n";
 constexpr const char * disclaimer =
     "/**\n"
     " * Original work: Copyright (c) 2014 Sergey Skoblikov\n"
-    " * Modified work: Copyright (c) 2015-2021 Dmitry Ivanov\n"
+    " * Modified work: Copyright (c) 2015-2022 Dmitry Ivanov\n"
     " *\n"
     " * This file is a part of QEverCloud project and is distributed under "
     "the terms\n"
@@ -918,7 +918,7 @@ void Generator::writeTypeProperties(
     if (s.m_name == QStringLiteral("Notebook") ||
         s.m_name == QStringLiteral("Tag"))
     {
-        ctx.m_out << indent << "Q_PROPERTY(std::optional<QString> "
+        ctx.m_out << indent << "Q_PROPERTY(std::optional<Guid> "
             << "linkedNotebookGuid READ linkedNotebookGuid "
             << "WRITE setLinkedNotebookGuid)" << ln;
 
@@ -3948,7 +3948,7 @@ void Generator::generateTypeCpp(
     ctx.m_out << indent << "d(new " << s.m_name
         << "::Impl)" << ln;
 
-    ctx.m_out << " {}" << ln << ln;
+    ctx.m_out << "{}" << ln << ln;
 
     ctx.m_out << s.m_name << "::" << s.m_name << "(const " << s.m_name
         << " & other) :" << ln
@@ -3983,7 +3983,7 @@ void Generator::generateTypeCpp(
     if (s.m_name == QStringLiteral("Notebook") ||
         s.m_name == QStringLiteral("Tag"))
     {
-        ctx.m_out << "const std::optional<QString> & " << s.m_name
+        ctx.m_out << "const std::optional<Guid> & " << s.m_name
             << "::linkedNotebookGuid() const"
             << ln
             << "{" << ln
@@ -3991,7 +3991,7 @@ void Generator::generateTypeCpp(
             << "}" << ln << ln;
 
         ctx.m_out << "void " << s.m_name << "::setLinkedNotebookGuid("
-            << "std::optional<QString> linkedNotebookGuid)" << ln
+            << "std::optional<Guid> linkedNotebookGuid)" << ln
             << "{" << ln
             << indent << "d->m_linkedNotebookGuid = "
             << "std::move(linkedNotebookGuid);"
@@ -4275,12 +4275,12 @@ void Generator::generateTypeImplHeader(
 
     if (s.m_name == QStringLiteral("Notebook"))
     {
-        ctx.m_out << indent << "std::optional<QString> m_linkedNotebookGuid;"
+        ctx.m_out << indent << "std::optional<Guid> m_linkedNotebookGuid;"
             << ln << ln;
     }
     else if (s.m_name == QStringLiteral("Tag"))
     {
-        ctx.m_out << indent << "std::optional<QString> m_linkedNotebookGuid;"
+        ctx.m_out << indent << "std::optional<Guid> m_linkedNotebookGuid;"
             << ln << indent << "QString m_parentTagLocalId;" << ln << ln;
     }
     else if (s.m_name == QStringLiteral("Note"))
@@ -4454,6 +4454,792 @@ void Generator::generateExceptionClassCloneMethodDefinition(
     ctx.m_out << "}" << ln << ln;
 }
 
+void Generator::generateAllTypeBuildersHeader(
+    Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("All.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("types/builders"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_TYPES_BUILDERS_ALL_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_TYPES_BUILDERS_ALL_H" << ln
+        << ln;
+
+    const auto & structures = parser.structures();
+    QStringList typeBuilders;
+    typeBuilders.reserve(structures.size());
+    for (const auto & s: structures) {
+        typeBuilders << (s.m_name + QStringLiteral("Builder"));
+    }
+
+    std::sort(typeBuilders.begin(), typeBuilders.end());
+
+    for (const auto & typeBuilder: qAsConst(typeBuilders)) {
+        ctx.m_out << "#include <qevercloud/types/builders/" << typeBuilder
+            << ".h>" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_BUILDERS_ALL_H" << ln;
+}
+
+void Generator::generateTypeBuildersFwdHeader(
+    const Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Fwd.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("types/builders"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_TYPES_BUILDERS_FWD_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_TYPES_BUILDERS_FWD_H" << ln
+        << ln;
+
+    ctx.m_out << "namespace qevercloud {" << ln << ln;
+
+    const auto & structures = parser.structures();
+    QStringList typeBuilderClasses;
+    typeBuilderClasses.reserve(structures.size());
+    for (const auto & s: structures) {
+        typeBuilderClasses << s.m_name + QStringLiteral("Builder");
+    }
+
+    std::sort(typeBuilderClasses.begin(), typeBuilderClasses.end());
+
+    for (const auto & typeBuilderClass: qAsConst(typeBuilderClasses)) {
+        ctx.m_out << "class " << typeBuilderClass << ";" << ln;
+    }
+
+    ctx.m_out << ln << "} // namespace qevercloud" << ln << ln;
+
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_TYPES_BUILDERS_FWD_H" << ln;
+}
+
+void Generator::generateTypeBuilderHeader(
+    const Parser::Structure & s, const QString & outPath,
+    const QString & fileSection)
+{
+    const QString fileName = s.m_name + QStringLiteral("Builder.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        fileSection + QStringLiteral("/builders"));
+
+    const QString typeHeader = [&]
+    {
+        QString result;
+        QTextStream strm{&result};
+
+        strm << "<qevercloud/" << fileSection << "/" << s.m_name
+            << ".h>";
+
+        return result;
+    }();
+
+    QStringList additionalIncludes = QStringList{}
+        << typeHeader
+        << QStringLiteral("<qevercloud/EDAMErrorCode.h>")
+        << QStringLiteral("<qevercloud/types/TypeAliases.h>")
+        << QStringLiteral("<QSharedDataPointer>")
+        << additionalIncludesForFields(s);
+
+    const bool isExceptionsSection =
+        (fileSection == QStringLiteral("exceptions"));
+
+    if (isExceptionsSection) {
+        additionalIncludes
+            << QStringLiteral("<qevercloud/exceptions/EvernoteException.h>");
+    }
+    else {
+        additionalIncludes
+            << QStringLiteral("<qevercloud/exceptions/EverCloudException.h>");
+    }
+
+    const bool generateLocalData =
+        !isExceptionsSection && shouldGenerateLocalDataMethods(s);
+
+    if (generateLocalData) {
+        additionalIncludes << QStringLiteral("<QHash>")
+            << QStringLiteral("<QVariant>");
+    }
+
+    const auto deps = dependentTypeNames(s);
+    for (const auto & dep: qAsConst(deps)) {
+        if (dep == QStringLiteral("QString")) {
+            continue;
+        }
+
+        if (dep == QStringLiteral("QByteArray")) {
+            additionalIncludes.append(QStringLiteral("<QByteArray>"));
+            continue;
+        }
+
+        const bool isExceptionType = m_allExceptions.contains(dep);
+        if (isExceptionType) {
+            additionalIncludes.append(
+                QStringLiteral("<qevercloud/exceptions/") + dep +
+                QStringLiteral(".h>"));
+        }
+        else {
+            additionalIncludes.append(
+                QStringLiteral("<qevercloud/types/") + dep +
+                QStringLiteral(".h>"));
+        }
+    }
+
+    sortIncludes(additionalIncludes);
+
+    writeHeaderHeader(
+        ctx, fileName, additionalIncludes, HeaderKind::Public);
+
+    const QString indent = QStringLiteral("    ");
+
+    ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name << "Builder" << ln
+        << "{" << ln
+        << "public:" << ln;
+
+    ctx.m_out << indent << s.m_name << "Builder();" << ln << ln;
+
+    ctx.m_out << indent << s.m_name << "Builder("
+        << s.m_name << "Builder && other) noexcept;" << ln << ln;
+
+    ctx.m_out << indent << "~" << s.m_name << "Builder() noexcept;"
+        << ln << ln;
+
+    ctx.m_out << indent << s.m_name << "Builder & operator=(" << s.m_name
+        << "Builder && other) noexcept;" << ln << ln;
+
+    for(const auto & field: qAsConst(s.m_fields))
+    {
+        const QString fieldTypeName = fieldTypeToStr(field);
+
+        ctx.m_out << indent << s.m_name << "Builder & set"
+            << capitalize(field.m_name) << "(" << fieldTypeName << " "
+            << field.m_name << ");" << ln;
+    }
+
+    if (generateLocalData)
+    {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << indent << s.m_name
+                << "Builder & setLocalId(QString localId);" << ln;
+        }
+
+        ctx.m_out << indent << s.m_name
+            << "Builder & setLocallyModified(bool locallyModified);" << ln;
+
+        ctx.m_out << indent << s.m_name
+            << "Builder & setLocalOnly(bool localOnly);" << ln;
+
+        ctx.m_out << indent << s.m_name
+            << "Builder & setLocallyFavorited(bool favorited);" << ln;
+
+        ctx.m_out << indent << s.m_name
+            << "Builder & setLocalData(QHash<QString, QVariant> localData);"
+            << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << s.m_name << "Builder & setLinkedNotebookGuid("
+            << "std::optional<Guid> linkedNotebookGuid);" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << s.m_name << "Builder & setLinkedNotebookGuid("
+            << "std::optional<Guid> linkedNotebookGuid);" << ln;
+
+        ctx.m_out << indent << s.m_name << "Builder & setParentTagLocalId("
+            << "QString parentTagLocalId);" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << s.m_name << "Builder & setNotebookLocalId("
+            << "QString notebookLocalId);" << ln;
+
+        ctx.m_out << indent << s.m_name
+            << "Builder & setTagLocalIds(QStringList tagLocalIds);" << ln;
+
+        ctx.m_out << indent << s.m_name << "Builder & setThumbnailData("
+            << "QByteArray thumbnailData);" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << s.m_name
+            << "Builder & setNoteLocalId(QString noteLocalId);" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << s.m_name << "Builder & setNoteGuid("
+            "std::optional<Guid> noteGuid);" << ln;
+    }
+
+    ctx.m_out << ln;
+
+    ctx.m_out << indent << "[[nodiscard]] " << s.m_name << " build();" << ln
+        << ln;
+
+    ctx.m_out << "private:" << ln
+        << indent << "class Impl;" << ln
+        << indent << "QSharedDataPointer<Impl> d;" << ln;
+
+    ctx.m_out << "};" << ln;
+
+    writeHeaderFooter(ctx.m_out, fileName);
+}
+
+void Generator::generateTypeBuilderCpp(
+    const Parser::Structure & s, const Parser::Enumerations & enumerations,
+    const QString & outPath, const QString & fileSection)
+{
+    const QString fileName = s.m_name + QStringLiteral("Builder.cpp");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation,
+        fileSection + QStringLiteral("/builders"));
+
+    ctx.m_out << disclaimer << ln;
+
+    ctx.m_out  << "#include <qevercloud/" << fileSection << "/builders/"
+        << s.m_name << "Builder.h>" << ln << ln;
+
+    ctx.m_out << "#include <QSharedData>" << ln << ln;
+
+    writeNamespaceBegin(ctx);
+
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name << "Builder::"
+        << "Impl final:" << ln
+        << indent << "public QSharedData" << ln
+        << "{" << ln
+        << "public:" << ln;
+
+    for (const auto & field: qAsConst(s.m_fields))
+    {
+        const QString fieldTypeName = fieldTypeToStr(field);
+
+        ctx.m_out << indent << fieldTypeName << " m_" << field.m_name;
+
+        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            ctx.m_out << ";" << ln;
+            continue;
+        }
+
+        const auto a = aliasedPrimitiveType(fieldTypeName);
+        const auto p = dynamic_cast<Parser::PrimitiveType*>(field.m_type.get());
+        if (a || p)
+        {
+            switch(a ? *a : p->m_type)
+            {
+            case Parser::PrimitiveType::Type::Bool:
+                ctx.m_out << " = false";
+                break;
+            case Parser::PrimitiveType::Type::Byte:
+            case Parser::PrimitiveType::Type::Int16:
+            case Parser::PrimitiveType::Type::Int32:
+            case Parser::PrimitiveType::Type::Int64:
+                ctx.m_out << " = 0";
+                break;
+            case Parser::PrimitiveType::Type::Double:
+                ctx.m_out << " = 0.0";
+                break;
+            }
+        }
+        else if (m_allEnums.contains(fieldTypeName))
+        {
+            const auto eit = std::find_if(
+                enumerations.constBegin(),
+                enumerations.constEnd(),
+                [&fieldTypeName](const auto & enumeration)
+                {
+                    return fieldTypeName == enumeration.m_name;
+                });
+
+            if (eit != enumerations.constEnd())
+            {
+                const auto & values = eit->m_values;
+                if (!values.isEmpty()) {
+                    ctx.m_out << " = " << fieldTypeName << "::"
+                        << values.front().first;
+                }
+            }
+        }
+
+        ctx.m_out << ";" << ln;
+    }
+
+    const bool isExceptionsSection =
+        (fileSection == QStringLiteral("exceptions"));
+
+    const bool generateLocalData =
+        !isExceptionsSection && shouldGenerateLocalDataMethods(s);
+
+    if (generateLocalData)
+    {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << indent << "QString m_localId;" << ln;
+        }
+
+        ctx.m_out << indent << "bool m_locallyModified = false;" << ln;
+        ctx.m_out << indent << "bool m_localOnly = false;" << ln;
+        ctx.m_out << indent << "bool m_locallyFavorited = false;" << ln;
+        ctx.m_out << indent << "QHash<QString, QVariant> m_localData;" << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << "std::optional<Guid> m_linkedNotebookGuid;"
+            << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "std::optional<Guid> m_linkedNotebookGuid;"
+            << ln << indent << "QString m_parentTagLocalId;" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "QString m_notebookLocalId;" << ln
+            << indent << "QStringList m_tagLocalIds;" << ln
+            << indent << "QByteArray m_thumbnailData;" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "QString m_noteLocalId;" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "std::optional<Guid> m_noteGuid;" << ln;
+    }
+
+    ctx.m_out << "};" << ln << ln;
+
+    ctx.m_out << s.m_name << "Builder::" << s.m_name << "Builder() :" << ln
+        << indent << "d(new " << s.m_name << "Builder::Impl)" << ln
+        << "{}" << ln << ln;
+
+    ctx.m_out << s.m_name << "Builder::" << s.m_name << "Builder("
+        << s.m_name << "Builder && other) noexcept :" << ln
+        << indent << "d{std::move(other.d)}" << ln
+        << "{}" << ln << ln;
+
+    ctx.m_out << s.m_name << "Builder::~" << s.m_name << "Builder() noexcept"
+        << " = default;" << ln << ln;
+
+    ctx.m_out << s.m_name << "Builder & " << s.m_name << "Builder::operator=("
+        << s.m_name << "Builder && other) noexcept" << ln
+        << "{" << ln
+        << indent << "if (this != &other) {" << ln
+        << indent << indent << "d = std::move(other.d);" << ln
+        << indent << "}" << ln << ln
+        << indent << "return *this;" << ln
+        << "}" << ln << ln;
+
+    for (const auto & field: qAsConst(s.m_fields))
+    {
+        const QString fieldTypeName = fieldTypeToStr(field);
+
+        ctx.m_out << s.m_name << "Builder & " << s.m_name << "Builder::set"
+            << capitalize(field.m_name) << "(" << fieldTypeName
+            << " " << field.m_name << ")" << ln
+            << "{" << ln
+            << indent << "d->m_" << field.m_name << " = ";
+
+        if (isFieldOfPrimitiveType(field, fieldTypeName)) {
+            ctx.m_out << field.m_name;
+        }
+        else {
+            ctx.m_out << "std::move(" << field.m_name << ")";
+        }
+
+        ctx.m_out << ";" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+    }
+
+    if (generateLocalData)
+    {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << s.m_name << "Builder & " << s.m_name
+                << "Builder::setLocalId(QString localId)" << ln
+                << "{" << ln
+                << indent << "d->m_localId = std::move(localId);" << ln
+                << indent << "return *this;" << ln
+                << "}" << ln << ln;
+        }
+
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setLocallyModified(bool locallyModified)" << ln
+            << "{" << ln
+            << indent << "d->m_locallyModified = locallyModified;" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setLocalOnly(bool localOnly)" << ln
+            << "{" << ln
+            << indent << "d->m_localOnly = localOnly;" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setLocallyFavorited(bool favorited)" << ln
+            << "{" << ln
+            << indent << "d->m_locallyFavorited = favorited;" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << s.m_name << "Builder &" << s.m_name
+            << "Builder::setLocalData(QHash<QString, QVariant> localData)" << ln
+            << "{" << ln
+            << indent << "d->m_localData = std::move(localData);" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << s.m_name << "Builder &" << s.m_name
+            << "Builder::setLinkedNotebookGuid(std::optional<Guid> "
+            << "linkedNotebookGuid)" << ln
+            << "{" << ln
+            << indent << "d->m_linkedNotebookGuid = std::move(linkedNotebookGuid"
+            << ");" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setLinkedNotebookGuid(std::optional<Guid> "
+            << "linkedNotebookGuid)" << ln
+            << "{" << ln
+            << indent << "d->m_linkedNotebookGuid = std::move(linkedNotebookGuid"
+            << ");" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setParentTagLocalId(QString parentTagLocalId)" << ln
+            << "{" << ln
+            << indent << "d->m_parentTagLocalId = std::move(parentTagLocalId);"
+            << indent << "return *this;" << ln
+            << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setNotebookLocalId(QString notebookLocalId)" << ln
+            << "{" << ln
+            << indent << "d->m_notebookLocalId = std::move(notebookLocalId);"
+            << indent << "return *this;" << ln
+            << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setTagLocalIds(QStringList tagLocalIds)" << ln
+            << "{" << ln
+            << indent << "d->m_tagLocalIds = std::move(tagLocalIds);" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setThumbnailData(QByteArray thumbnailData)" << ln
+            << "{" << ln
+            << indent << "d->m_thumbnailData = std::move(thumbnailData);" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setNoteLocalId(QString noteLocalId)" << ln
+            << "{" << ln
+            << indent << "d->m_noteLocalId = std::move(noteLocalId);" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << s.m_name << "Builder & " << s.m_name
+            << "Builder::setNoteGuid(std::optional<Guid> noteGuid)" << ln
+            << "{" << ln
+            << indent << "d->m_noteGuid = std::move(noteGuid);" << ln
+            << indent << "return *this;" << ln
+            << "}" << ln << ln;
+    }
+
+    ctx.m_out << s.m_name << " " << s.m_name << "Builder::build()" << ln
+        << "{" << ln;
+
+    ctx.m_out << indent << s.m_name << " result;" << ln << ln;
+
+    for(const auto & field: qAsConst(s.m_fields))
+    {
+        ctx.m_out << indent << "result.set" << capitalize(field.m_name)
+            << "(";
+
+        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            ctx.m_out << "std::move(d->m_" << field.m_name << "));" << ln;
+            continue;
+        }
+
+        const QString fieldTypeName = fieldTypeToStr(field);
+
+        if (isFieldOfPrimitiveType(field, fieldTypeName)) {
+            ctx.m_out << "d->m_" << field.m_name << ");" << ln;
+        }
+        else {
+            ctx.m_out << "std::move(d->m_" << field.m_name << "));" << ln;
+        }
+    }
+
+    if (generateLocalData)
+    {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << indent << "result.setLocalId(std::move(d->m_localId));"
+                << ln;
+        }
+
+        ctx.m_out << indent
+            << "result.setLocallyModified(d->m_locallyModified);" << ln;
+
+        ctx.m_out << indent
+            << "result.setLocalOnly(d->m_localOnly);" << ln;
+
+        ctx.m_out << indent
+            << "result.setLocallyFavorited(d->m_locallyFavorited);" << ln;
+
+        ctx.m_out << indent
+            << "result.setLocalData(std::move(d->m_localData));" << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << "result.setLinkedNotebookGuid("
+            << "std::move(d->m_linkedNotebookGuid));" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "result.setLinkedNotebookGuid("
+            << "std::move(d->m_linkedNotebookGuid));" << ln;
+
+        ctx.m_out << indent << "result.setParentTagLocalId("
+            << "std::move(d->m_parentTagLocalId));" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "result.setNotebookLocalId("
+            << "std::move(d->m_notebookLocalId));" << ln;
+
+        ctx.m_out << indent << "result.setTagLocalIds("
+            << "std::move(d->m_tagLocalIds));" << ln;
+
+        ctx.m_out << indent << "result.setThumbnailData("
+            << "std::move(d->m_thumbnailData));" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "result.setNoteLocalId("
+            << "std::move(d->m_noteLocalId));" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "result.setNoteGuid("
+            << "std::move(d->m_noteGuid));" << ln;
+    }
+
+    ctx.m_out << ln;
+
+    for (const auto & field: qAsConst(s.m_fields))
+    {
+        ctx.m_out << indent << "d->m_" << field.m_name;
+
+        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+            ctx.m_out << " = {};" << ln;
+            continue;
+        }
+
+        const QString fieldTypeName = fieldTypeToStr(field);
+        if (!isFieldOfPrimitiveType(field, fieldTypeName)) {
+            if (fieldTypeName == QStringLiteral("QString")) {
+                ctx.m_out << " = QString{};" << ln;
+            }
+            else if (fieldTypeName == QStringLiteral("Guid")) {
+                ctx.m_out << " = Guid{};" << ln;
+            }
+            else {
+                ctx.m_out << " = {};" << ln;
+            }
+            continue;
+        }
+
+        const auto a = aliasedPrimitiveType(fieldTypeName);
+        const auto p = dynamic_cast<Parser::PrimitiveType*>(field.m_type.get());
+        if (a || p)
+        {
+            switch(a ? *a : p->m_type)
+            {
+            case Parser::PrimitiveType::Type::Bool:
+                ctx.m_out << " = false" << ln;
+                break;
+            case Parser::PrimitiveType::Type::Byte:
+            case Parser::PrimitiveType::Type::Int16:
+            case Parser::PrimitiveType::Type::Int32:
+            case Parser::PrimitiveType::Type::Int64:
+                ctx.m_out << " = 0";
+                break;
+            case Parser::PrimitiveType::Type::Double:
+                ctx.m_out << " = 0.0";
+                break;
+            }
+        }
+        else if (m_allEnums.contains(fieldTypeName))
+        {
+            const auto eit = std::find_if(
+                enumerations.constBegin(),
+                enumerations.constEnd(),
+                [&fieldTypeName](const auto & enumeration)
+                {
+                    return fieldTypeName == enumeration.m_name;
+                });
+
+            if (eit != enumerations.constEnd())
+            {
+                const auto & values = eit->m_values;
+                if (!values.isEmpty()) {
+                    ctx.m_out << " = " << fieldTypeName << "::"
+                        << values.front().first;
+                }
+            }
+        }
+
+        ctx.m_out << ";" << ln;
+    }
+
+    if (generateLocalData)
+    {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << indent << "d->m_localId = QString{};" << ln;
+        }
+
+        ctx.m_out << indent << "d->m_locallyModified = false;" << ln;
+        ctx.m_out << indent << "d->m_localOnly = false;" << ln;
+        ctx.m_out << indent << "d->m_locallyFavorited = false;" << ln;
+        ctx.m_out << indent << "d->m_localData = {};" << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook"))
+    {
+        ctx.m_out << indent << "d->m_linkedNotebookGuid = Guid{};" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "d->m_linkedNotebookGuid = Guid{};" << ln;
+        ctx.m_out << indent << "d->m_parentTagLocalId = QString{};" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "d->m_notebookLocalId = QString{};" << ln;
+        ctx.m_out << indent << "d->m_tagLocalIds = QStringList{};" << ln;
+        ctx.m_out << indent << "d->m_thumbnailData = {};" << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "d->m_noteLocalId = QString{};" << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "d->m_noteGuid = Guid{};" << ln;
+    }
+
+    ctx.m_out << ln
+        << indent << "return result;" << ln
+        << "}" << ln << ln;
+
+    writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateAllExceptionBuildersHeader(
+    Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("All.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("exceptions/builders"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_EXCEPTIONS_BUILDERS_ALL_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_EXCEPTIONS_BUILDERS_ALL_H" << ln
+        << ln;
+
+    const auto & exceptions = parser.exceptions();
+    QStringList exceptionBuilders;
+    exceptionBuilders.reserve(exceptions.size());
+    for (const auto & e: exceptions) {
+        exceptionBuilders << (e.m_name + QStringLiteral("Builder"));
+    }
+
+    std::sort(exceptionBuilders.begin(), exceptionBuilders.end());
+
+    for (const auto & exceptionBuilder: qAsConst(exceptionBuilders)) {
+        ctx.m_out << "#include <qevercloud/exceptions/builders/"
+            << exceptionBuilder << ".h>" << ln;
+    }
+
+    ctx.m_out << ln;
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_EXCEPTIONS_BUILDERS_ALL_H"
+        << ln;
+}
+
+void Generator::generateExceptionBuildersFwdHeader(
+    const Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Fwd.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("exceptions/builders"));
+
+    ctx.m_out << disclaimer << ln;
+    ctx.m_out << "#ifndef QEVERCLOUD_GENERATED_EXCEPTIONS_BUILDERS_FWD_H" << ln;
+    ctx.m_out << "#define QEVERCLOUD_GENERATED_EXCEPTIONS_BUILDERS_FWD_H" << ln
+        << ln;
+
+    ctx.m_out << "namespace qevercloud {" << ln << ln;
+
+    const auto & exceptions = parser.exceptions();
+    QStringList exceptionBuilderClasses;
+    exceptionBuilderClasses.reserve(exceptions.size());
+    for (const auto & e: exceptions) {
+        exceptionBuilderClasses << e.m_name + QStringLiteral("Builder");
+    }
+
+    std::sort(exceptionBuilderClasses.begin(), exceptionBuilderClasses.end());
+
+    for (const auto & exceptionBuilderClass: qAsConst(exceptionBuilderClasses))
+    {
+        ctx.m_out << "class " << exceptionBuilderClass << ";" << ln;
+    }
+
+    ctx.m_out << ln << "} // namespace qevercloud" << ln << ln;
+
+    ctx.m_out << "#endif // QEVERCLOUD_GENERATED_EXCEPTIONS_BUILDERS_FWD_H"
+        << ln;
+}
+
 void Generator::generateServiceHeader(
     const Parser::Service & service, const QString & outPath)
 {
@@ -4503,11 +5289,11 @@ void Generator::generateServiceHeader(
 
     if (service.m_name == QStringLiteral("NoteStore"))
     {
-        ctx.m_out << "    virtual const std::optional<QString> & "
+        ctx.m_out << "    virtual const std::optional<Guid> & "
             << "linkedNotebookGuid() const = 0;"
             << ln
             << "    virtual void setLinkedNotebookGuid("
-            << "std::optional<QString> linkedNotebookGuid) = 0;"
+            << "std::optional<Guid> linkedNotebookGuid) = 0;"
             << ln << ln;
     }
 
@@ -4605,7 +5391,7 @@ void Generator::generateServiceHeader(
 
     if (service.m_name == QStringLiteral("NoteStore"))
     {
-        ctx.m_out << "    std::optional<QString> linkedNotebookGuid"
+        ctx.m_out << "    std::optional<Guid> linkedNotebookGuid"
             << " = {}," << ln;
     }
 
@@ -4659,7 +5445,7 @@ void Generator::generateServiceCpp(
     const bool isNoteStore = (service.m_name == QStringLiteral("NoteStore"));
     if (isNoteStore)
     {
-        ctx.m_out << "    std::optional<QString> linkedNotebookGuid," << ln;
+        ctx.m_out << "    std::optional<Guid> linkedNotebookGuid," << ln;
     }
 
     ctx.m_out << "    IRequestContextPtr ctx," << ln
@@ -5831,7 +6617,7 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << indent
             << " */" << ln
             << indent
-            << "[[nodiscard]] const std::optional<QString> & "
+            << "[[nodiscard]] const std::optional<Guid> & "
             << "linkedNotebookGuid() const;" << ln << ln;
 
         ctx.m_out << indent << "/**" << ln
@@ -5864,7 +6650,7 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << indent
             << " */" << ln
             << indent
-            << "[[nodiscard]] const std::optional<QString> & "
+            << "[[nodiscard]] const std::optional<Guid> & "
             << "linkedNotebookGuid() const;" << ln << ln;
 
         ctx.m_out << indent << "/**" << ln
@@ -6041,7 +6827,7 @@ void Generator::generateServiceClassDeclaration(
             << ln;
 
         if (service.m_name == QStringLiteral("NoteStore")) {
-            ctx.m_out << "            std::optional<QString> "
+            ctx.m_out << "            std::optional<Guid> "
                 << "linkedNotebookGuid = {}," << ln;
         }
     }
@@ -6116,7 +6902,7 @@ void Generator::generateServiceClassDeclaration(
 
         if (service.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    const std::optional<QString> & "
+            ctx.m_out << "    const std::optional<Guid> & "
                 << "linkedNotebookGuid() const override" << ln
                 << "    {" << ln
                 << "        return m_linkedNotebookGuid;" << ln
@@ -6124,7 +6910,7 @@ void Generator::generateServiceClassDeclaration(
                 << ln;
 
             ctx.m_out << "    void setLinkedNotebookGuid("
-                << "std::optional<QString> linkedNotebookGuid) override" << ln
+                << "std::optional<Guid> linkedNotebookGuid) override" << ln
                 << "    {" << ln
                 << "        m_linkedNotebookGuid = "
                 << "std::move(linkedNotebookGuid);" << ln
@@ -6158,7 +6944,7 @@ void Generator::generateServiceClassDeclaration(
 
         if (service.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    const std::optional<QString> & "
+            ctx.m_out << "    const std::optional<Guid> & "
                 << "linkedNotebookGuid() const override" << ln
                 << "    {" << ln
                 << "        return m_service->linkedNotebookGuid();" << ln
@@ -6166,7 +6952,7 @@ void Generator::generateServiceClassDeclaration(
                 << ln << ln;
 
             ctx.m_out << "    void setLinkedNotebookGuid("
-                << "std::optional<QString> linkedNotebookGuid) override" << ln
+                << "std::optional<Guid> linkedNotebookGuid) override" << ln
                 << "    {" << ln
                 << "        m_service->setLinkedNotebookGuid("
                 << "std::move(linkedNotebookGuid));" << ln
@@ -6245,7 +7031,7 @@ void Generator::generateServiceClassDeclaration(
         ctx.m_out << "    QString m_url;" << ln;
 
         if (service.m_name == QStringLiteral("NoteStore")) {
-            ctx.m_out << "    std::optional<QString> m_linkedNotebookGuid;"
+            ctx.m_out << "    std::optional<Guid> m_linkedNotebookGuid;"
                 << ln;
         }
     }
@@ -7504,6 +8290,24 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
         generateTypeCpp(s, outPath, exceptionsSection);
         generateTypeImplHeader(s, enumerations, outPath, exceptionsSection);
         generateTypeImplCpp(s, outPath, exceptionsSection);
+    }
+
+    generateAllTypeBuildersHeader(parser, outPath);
+    generateTypeBuildersFwdHeader(parser, outPath);
+
+    for (const auto & s: parser.structures())
+    {
+        generateTypeBuilderHeader(s, outPath, typesSection);
+        generateTypeBuilderCpp(s, enumerations, outPath, typesSection);
+    }
+
+    generateAllExceptionBuildersHeader(parser, outPath);
+    generateExceptionBuildersFwdHeader(parser, outPath);
+
+    for (const auto & s: parser.exceptions())
+    {
+        generateTypeBuilderHeader(s, outPath, exceptionsSection);
+        generateTypeBuilderCpp(s, enumerations, outPath, exceptionsSection);
     }
 
     for (const auto & s: parser.services())

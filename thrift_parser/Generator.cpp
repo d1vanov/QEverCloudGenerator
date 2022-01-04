@@ -28,12 +28,15 @@
 #include <QDir>
 #include <QFile>
 #include <QMap>
+#include <QSet>
 #include <QStack>
 #include <QString>
 #include <QTextStream>
 
 #include <algorithm>
+#include <map>
 #include <memory>
+#include <set>
 #include <stdexcept>
 
 namespace {
@@ -3283,7 +3286,13 @@ void Generator::generateErrorsHeader(Parser & parser, const QString & outPath)
     }
 
     QStringList extraLinesOutsideNamespace;
-    extraLinesOutsideNamespace.reserve(enumerations.size());
+    extraLinesOutsideNamespace.reserve(enumerations.size() + 2);
+    extraLinesOutsideNamespace << QStringLiteral(
+        "// NOTE: explicit metatype declarations are not needed if "
+        "QEVERCLOUD_USES_Q_NAMESPACE is defined");
+    extraLinesOutsideNamespace << QStringLiteral(
+        "// NOTE: but since it is not necessarily defined, explicit metatype "
+        "declarations are here");
     for(const auto & e: enumerations)
     {
         QString line;
@@ -3902,15 +3911,7 @@ void Generator::generateTypeHeader(
         << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln
         << ln;
 
-    QStringList extraLinesOutsideNamespace;
-    extraLinesOutsideNamespace.reserve(1);
-
-    QString metatypeDeclarationLine;
-    QTextStream lineOut(&metatypeDeclarationLine);
-    lineOut << "Q_DECLARE_METATYPE(qevercloud::" << s.m_name << ")";
-    extraLinesOutsideNamespace << metatypeDeclarationLine;
-
-    writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
+    writeHeaderFooter(ctx.m_out, fileName);
 }
 
 void Generator::generateTypeCpp(
@@ -5628,6 +5629,280 @@ void Generator::generateTypeBuildersTestMethod(
     ctx.m_out << indent << "QVERIFY(built == value);" << ln;
 
     ctx.m_out << "}" << ln << ln;
+}
+
+void Generator::generateMetaTypesHeader(
+    const Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Metatypes.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Interface,
+        QStringLiteral("types"));
+
+    auto additionalIncludes = QStringList{}
+        << QStringLiteral("<qevercloud/types/All.h>")
+        << QStringLiteral("<QMetaType>");
+
+    sortIncludes(additionalIncludes);
+
+    writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
+
+    ctx.m_out << "QEVERCLOUD_EXPORT void registerMetatypes();" << ln << ln;
+
+    const auto processSingularType =
+        [&](const std::shared_ptr<Parser::Type> & type)
+        {
+            const auto valueTypeName = typeToStr(type, {});
+            const auto actualTypeName = aliasedTypeName(valueTypeName);
+
+            if (valueTypeName != actualTypeName) {
+                return actualTypeName;
+            }
+
+            if (dynamic_cast<Parser::IdentifierType*>(type.get())) {
+                return QStringLiteral("qevercloud::") + valueTypeName;
+            }
+
+            return valueTypeName;
+        };
+
+    auto structsAndExceptions = parser.structures();
+    structsAndExceptions << parser.exceptions();
+
+    std::set<QString> dependentOptionalTypeNames;
+
+    struct MapType
+    {
+        QString m_keyType;
+        QString m_valueType;
+    };
+
+    std::map<QString, MapType> dependentOptionalMapTypes;
+
+    for (const auto & s: qAsConst(structsAndExceptions))
+    {
+        for (const auto & f: qAsConst(s.m_fields))
+        {
+            if (f.m_required != Parser::Field::RequiredFlag::Optional) {
+                continue;
+            }
+
+            if (const auto * listType =
+                dynamic_cast<Parser::ListType*>(f.m_type.get()))
+            {
+                QString typeName;
+                QTextStream strm{&typeName};
+                strm << "QList<";
+                strm << processSingularType(listType->m_valueType);
+                strm << ">";
+                dependentOptionalTypeNames.insert(typeName);
+            }
+            else if (const auto * setType =
+                     dynamic_cast<Parser::SetType*>(f.m_type.get()))
+            {
+                QString typeName;
+                QTextStream strm{&typeName};
+                strm << "QSet<";
+                strm << processSingularType(setType->m_valueType);
+                strm << ">";
+                dependentOptionalTypeNames.insert(typeName);
+            }
+            else if (const auto * mapType =
+                     dynamic_cast<Parser::MapType*>(f.m_type.get()))
+            {
+                const auto & keyType = mapType->m_keyType;
+                const auto & valueType = mapType->m_valueType;
+
+                auto keyTypeName = processSingularType(keyType);
+                auto valueTypeName = processSingularType(valueType);
+
+                QString typeName;
+                QTextStream strm{&typeName};
+                strm << "QMap<";
+                strm << keyTypeName;
+                strm << ", ";
+                strm << valueTypeName;
+                strm << ">";
+
+                dependentOptionalMapTypes[typeName] =
+                    MapType{std::move(keyTypeName), std::move(valueTypeName)};
+            }
+            else
+            {
+                dependentOptionalTypeNames.insert(
+                    processSingularType(f.m_type));
+            }
+        }
+    }
+
+    QStringList extraLinesOutsideNamespace;
+    extraLinesOutsideNamespace.reserve(
+        dependentOptionalTypeNames.size() +
+        dependentOptionalMapTypes.size() * 3 + 1);
+
+    for (const auto & typeName: qAsConst(dependentOptionalTypeNames))
+    {
+        QString line;
+        QTextStream strm{&line};
+        strm << "Q_DECLARE_METATYPE(std::optional<" << typeName << ">);";
+        extraLinesOutsideNamespace << line;
+    }
+
+    extraLinesOutsideNamespace << QString{};
+
+    for (auto it = dependentOptionalMapTypes.begin(),
+         end = dependentOptionalMapTypes.end(); it != end; ++it)
+    {
+        const auto & typeName = it->first;
+        const auto & mapType = it->second;
+
+        QString typeAlias;
+        {
+            QTextStream strm{&typeAlias};
+            strm << "Map" << capitalize(mapType.m_keyType)
+                << "To" << capitalize(mapType.m_valueType);
+        }
+
+        {
+            QString line;
+            QTextStream strm{&line};
+            strm << "using " << typeAlias << " = " << typeName << ";";
+            extraLinesOutsideNamespace << line;
+        }
+
+        {
+            QString line;
+            QTextStream strm{&line};
+            strm << "Q_DECLARE_METATYPE(std::optional<" << typeAlias << ">);";
+            extraLinesOutsideNamespace << line;
+        }
+
+        extraLinesOutsideNamespace << QString{};
+    }
+
+    if (!dependentOptionalMapTypes.empty() &&
+        !extraLinesOutsideNamespace.isEmpty())
+    {
+        extraLinesOutsideNamespace.erase(
+            std::prev(extraLinesOutsideNamespace.end()));
+    }
+
+    writeHeaderFooter(ctx.m_out, fileName, {}, extraLinesOutsideNamespace);
+}
+
+void Generator::generateMetaTypesCpp(
+    const Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("Metatypes.cpp");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Implementation,
+        QStringLiteral("types"));
+
+    writeHeaderBody(
+        ctx, QStringLiteral("types/Metatypes.h"), {}, HeaderKind::Public, 1);
+
+    ctx.m_out << "void registerMetatypes()" << ln
+        << "{" << ln;
+
+    const auto processSingularType =
+        [&](const std::shared_ptr<Parser::Type> & type)
+        {
+            const auto valueTypeName = typeToStr(type, {});
+            const auto actualTypeName = aliasedTypeName(valueTypeName);
+
+            if (valueTypeName != actualTypeName) {
+                return actualTypeName;
+            }
+
+            return valueTypeName;
+        };
+
+    constexpr const char * indent = "    ";
+
+    auto structsAndExceptions = parser.structures();
+    structsAndExceptions << parser.exceptions();
+
+    std::sort(
+        structsAndExceptions.begin(),
+        structsAndExceptions.end(),
+        [](const Parser::Structure & lhs, const Parser::Structure & rhs)
+        {
+            return lhs.m_name < rhs.m_name;
+        });
+
+    std::set<QString> dependentOptionalTypeNames;
+
+    for (const auto & s: qAsConst(structsAndExceptions))
+    {
+        ctx.m_out << indent << "qRegisterMetaType<"
+            << s.m_name << ">(\"" << s.m_name << "\");" << ln;
+
+        for (const auto & f: qAsConst(s.m_fields))
+        {
+            if (f.m_required != Parser::Field::RequiredFlag::Optional) {
+                continue;
+            }
+
+            if (const auto * listType =
+                dynamic_cast<Parser::ListType*>(f.m_type.get()))
+            {
+                QString typeName;
+                QTextStream strm{&typeName};
+                strm << "QList<";
+                strm << processSingularType(listType->m_valueType);
+                strm << ">";
+                dependentOptionalTypeNames.insert(typeName);
+            }
+            else if (const auto * setType =
+                     dynamic_cast<Parser::SetType*>(f.m_type.get()))
+            {
+                QString typeName;
+                QTextStream strm{&typeName};
+                strm << "QSet<";
+                strm << processSingularType(setType->m_valueType);
+                strm << ">";
+                dependentOptionalTypeNames.insert(typeName);
+            }
+            else if (const auto * mapType =
+                     dynamic_cast<Parser::MapType*>(f.m_type.get()))
+            {
+                const auto & keyType = mapType->m_keyType;
+                const auto & valueType = mapType->m_valueType;
+
+                const auto keyTypeName = processSingularType(keyType);
+                const auto valueTypeName = processSingularType(valueType);
+
+                QString typeName;
+                QTextStream strm{&typeName};
+                strm << "QMap<";
+                strm << keyTypeName;
+                strm << ", ";
+                strm << valueTypeName;
+                strm << ">";
+
+                dependentOptionalTypeNames.insert(typeName);
+            }
+            else
+            {
+                dependentOptionalTypeNames.insert(
+                    processSingularType(f.m_type));
+            }
+        }
+    }
+
+    ctx.m_out << ln;
+
+    for (const auto & typeName: qAsConst(dependentOptionalTypeNames))
+    {
+        ctx.m_out << indent << "qRegisterMetaType<std::optional<" << typeName
+            << ">>(\"std::optional<" << typeName << ">\");" << ln;
+    }
+
+    ctx.m_out << "}" << ln << ln;
+
+    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateServiceHeader(
@@ -8710,6 +8985,9 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
 
     generateTypeBuildersTestHeader(parser, outPath);
     generateTypeBuildersTestCpp(parser, outPath);
+
+    generateMetaTypesHeader(parser, outPath);
+    generateMetaTypesCpp(parser, outPath);
 
     for (const auto & s: parser.services())
     {

@@ -139,6 +139,12 @@ private:
         const QList<Parser::Enumeration> & enumerations,
         OutputFileContext & ctx, bool isException);
 
+    void generateMetaTypesHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateMetaTypesCpp(
+        const Parser & parser, const QString & outPath);
+
     void generateServiceHeader(
         const Parser::Service & service, const QString & outPath);
 

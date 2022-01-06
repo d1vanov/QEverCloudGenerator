@@ -5641,6 +5641,7 @@ void Generator::generateMetaTypesHeader(
         QStringLiteral("types"));
 
     auto additionalIncludes = QStringList{}
+        << QStringLiteral("<qevercloud/exceptions/All.h>")
         << QStringLiteral("<qevercloud/types/All.h>")
         << QStringLiteral("<QMetaType>");
 
@@ -5813,10 +5814,16 @@ void Generator::generateMetaTypesCpp(
             const auto actualTypeName = aliasedTypeName(valueTypeName);
 
             if (valueTypeName != actualTypeName) {
-                return actualTypeName;
+                return std::make_pair(actualTypeName, actualTypeName);
             }
 
-            return valueTypeName;
+            if (dynamic_cast<Parser::IdentifierType*>(type.get())) {
+                return std::make_pair(
+                    valueTypeName,
+                    QStringLiteral("qevercloud::") + valueTypeName);
+            }
+
+            return std::make_pair(valueTypeName, valueTypeName);
         };
 
     constexpr const char * indent = "    ";
@@ -5832,12 +5839,12 @@ void Generator::generateMetaTypesCpp(
             return lhs.m_name < rhs.m_name;
         });
 
-    std::set<QString> dependentOptionalTypeNames;
+    std::set<std::pair<QString, QString>> dependentOptionalTypeNames;
 
     for (const auto & s: qAsConst(structsAndExceptions))
     {
         ctx.m_out << indent << "qRegisterMetaType<"
-            << s.m_name << ">(\"" << s.m_name << "\");" << ln;
+            << s.m_name << ">(\"qevercloud::" << s.m_name << "\");" << ln;
 
         for (const auto & f: qAsConst(s.m_fields))
         {
@@ -5848,22 +5855,28 @@ void Generator::generateMetaTypesCpp(
             if (const auto * listType =
                 dynamic_cast<Parser::ListType*>(f.m_type.get()))
             {
+                const auto typeNames =
+                    processSingularType(listType->m_valueType);
+
                 QString typeName;
                 QTextStream strm{&typeName};
                 strm << "QList<";
-                strm << processSingularType(listType->m_valueType);
+                strm << typeNames.second;
                 strm << ">";
-                dependentOptionalTypeNames.insert(typeName);
+                dependentOptionalTypeNames.insert(typeNames);
             }
             else if (const auto * setType =
                      dynamic_cast<Parser::SetType*>(f.m_type.get()))
             {
+                const auto typeNames =
+                    processSingularType(setType->m_valueType);
+
                 QString typeName;
                 QTextStream strm{&typeName};
                 strm << "QSet<";
-                strm << processSingularType(setType->m_valueType);
+                strm << typeNames.second;
                 strm << ">";
-                dependentOptionalTypeNames.insert(typeName);
+                dependentOptionalTypeNames.insert(typeNames);
             }
             else if (const auto * mapType =
                      dynamic_cast<Parser::MapType*>(f.m_type.get()))
@@ -5871,18 +5884,19 @@ void Generator::generateMetaTypesCpp(
                 const auto & keyType = mapType->m_keyType;
                 const auto & valueType = mapType->m_valueType;
 
-                const auto keyTypeName = processSingularType(keyType);
-                const auto valueTypeName = processSingularType(valueType);
+                const auto keyTypeNames = processSingularType(keyType);
+                const auto valueTypeNames = processSingularType(valueType);
 
                 QString typeName;
                 QTextStream strm{&typeName};
                 strm << "QMap<";
-                strm << keyTypeName;
+                strm << keyTypeNames.second;
                 strm << ", ";
-                strm << valueTypeName;
+                strm << valueTypeNames.second;
                 strm << ">";
 
-                dependentOptionalTypeNames.insert(typeName);
+                dependentOptionalTypeNames.insert(
+                    std::make_pair(typeName, typeName));
             }
             else
             {
@@ -5894,10 +5908,20 @@ void Generator::generateMetaTypesCpp(
 
     ctx.m_out << ln;
 
-    for (const auto & typeName: qAsConst(dependentOptionalTypeNames))
+    for (const auto & typeNames: qAsConst(dependentOptionalTypeNames))
     {
-        ctx.m_out << indent << "qRegisterMetaType<std::optional<" << typeName
-            << ">>(\"std::optional<" << typeName << ">\");" << ln;
+        ctx.m_out << indent << "qRegisterMetaType<std::optional<"
+            << typeNames.first << ">>(\"std::optional<" << typeNames.second
+            << ">\");" << ln;
+    }
+
+    ctx.m_out << ln;
+
+    for (const auto & typeAlias: qAsConst(parser.typeAliases()))
+    {
+        ctx.m_out << indent << "qRegisterMetaType<"
+            << typeAlias.m_name << ">(\"qevercloud::" << typeAlias.m_name
+            << "\");" << ln;
     }
 
     ctx.m_out << "}" << ln << ln;

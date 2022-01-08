@@ -5649,6 +5649,13 @@ void Generator::generateMetaTypesHeader(
 
     writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
 
+    ctx.m_out << "/**" << ln
+        << " * This function calls qRegisterMetatype for fields of QEverCloud"
+        << ln
+        << " * types and exceptions so that they can be used in queued "
+        << "signal-slot connections." << ln
+        << " * Call this function if you need it." << ln
+        << " */" << ln;
     ctx.m_out << "QEVERCLOUD_EXPORT void registerMetatypes();" << ln << ln;
 
     const auto processSingularType =
@@ -5841,7 +5848,7 @@ void Generator::generateMetaTypesCpp(
 
     std::set<std::pair<QString, QString>> dependentOptionalTypeNames;
 
-    for (const auto & s: qAsConst(structsAndExceptions))
+    const auto processStruct = [&](const Parser::Structure & s)
     {
         ctx.m_out << indent << "qRegisterMetaType<"
             << s.m_name << ">(\"qevercloud::" << s.m_name << "\");" << ln;
@@ -5904,6 +5911,34 @@ void Generator::generateMetaTypesCpp(
                     processSingularType(f.m_type));
             }
         }
+    };
+
+    const auto structureLessByName =
+        [](const Parser::Structure & lhs,
+           const Parser::Structure & rhs) noexcept
+        {
+            return lhs.m_name < rhs.m_name;
+        };
+
+    const auto processStructures = [&](Parser::Structures structures)
+    {
+        std::sort(structures.begin(), structures.end(), structureLessByName);
+        for (const auto & s: qAsConst(structures))
+        {
+            processStruct(s);
+        }
+
+        ctx.m_out << ln;
+    };
+
+    processStructures(parser.exceptions());
+    processStructures(parser.structures());
+
+    for (const auto & typeAlias: qAsConst(parser.typeAliases()))
+    {
+        ctx.m_out << indent << "qRegisterMetaType<"
+            << typeAlias.m_name << ">(\"qevercloud::" << typeAlias.m_name
+            << "\");" << ln;
     }
 
     ctx.m_out << ln;
@@ -5913,15 +5948,6 @@ void Generator::generateMetaTypesCpp(
         ctx.m_out << indent << "qRegisterMetaType<std::optional<"
             << typeNames.first << ">>(\"std::optional<" << typeNames.second
             << ">\");" << ln;
-    }
-
-    ctx.m_out << ln;
-
-    for (const auto & typeAlias: qAsConst(parser.typeAliases()))
-    {
-        ctx.m_out << indent << "qRegisterMetaType<"
-            << typeAlias.m_name << ">(\"qevercloud::" << typeAlias.m_name
-            << "\");" << ln;
     }
 
     ctx.m_out << "}" << ln << ln;

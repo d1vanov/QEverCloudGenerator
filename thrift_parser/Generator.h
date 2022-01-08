@@ -99,6 +99,12 @@ private:
         const Parser::Structure & s, const QString & outPath,
         const QString & fileSection);
 
+    void generateTypeSerializeToJson(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateTypeDeserializeFromJson(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
     void generateExceptionClassWhatMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 
@@ -300,7 +306,8 @@ private:
         OutputFileContext & ctx, const QString & fileName,
         const QStringList & additionalIncludes = {},
         const HeaderKind headerKind = HeaderKind::Public,
-        const QString & section = {});
+        const QString & section = {},
+        const QStringList & forwardDeclarationsOutsideNamespace = {});
 
     void writeHeaderBody(
         OutputFileContext & ctx, const QString & headerFileName,

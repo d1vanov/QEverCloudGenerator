@@ -2156,7 +2156,8 @@ void Generator::writeHeaderHeader(
     OutputFileContext & ctx, const QString & fileName,
     const QStringList & additionalIncludes,
     const HeaderKind headerKind,
-    const QString & section)
+    const QString & section,
+    const QStringList & forwardDeclarationsOutsideNamespace)
 {
     ctx.m_out << disclaimer << ln;
 
@@ -2181,6 +2182,14 @@ void Generator::writeHeaderHeader(
     }
 
     if (!additionalIncludes.isEmpty()) {
+        ctx.m_out << ln;
+    }
+
+    for (const auto & fwd: qAsConst(forwardDeclarationsOutsideNamespace)) {
+        ctx.m_out << fwd << ln;
+    }
+
+    if (!forwardDeclarationsOutsideNamespace.isEmpty()) {
         ctx.m_out << ln;
     }
 
@@ -3775,7 +3784,8 @@ void Generator::generateTypeHeader(
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
-        ctx, fileName, additionalIncludes, HeaderKind::Public);
+        ctx, fileName, additionalIncludes, HeaderKind::Public,
+        {}, QStringList{} << QStringLiteral("class QJsonObject;"));
 
     const QString indent = QStringLiteral("    ");
 
@@ -3876,6 +3886,12 @@ void Generator::generateTypeHeader(
 
     ctx.m_out << ln;
 
+    ctx.m_out << indent << "void serializeToJson("
+        << "QJsonObject & object) const;" << ln << ln;
+
+    ctx.m_out << indent << "[[nodiscard]] static std::optional<" << s.m_name
+        << "> deserializeFromJson(QJsonObject & object);" << ln << ln;
+
     if (generateLocalData)
     {
         if (shouldGenerateLocalId(s))
@@ -3925,10 +3941,12 @@ void Generator::generateTypeCpp(
 
     ctx.m_out << disclaimer << ln;
 
-    ctx.m_out  << "#include <qevercloud/" << fileSection << "/" << s.m_name
+    ctx.m_out << "#include <qevercloud/" << fileSection << "/" << s.m_name
         << ".h>" << ln << ln;
 
-    ctx.m_out  << "#include \"impl/" << s.m_name << "Impl.h\"" << ln << ln;
+    ctx.m_out << "#include \"impl/" << s.m_name << "Impl.h\"" << ln << ln;
+
+    ctx.m_out << "#include <QJsonObject>" << ln << ln;
 
     constexpr const char * indent = "    ";
     const bool isException = m_allExceptions.contains(s.m_name);
@@ -4096,6 +4114,9 @@ void Generator::generateTypeCpp(
     for(const auto & f: qAsConst(s.m_fields)) {
         generateClassAccessoryMethodsForFieldDefinitions(s, f, ctx);
     }
+
+    generateTypeSerializeToJson(s, ctx);
+    generateTypeDeserializeFromJson(s, ctx);
 
     ctx.m_out << "void " << s.m_name
         << "::print(QTextStream & strm) const" << ln
@@ -4412,6 +4433,33 @@ void Generator::generateTypeImplCpp(
 
     writeTypeImplPrintDefinition(ctx.m_out, s);
     writeNamespaceEnd(ctx.m_out);
+}
+
+void Generator::generateTypeSerializeToJson(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "void " << s.m_name << "::serializeToJson("
+        << "QJsonObject & object) const" << ln
+        << "{" << ln
+        << indent << "// TODO: implement" << ln
+        << indent << "Q_UNUSED(object)" << ln
+        << "}" << ln << ln;
+}
+
+void Generator::generateTypeDeserializeFromJson(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
+    constexpr const char * indent = "    ";
+
+    ctx.m_out << "std::optional<" << s.m_name << "> "
+        << s.m_name << "::deserializeFromJson(QJsonObject & object)" << ln
+        << "{" << ln
+        << indent << "// TODO: implement" << ln
+        << indent << "Q_UNUSED(object)" << ln
+        << indent << "return std::nullopt;" << ln
+        << "}" << ln << ln;
 }
 
 void Generator::generateExceptionClassWhatMethodDefinition(

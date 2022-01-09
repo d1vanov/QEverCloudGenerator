@@ -99,11 +99,11 @@ private:
         const Parser::Structure & s, const QString & outPath,
         const QString & fileSection);
 
-    void generateTypeSerializeToJson(
-        const Parser::Structure & s, OutputFileContext & ctx);
+    void generateSerializationJsonHeader(
+        const Parser::Structure & s, const QString & outPath);
 
-    void generateTypeDeserializeFromJson(
-        const Parser::Structure & s, OutputFileContext & ctx);
+    void generateSerializationJsonCpp(
+        const Parser::Structure & s, const QString & outPath);
 
     void generateExceptionClassWhatMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);

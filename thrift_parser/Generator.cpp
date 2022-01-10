@@ -4498,15 +4498,138 @@ void Generator::generateSerializationJsonCpp(
         ctx.m_out << ln;
     }
 
+    ctx.m_out << "#include <QJsonArray>" << ln << ln;
+
     writeNamespaceBegin(ctx);
 
     constexpr const char * indent = "    ";
 
     ctx.m_out << "QJsonObject serializeToJson(const "
         << s.m_name << " & value)" << ln
-        << "{" << ln
-        << indent << "// TODO: implement" << ln
-        << indent << "return {};" << ln
+        << "{" << ln;
+
+    ctx.m_out << indent << "QJsonObject object;" << ln << ln;
+
+    const auto processArrayElement =
+        [&](const std::shared_ptr<Parser::Type> & type)
+        {
+            // TODO: implement
+            Q_UNUSED(type)
+        };
+
+    for (const auto & field: s.m_fields)
+    {
+        const auto * listType =
+            dynamic_cast<Parser::ListType*>(field.m_type.get());
+
+        const auto * setType =
+            dynamic_cast<Parser::SetType*>(field.m_type.get());
+
+        if (listType || setType)
+        {
+            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << indent << "if (value." << field.m_name << "())"
+                    << ln;
+            }
+
+            ctx.m_out << indent << "{" << ln;
+            ctx.m_out << indent << indent << "QJsonArray array;" << ln;
+
+            ctx.m_out << indent << indent << "for (const auto & v: qAsConst(";
+
+            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << "*";
+            }
+
+            ctx.m_out << "value." << field.m_name << "()))" << ln
+                << indent << indent << "{" << ln;
+
+            processArrayElement(
+                listType ? listType->m_valueType : setType->m_valueType);
+
+            ctx.m_out << indent << indent << indent << "// TODO: implement"
+                << ln << indent << indent << "}" << ln;
+
+            ctx.m_out << indent << "}" << ln << ln;
+        }
+        else if (const auto * mapType =
+                 dynamic_cast<Parser::MapType*>(field.m_type.get()))
+        {
+            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << indent << "if (value." << field.m_name << "())"
+                    << ln;
+            }
+
+            ctx.m_out << indent << "{" << ln;
+            ctx.m_out << indent << indent << "QJsonObject subobject;" << ln;
+
+            ctx.m_out << indent << indent << "for (const auto & v: qAsConst(";
+
+            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << "*";
+            }
+
+            ctx.m_out << "value." << field.m_name << "()))" << ln
+                << indent << indent << "{" << ln;
+
+            // TODO: figure out how to put stuff into subobject
+
+            ctx.m_out << indent << indent << indent << "// TODO: implement"
+                << ln << indent << indent << "}" << ln;
+
+            ctx.m_out << indent << "}" << ln << ln;
+        }
+        else
+        {
+            const auto fieldTypeName = typeToStr(field.m_type, field.m_name);
+            const auto actualFieldTypeName = aliasedTypeName(fieldTypeName);
+
+            if (field.m_required ==
+                Parser::Field::RequiredFlag::Optional)
+            {
+                ctx.m_out << indent << "if (value." << field.m_name
+                    << "()) {" << ln;
+                ctx.m_out << indent << indent;
+            }
+            else
+            {
+                ctx.m_out << indent;
+            }
+
+            ctx.m_out << "object[\""
+                << field.m_name << "\"] = ";
+
+            bool isComplexType = false;
+            if (actualFieldTypeName == fieldTypeName &&
+                dynamic_cast<Parser::IdentifierType*>(field.m_type.get()))
+            {
+                isComplexType = true;
+                ctx.m_out << "serializeToJson(";
+            }
+
+            if (field.m_required ==
+                Parser::Field::RequiredFlag::Optional)
+            {
+                ctx.m_out << "*";
+            }
+
+            ctx.m_out << "value." << field.m_name << "()";
+
+            if (isComplexType) {
+                ctx.m_out << ")";
+            }
+
+            ctx.m_out << ";" << ln;
+
+            if (field.m_required ==
+                Parser::Field::RequiredFlag::Optional)
+            {
+                ctx.m_out << indent << "}" << ln << ln;
+            }
+        }
+    }
+
+    ctx.m_out << indent << "return object;" << ln
         << "}" << ln << ln;
 
     ctx.m_out << "bool deserializeFromJson("

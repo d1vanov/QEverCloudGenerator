@@ -4498,6 +4498,23 @@ void Generator::generateSerializationJsonCpp(
         ctx.m_out << ln;
     }
 
+    const bool needsToRangeHeader =
+        [&]
+        {
+            for (const auto & field: s.m_fields)
+            {
+                if (dynamic_cast<Parser::MapType*>(field.m_type.get())) {
+                    return true;
+                }
+            }
+
+            return false;
+        }();
+
+    if (needsToRangeHeader) {
+        ctx.m_out << "#include <qevercloud/utility/ToRange.h>" << ln << ln;
+    }
+
     ctx.m_out << "#include <QJsonArray>" << ln << ln;
 
     writeNamespaceBegin(ctx);
@@ -4513,8 +4530,18 @@ void Generator::generateSerializationJsonCpp(
     const auto processArrayElement =
         [&](const std::shared_ptr<Parser::Type> & type)
         {
-            // TODO: implement
-            Q_UNUSED(type)
+            ctx.m_out << indent << indent << indent << "array << ";
+
+            const auto typeName = typeToStr(type, {});
+            const auto actualTypeName = aliasedTypeName(typeName);
+            if (actualTypeName == typeName &&
+                dynamic_cast<Parser::IdentifierType*>(type.get()))
+            {
+                ctx.m_out << "serializeToJson(v);" << ln;
+            }
+            else {
+                ctx.m_out << "v;" << ln;
+            }
         };
 
     for (const auto & field: s.m_fields)
@@ -4547,14 +4574,23 @@ void Generator::generateSerializationJsonCpp(
             processArrayElement(
                 listType ? listType->m_valueType : setType->m_valueType);
 
-            ctx.m_out << indent << indent << indent << "// TODO: implement"
-                << ln << indent << indent << "}" << ln;
+            ctx.m_out << indent << indent << "}" << ln << ln;
+
+            ctx.m_out << indent << indent << "object[\"" << field.m_name
+                << "\"] = array;" << ln;
 
             ctx.m_out << indent << "}" << ln << ln;
         }
         else if (const auto * mapType =
                  dynamic_cast<Parser::MapType*>(field.m_type.get()))
         {
+            const auto keyTypeName = typeToStr(mapType->m_keyType, {});
+            const auto actualKeyTypeName = aliasedTypeName(keyTypeName);
+            if (actualKeyTypeName != QStringLiteral("QString")) {
+                throw std::runtime_error{
+                    "Only strings are supported as keys for maps"};
+            }
+
             if (field.m_required == Parser::Field::RequiredFlag::Optional) {
                 ctx.m_out << indent << "if (value." << field.m_name << "())"
                     << ln;
@@ -4563,19 +4599,34 @@ void Generator::generateSerializationJsonCpp(
             ctx.m_out << indent << "{" << ln;
             ctx.m_out << indent << indent << "QJsonObject subobject;" << ln;
 
-            ctx.m_out << indent << indent << "for (const auto & v: qAsConst(";
+            ctx.m_out << indent << indent << "for (auto it: toRange("
+                << "qAsConst(";
 
             if (field.m_required == Parser::Field::RequiredFlag::Optional) {
                 ctx.m_out << "*";
             }
 
-            ctx.m_out << "value." << field.m_name << "()))" << ln
+            ctx.m_out << "value." << field.m_name << "())))" << ln
                 << indent << indent << "{" << ln;
 
-            // TODO: figure out how to put stuff into subobject
+            ctx.m_out << indent << indent << indent << "subobject[it.key()] = ";
 
-            ctx.m_out << indent << indent << indent << "// TODO: implement"
-                << ln << indent << indent << "}" << ln;
+            const auto valueTypeName = typeToStr(mapType->m_valueType, {});
+            const auto actualValueTypeName = aliasedTypeName(valueTypeName);
+            if (actualValueTypeName == valueTypeName &&
+                dynamic_cast<Parser::IdentifierType*>(
+                    mapType->m_valueType.get()))
+            {
+                ctx.m_out << "serializeToJson(it.value());" << ln;
+            }
+            else
+            {
+                ctx.m_out << "it.value();" << ln;
+            }
+
+            ctx.m_out << indent << indent << "}" << ln;
+            ctx.m_out << indent << indent << "object[\"" << field.m_name
+                << "\"] = subobject;" << ln;
 
             ctx.m_out << indent << "}" << ln << ln;
         }

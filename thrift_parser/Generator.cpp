@@ -43,7 +43,18 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-constexpr const char * ln = "\n";
+constexpr const char * auxiliaryMethodsDisclaimer =
+    "    /**\n"
+    "     * Methods below correspond to fields which are NOT set by QEverCloud "
+    "itself.\n"
+    "     * They exist for convenience of client code and are intended to be "
+    "called\n"
+    "     * and used by QEverCloud's client code if/when appropriate\n"
+    "     */\n";
+
+constexpr const char * blockSeparator =
+    "////////////////////////////////////////"
+    "////////////////////////////////////////";
 
 constexpr const char * disclaimer =
     "/**\n"
@@ -58,18 +69,9 @@ constexpr const char * disclaimer =
     " * This file was generated from Evernote Thrift API\n"
     " */\n";
 
-constexpr const char * blockSeparator =
-    "////////////////////////////////////////"
-    "////////////////////////////////////////";
+constexpr const char * indent = "    ";
 
-constexpr const char * auxiliaryMethodsDisclaimer =
-    "    /**\n"
-    "     * Methods below correspond to fields which are NOT set by QEverCloud "
-    "itself.\n"
-    "     * They exist for convenience of client code and are intended to be "
-    "called\n"
-    "     * and used by QEverCloud's client code if/when appropriate\n"
-    "     */\n";
+constexpr const char * ln = "\n";
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -887,8 +889,6 @@ void Generator::writeTypeProperties(
         }
     }
 
-    constexpr const char * indent = "    ";
-
     for(auto it = typeAliases.constBegin(), end = typeAliases.constEnd();
         it != end; ++it)
     {
@@ -1046,8 +1046,6 @@ void Generator::writeTypeImplPrintDefinition(
     out << "void " << s.m_name
         << "::Impl::print(QTextStream & strm) const" << ln
         << "{" << ln;
-
-    constexpr const char * indent = "    ";
 
     out << indent << "strm << \"" << s.m_name << ": {\\n\";" << ln;
 
@@ -1704,8 +1702,6 @@ void Generator::generateTestServerHelperLambda(
 
     ctx.m_out << "        {" << ln;
 
-    constexpr const char * indent = "    ";
-
     for(const auto & param: func.m_params)
     {
         if (param.m_name == QStringLiteral("authenticationToken")) {
@@ -1916,7 +1912,7 @@ void Generator::generateTestServerServiceCall(
         << "            nullptr," << ln
         << "            nullRetryPolicy()));" << ln << ln;
 
-    QString indent = QStringLiteral("    ");
+    QString indentStr = QStringLiteral("    ");
     if (!exceptionTypeToCatch.isEmpty())
     {
         ctx.m_out << indent << "bool caughtException = false;" << ln;
@@ -1924,12 +1920,12 @@ void Generator::generateTestServerServiceCall(
         ctx.m_out << indent << "try" << ln
             << indent << "{" << ln;
 
-        indent += indent;
+        indentStr += QString::fromUtf8(indent);
     }
 
     if (callKind == ServiceCallKind::Sync)
     {
-        ctx.m_out << indent;
+        ctx.m_out << indentStr;
         if (funcReturnTypeName != QStringLiteral("void")) {
             ctx.m_out << funcReturnTypeName << " res = ";
         }
@@ -1938,7 +1934,7 @@ void Generator::generateTestServerServiceCall(
     }
     else if (callKind == ServiceCallKind::Async)
     {
-        ctx.m_out << indent << "QFuture<QVariant> result = "
+        ctx.m_out << indentStr << "QFuture<QVariant> result = "
             << serviceName << "->" << func.m_name << "Async(" << ln;
     }
     else
@@ -1955,21 +1951,21 @@ void Generator::generateTestServerServiceCall(
             continue;
         }
 
-        ctx.m_out << indent << "    " << param.m_name << "," << ln;
+        ctx.m_out << indentStr << "    " << param.m_name << "," << ln;
     }
 
-    ctx.m_out << indent << "    ctx);" << ln << ln;
+    ctx.m_out << indentStr << "    ctx);" << ln << ln;
 
     if (callKind == ServiceCallKind::Async)
     {
-        ctx.m_out << indent << "QFutureWatcher<QVariant> watcher;" << ln
-            << indent << "QEventLoop loop;" << ln
-            << indent << "QObject::connect(" << ln
-            << indent << indent << "&watcher, "
+        ctx.m_out << indentStr << "QFutureWatcher<QVariant> watcher;" << ln
+            << indentStr << "QEventLoop loop;" << ln
+            << indentStr << "QObject::connect(" << ln
+            << indentStr << indent << "&watcher, "
             << "&QFutureWatcher<QVariant>::finished, &loop," << ln
-            << indent << indent << "&QEventLoop::quit);" << ln << ln
-            << indent << "watcher.setFuture(result);" << ln
-            << indent << "loop.exec();" << ln;
+            << indentStr << indent << "&QEventLoop::quit);" << ln << ln
+            << indentStr << "watcher.setFuture(result);" << ln
+            << indentStr << "loop.exec();" << ln;
 
         if (exceptionTypeToCatch.isEmpty())
         {
@@ -1978,29 +1974,31 @@ void Generator::generateTestServerServiceCall(
                 if (const auto s = structForType(func.m_type, parser); s &&
                     ((shouldGenerateLocalDataMethods(*s) &&
                         shouldGenerateLocalId(*s)) ||
-                        structContainsFieldsWithLocalId(*s, parser.structures())))
+                        structContainsFieldsWithLocalId(
+                            *s, parser.structures())))
                 {
-                    ctx.m_out << indent << "compareValuesWithoutLocalIds("
+                    ctx.m_out << indentStr << "compareValuesWithoutLocalIds("
                         << "qvariant_cast<" << funcReturnTypeName
                         << ">(result.result()), response);" << ln;
                 }
                 else if (const auto listType =
-                            std::dynamic_pointer_cast<Parser::ListType>(func.m_type))
+                    std::dynamic_pointer_cast<Parser::ListType>(func.m_type))
                 {
                     if (const auto s =
                         structForType(listType->m_valueType, parser); s &&
                         ((shouldGenerateLocalDataMethods(*s) &&
                             shouldGenerateLocalId(*s)) ||
-                            structContainsFieldsWithLocalId(*s, parser.structures())))
+                            structContainsFieldsWithLocalId(
+                                *s, parser.structures())))
                     {
-                        ctx.m_out << indent
+                        ctx.m_out << indentStr
                             << "compareListValuesWithoutLocalIds("
                             << "qvariant_cast<" << funcReturnTypeName
                             << ">(result.result()), response);" << ln;
                     }
                     else
                     {
-                        ctx.m_out << indent
+                        ctx.m_out << indentStr
                             << "QVERIFY(qvariant_cast<" << funcReturnTypeName
                             << ">(result.result()) == response);" << ln;
                     }
@@ -2013,41 +2011,42 @@ void Generator::generateTestServerServiceCall(
                         (shouldGenerateLocalDataMethods(*s) ||
                             structContainsFieldsWithLocalId(*s, parser.structures())))
                     {
-                        ctx.m_out << indent
+                        ctx.m_out << indentStr
                             << "compareSetValuesWithoutLocalIds("
                             << "qvariant_cast<" << funcReturnTypeName
                             << ">(result.result()), response);" << ln;
                     }
                     else
                     {
-                        ctx.m_out << indent
+                        ctx.m_out << indentStr
                             << "QVERIFY(qvariant_cast<" << funcReturnTypeName
                             << ">(result.result()) == response);" << ln;
                     }
                 }
                 else if (const auto mapType =
-                            std::dynamic_pointer_cast<Parser::MapType>(func.m_type))
+                    std::dynamic_pointer_cast<Parser::MapType>(func.m_type))
                 {
                     if (const auto s =
                         structForType(mapType->m_valueType, parser); s &&
                         (shouldGenerateLocalDataMethods(*s) ||
-                            structContainsFieldsWithLocalId(*s, parser.structures())))
+                            structContainsFieldsWithLocalId(
+                                *s, parser.structures())))
                     {
-                        ctx.m_out << indent
+                        ctx.m_out << indentStr
                             << "compareMapValuesWithoutLocalIds("
                             << "qvariant_cast<" << funcReturnTypeName
                             << ">(result.result()), response);" << ln;
                     }
                     else
                     {
-                        ctx.m_out << indent
+                        ctx.m_out << indentStr
                             << "QVERIFY(qvariant_cast<" << funcReturnTypeName
                             << ">(result.result()) == response);" << ln;
                     }
                 }
                 else
                 {
-                    ctx.m_out << indent
+                    ctx.m_out << indentStr
                         << "QVERIFY(qvariant_cast<" << funcReturnTypeName
                         << ">(result.result()) == response);" << ln;
                 }
@@ -2056,7 +2055,7 @@ void Generator::generateTestServerServiceCall(
         else
         {
             ctx.m_out << ln;
-            ctx.m_out << indent << "result.waitForFinished();" << ln;
+            ctx.m_out << indentStr << "result.waitForFinished();" << ln;
         }
     }
 
@@ -2065,7 +2064,7 @@ void Generator::generateTestServerServiceCall(
         if ((callKind == ServiceCallKind::Sync) &&
             (funcReturnTypeName != QStringLiteral("void")))
         {
-            ctx.m_out << indent << "Q_UNUSED(res)" << ln;
+            ctx.m_out << indentStr << "Q_UNUSED(res)" << ln;
         }
 
         ctx.m_out << "    }" << ln
@@ -2884,7 +2883,7 @@ void Generator::writeThriftWriteFields(
 {
     for(const auto & field: fields)
     {
-        QString indent = QLatin1String("");
+        QString indentStr = QLatin1String("");
 
         const bool isOptional =
             (field.m_required == Parser::Field::RequiredFlag::Optional);
@@ -2893,19 +2892,19 @@ void Generator::writeThriftWriteFields(
             (fieldPrefix.isEmpty() ? QLatin1String("") : QStringLiteral("()"));
 
         if (isOptional) {
-            indent = QStringLiteral("    ");
+            indentStr = QStringLiteral("    ");
             out << "    if (" << fieldPrefix
                 << field.m_name << fieldSuffix << ") {" << ln;
         }
 
-        out << indent << "    writer.writeFieldBegin(" << ln
-            << indent << "        QStringLiteral(\""
+        out << indentStr << "    writer.writeFieldBegin(" << ln
+            << indentStr << "        QStringLiteral(\""
             << field.m_name << "\")," << ln
-            << indent << "        " << typeToStr(
+            << indentStr << "        " << typeToStr(
                 field.m_type, indentPrefix + QStringLiteral(". ") + field.m_name,
                 MethodType::ThriftFieldType)
             << "," << ln
-            << indent << "        " << field.m_id << ");" << ln << ln;
+            << indentStr << "        " << field.m_id << ");" << ln << ln;
 
         QString writeMethod = typeToStr(
             field.m_type, indentPrefix + QStringLiteral(",") + field.m_name,
@@ -2916,14 +2915,14 @@ void Generator::writeThriftWriteFields(
             auto valueType = std::dynamic_pointer_cast<Parser::ListType>(
                 field.m_type)->m_valueType;
 
-            out << indent << "    writer.writeListBegin("
+            out << indentStr << "    writer.writeListBegin("
                 << typeToStr(
                     valueType, indentPrefix + QStringLiteral(",") + field.m_name,
                     MethodType::ThriftFieldType)
                 << ", " << fieldPrefix << field.m_name << "()"
                 << (isOptional ? "->" : ".") << "length());" << ln;
 
-            out << indent
+            out << indentStr
                 << "    for(const auto & value: qAsConst("
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
                 << fieldSuffix << ")) {" << ln;
@@ -2932,28 +2931,28 @@ void Generator::writeThriftWriteFields(
                 valueType, indentPrefix + QStringLiteral(",") + field.m_name,
                 MethodType::WriteMethod);
 
-            out << indent << "        " << writeMethod << "value"
+            out << indentStr << "        " << writeMethod << "value"
                 << (writeMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
                     : QLatin1String(""))
                 << ");" << ln;
 
-            out << indent << "    }" << ln;
-            out << indent << "    writer.writeListEnd();" << ln << ln;
+            out << indentStr << "    }" << ln;
+            out << indentStr << "    writer.writeListEnd();" << ln << ln;
         }
         else if (writeMethod.contains(QStringLiteral("writeSetBegin")))
         {
             auto valueType = std::dynamic_pointer_cast<Parser::SetType>(
                 field.m_type)->m_valueType;
 
-            out << indent << "    writer.writeSetBegin("
+            out << indentStr << "    writer.writeSetBegin("
                 << typeToStr(
                     valueType, indentPrefix + QStringLiteral(",") + field.m_name,
                     MethodType::ThriftFieldType)
                 << ", " << fieldPrefix << field.m_name << "()"
                 << (isOptional ? "->" : ".") << "count());" << ln;
 
-            out << indent << "    for(const auto & value: qAsConst("
+            out << indentStr << "    for(const auto & value: qAsConst("
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
                 << fieldSuffix << ")) {" << ln;
 
@@ -2961,15 +2960,15 @@ void Generator::writeThriftWriteFields(
                 valueType, indentPrefix + QStringLiteral(",") + field.m_name,
                 MethodType::WriteMethod);
 
-            out << indent << "        " << writeMethod
+            out << indentStr << "        " << writeMethod
                 << "value"
                 << (writeMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
                     : QLatin1String(""))
                 << ");" << ln;
 
-            out << indent << "    }" << ln;
-            out << indent << "    writer.writeSetEnd();" << ln << ln;
+            out << indentStr << "    }" << ln;
+            out << indentStr << "    writer.writeSetEnd();" << ln << ln;
         }
         else if (writeMethod.contains(QStringLiteral("writeMapBegin")))
         {
@@ -2979,7 +2978,7 @@ void Generator::writeThriftWriteFields(
             auto valueType =
                 std::dynamic_pointer_cast<Parser::MapType>(field.m_type)->m_valueType;
 
-            out << indent << "    writer.writeMapBegin("
+            out << indentStr << "    writer.writeMapBegin("
                 << typeToStr(
                     keyType, indentPrefix + QStringLiteral(",") + field.m_name,
                     MethodType::ThriftFieldType)
@@ -2990,7 +2989,7 @@ void Generator::writeThriftWriteFields(
                 << ", " << fieldPrefix << field.m_name << "()"
                 << (isOptional ? "->" : ".") << "size());" << ln;
 
-            out << indent << "    for(const auto & it: "
+            out << indentStr << "    for(const auto & it: "
                 << "toRange(" << (isOptional ? "*" : "") << fieldPrefix
                 << field.m_name << fieldSuffix << ")) {" << ln;
 
@@ -3002,25 +3001,25 @@ void Generator::writeThriftWriteFields(
                 valueType, indentPrefix + QStringLiteral(",") + field.m_name,
                 MethodType::WriteMethod);
 
-            out << indent << "        " << keyWriteMethod
+            out << indentStr << "        " << keyWriteMethod
                 << "it.key()"
                 << (keyWriteMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
                     : QLatin1String(""))
                 << ");" << ln;
 
-            out << indent << "        " << valueWriteMethod << "it.value()"
+            out << indentStr << "        " << valueWriteMethod << "it.value()"
                 << (valueWriteMethod.contains(QStringLiteral("static_cast<"))
                     ? QStringLiteral(")")
                     : QLatin1String(""))
                 << ");" << ln;
 
-            out << indent << "    }" << ln;
-            out << indent << "    writer.writeMapEnd();" << ln << ln;
+            out << indentStr << "    }" << ln;
+            out << indentStr << "    writer.writeMapEnd();" << ln << ln;
         }
         else
         {
-            out << indent << "    " << writeMethod
+            out << indentStr << "    " << writeMethod
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
                 << fieldSuffix
                 << (writeMethod.contains(QStringLiteral("static_cast<"))
@@ -3029,7 +3028,7 @@ void Generator::writeThriftWriteFields(
                 << ");" << ln;
         }
 
-        out << indent << "    writer.writeFieldEnd();" << ln;
+        out << indentStr << "    writer.writeFieldEnd();" << ln;
         if (isOptional) {
             out << "    }" << ln;
         }
@@ -3041,9 +3040,9 @@ void Generator::writeThriftReadField(
     QTextStream & out, const Parser::Field & field, const QString & indentPrefix,
     const QString & fieldParent)
 {
-    constexpr const char * indent = "                ";
+    constexpr const char * longIndent = "                ";
 
-    out << indent
+    out << longIndent
         << typeToStr(
             field.m_type, indentPrefix + field.m_name, MethodType::ReadTypeName)
         << " v;" << ln;
@@ -3062,27 +3061,27 @@ void Generator::writeThriftReadField(
             valueType,  indentPrefix + field.m_name,
             MethodType::ThriftFieldType);
 
-        out << indent << "qint32 size;" << ln;
-        out << indent << "ThriftFieldType elemType;" << ln;
-        out << indent << "reader.readListBegin(elemType, size);" << ln;
-        out << indent << "v.reserve(size);" << ln;
-        out << indent << "if (elemType != " << valueThriftType
-            << ") {" << ln << indent << "    throw ThriftException("
-            << ln << indent << "        ThriftException::Type::"
-            << "INVALID_DATA," << ln << indent
+        out << longIndent << "qint32 size;" << ln;
+        out << longIndent << "ThriftFieldType elemType;" << ln;
+        out << longIndent << "reader.readListBegin(elemType, size);" << ln;
+        out << longIndent << "v.reserve(size);" << ln;
+        out << longIndent << "if (elemType != " << valueThriftType
+            << ") {" << ln << longIndent << "    throw ThriftException("
+            << ln << longIndent << "        ThriftException::Type::"
+            << "INVALID_DATA," << ln << longIndent
             << "        QStringLiteral(\"Incorrect list type ("
             << indentPrefix + field.m_name << ")\"));" << ln
-            << indent << "}" << ln;
-        out << indent << "for(qint32 i = 0; i < size; i++) {"
+            << longIndent << "}" << ln;
+        out << longIndent << "for(qint32 i = 0; i < size; i++) {"
             << ln;
-        out << indent << "    "
+        out << longIndent << "    "
             << typeToStr(
                 valueType, indentPrefix + field.m_name, MethodType::ReadTypeName)
             << " elem;" << ln;
-        out << indent << "    " << valueReadMethod << "elem);" << ln;
-        out << indent << "    v.append(elem);" << ln;
-        out << indent << "}" << ln;
-        out << indent << "reader.readListEnd();" << ln;
+        out << longIndent << "    " << valueReadMethod << "elem);" << ln;
+        out << longIndent << "    v.append(elem);" << ln;
+        out << longIndent << "}" << ln;
+        out << longIndent << "reader.readListEnd();" << ln;
     }
     else if (readMethod.contains(QStringLiteral("readSetBegin")))
     {
@@ -3095,26 +3094,27 @@ void Generator::writeThriftReadField(
         QString valueThriftType = typeToStr(
             valueType, indentPrefix + field.m_name, MethodType::ThriftFieldType);
 
-        out << indent << "qint32 size;" << ln;
-        out << indent << "ThriftFieldType elemType;" << ln;
-        out << indent << "reader.readSetBegin(elemType, size);" << ln;
-        out << indent << "v.reserve(size);" << ln;
-        out << indent << "if (elemType != " << valueThriftType
+        out << longIndent << "qint32 size;" << ln;
+        out << longIndent << "ThriftFieldType elemType;" << ln;
+        out << longIndent << "reader.readSetBegin(elemType, size);" << ln;
+        out << longIndent << "v.reserve(size);" << ln;
+        out << longIndent << "if (elemType != " << valueThriftType
             << ") {" << ln
-            << indent << "    throw ThriftException(" << ln
-            << indent << "        ThriftException::Type::INVALID_DATA," << ln
-            << indent << "        QStringLiteral(\"Incorrect set type ("
+            << longIndent << "    throw ThriftException(" << ln
+            << longIndent << "        ThriftException::Type::INVALID_DATA,"
+            << ln
+            << longIndent << "        QStringLiteral(\"Incorrect set type ("
             << indentPrefix + field.m_name << ")\"));" << ln
-            << indent << "}" << ln;
-        out << indent << "for(qint32 i = 0; i < size; i++) {" << ln;
-        out << indent << "    "
+            << longIndent << "}" << ln;
+        out << longIndent << "for(qint32 i = 0; i < size; i++) {" << ln;
+        out << longIndent << "    "
             << typeToStr(
                 valueType, indentPrefix + field.m_name, MethodType::ReadTypeName)
             << " elem;" << ln;
-        out << indent << "    " << valueReadMethod << "elem);" << ln;
-        out << indent << "    v.insert(elem);" << ln;
-        out << indent << "}" << ln;
-        out << indent << "reader.readSetEnd();" << ln;
+        out << longIndent << "    " << valueReadMethod << "elem);" << ln;
+        out << longIndent << "    v.insert(elem);" << ln;
+        out << longIndent << "}" << ln;
+        out << longIndent << "reader.readSetEnd();" << ln;
     }
     else if (readMethod.contains(QStringLiteral("readMapBegin")))
     {
@@ -3136,43 +3136,44 @@ void Generator::writeThriftReadField(
         QString valueThriftType = typeToStr(
             valueType, indentPrefix + field.m_name, MethodType::ThriftFieldType);
 
-        out << indent << "qint32 size;" << ln;
-        out << indent << "ThriftFieldType keyType;" << ln;
-        out << indent << "ThriftFieldType elemType;" << ln;
-        out << indent << "reader.readMapBegin(keyType, elemType, size);" << ln;
-        out << indent << "if (keyType != " << keyThriftType
+        out << longIndent << "qint32 size;" << ln;
+        out << longIndent << "ThriftFieldType keyType;" << ln;
+        out << longIndent << "ThriftFieldType elemType;" << ln;
+        out << longIndent << "reader.readMapBegin(keyType, elemType, size);"
+            << ln;
+        out << longIndent << "if (keyType != " << keyThriftType
             << ") throw ThriftException(ThriftException::Type::"
             << "INVALID_DATA, QStringLiteral(\"Incorrect map key type ("
             << indentPrefix << field.m_name << ")\"));" << ln;
-        out << indent << "if (elemType != " << valueThriftType
+        out << longIndent << "if (elemType != " << valueThriftType
             << ") throw ThriftException(ThriftException::Type::"
             << "INVALID_DATA, QStringLiteral(\"Incorrect map value type ("
             << indentPrefix + field.m_name << ")\"));" << ln;
-        out << indent << "for(qint32 i = 0; i < size; i++) {" << ln;
-        out << indent << "    "
+        out << longIndent << "for(qint32 i = 0; i < size; i++) {" << ln;
+        out << longIndent << "    "
             << typeToStr(
                 keyType, indentPrefix + field.m_name, MethodType::ReadTypeName)
             << " key;" << ln;
-        out << indent << "    " << keyReadMethod << "key);" << ln;
-        out << indent << "    "
+        out << longIndent << "    " << keyReadMethod << "key);" << ln;
+        out << longIndent << "    "
             << typeToStr(
                 valueType, indentPrefix + field.m_name, MethodType::ReadTypeName)
             << " value;" << ln;
-        out << indent << "    " << valueReadMethod << "value);" << ln;
-        out << indent << "    v[key] = value;" << ln;
-        out << indent << "}" << ln;
-        out << indent << "reader.readMapEnd();" << ln;
+        out << longIndent << "    " << valueReadMethod << "value);" << ln;
+        out << longIndent << "    v[key] = value;" << ln;
+        out << longIndent << "}" << ln;
+        out << longIndent << "reader.readMapEnd();" << ln;
     }
     else
     {
-        out << indent << readMethod << "v);" << ln;
+        out << longIndent << readMethod << "v);" << ln;
     }
 
     if (fieldParent.isEmpty()) {
-        out << indent << field.m_name << " = ";
+        out << longIndent << field.m_name << " = ";
     }
     else {
-        out << indent << fieldParent << "set" << capitalize(field.m_name)
+        out << longIndent << fieldParent << "set" << capitalize(field.m_name)
             << "(";
     }
 
@@ -3786,8 +3787,6 @@ void Generator::generateTypeHeader(
     sortIncludes(additionalIncludes);
     writeHeaderHeader(ctx, fileName, additionalIncludes);
 
-    const QString indent = QStringLiteral("    ");
-
     if (!s.m_docComment.isEmpty()) {
         ctx.m_out << s.m_docComment << ln;
     }
@@ -3822,7 +3821,7 @@ void Generator::generateTypeHeader(
         << " && other) noexcept;" << ln << ln;
 
     if (generateLocalData) {
-        generateTypeLocalDataAccessoryMethodDeclarations(s, ctx, indent);
+        generateTypeLocalDataAccessoryMethodDeclarations(s, ctx);
     }
 
     for(const auto & f: qAsConst(s.m_fields))
@@ -3848,11 +3847,11 @@ void Generator::generateTypeHeader(
             }
         }
 
-        generateClassAccessoryMethodsForFieldDeclarations(f, ctx, indent);
+        generateClassAccessoryMethodsForFieldDeclarations(f, ctx);
         ctx.m_out << ln;
     }
 
-    generateClassAccessoryMethodsForAuxiliaryFields(s, ctx, indent);
+    generateClassAccessoryMethodsForAuxiliaryFields(s, ctx);
 
     ctx.m_out << indent
         << "void print(QTextStream & strm) const override;" << ln << ln;
@@ -3913,12 +3912,13 @@ void Generator::generateTypeHeader(
         << indent << "QSharedDataPointer<Impl> d;" << ln
         << "};" << ln << ln;
 
-    ctx.m_out << "[[nodiscard]] QEVERCLOUD_EXPORT bool operator==(const " << s.m_name
-        << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln;
-
-    ctx.m_out << "[[nodiscard]] QEVERCLOUD_EXPORT bool operator!=(const " << s.m_name
-        << " & lhs, const " << s.m_name << " & rhs) noexcept;" << ln
+    ctx.m_out << "[[nodiscard]] QEVERCLOUD_EXPORT bool operator==(const "
+        << s.m_name << " & lhs, const " << s.m_name << " & rhs) noexcept;"
         << ln;
+
+    ctx.m_out << "[[nodiscard]] QEVERCLOUD_EXPORT bool operator!=(const "
+        << s.m_name << " & lhs, const " << s.m_name << " & rhs) noexcept;"
+        << ln << ln;
 
     writeHeaderFooter(ctx.m_out, fileName);
 }
@@ -3939,9 +3939,7 @@ void Generator::generateTypeCpp(
 
     ctx.m_out << "#include \"impl/" << s.m_name << "Impl.h\"" << ln << ln;
 
-    constexpr const char * indent = "    ";
     const bool isException = m_allExceptions.contains(s.m_name);
-
     if (isException) {
         ctx.m_out << "#include <memory>" << ln << ln;
     }
@@ -4251,8 +4249,6 @@ void Generator::generateTypeImplHeader(
     writeHeaderHeader(
         ctx, fileName, additionalIncludes, HeaderKind::Private);
 
-    constexpr const char * indent = "    ";
-
     ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name << "::"
         << "Impl final:" << ln
         << indent << "public QSharedData," << ln
@@ -4402,8 +4398,6 @@ void Generator::generateTypeImplCpp(
     ctx.m_out << ln;
     writeNamespaceBegin(ctx);
 
-    constexpr const char * indent = "    ";
-
     if (isTypeWithLocalData) {
         ctx.m_out << s.m_name << "::Impl::Impl()" << ln
             << "{" << ln;
@@ -4518,9 +4512,14 @@ void Generator::generateSerializationJsonCpp(
     ctx.m_out << "#include <QJsonArray>" << ln << ln;
 
     writeNamespaceBegin(ctx);
+    generateSerializeToJsonMethod(s, ctx);
+    generateDeserializeFromJsonMethod(s, ctx);
+    writeNamespaceEnd(ctx.m_out);
+}
 
-    constexpr const char * indent = "    ";
-
+void Generator::generateSerializeToJsonMethod(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
     ctx.m_out << "QJsonObject serializeToJson(const "
         << s.m_name << " & value)" << ln
         << "{" << ln;
@@ -4682,7 +4681,11 @@ void Generator::generateSerializationJsonCpp(
 
     ctx.m_out << indent << "return object;" << ln
         << "}" << ln << ln;
+}
 
+void Generator::generateDeserializeFromJsonMethod(
+    const Parser::Structure & s, OutputFileContext & ctx)
+{
     ctx.m_out << "bool deserializeFromJson("
         << "const QJsonObject & object, " << s.m_name << " & value)" << ln
         << "{" << ln
@@ -4691,15 +4694,11 @@ void Generator::generateSerializationJsonCpp(
         << indent << "Q_UNUSED(value)" << ln
         << indent << "return false;" << ln
         << "}" << ln << ln;
-
-    writeNamespaceEnd(ctx.m_out);
 }
 
 void Generator::generateExceptionClassWhatMethodDefinition(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
-    constexpr const char * indent = "    ";
-
     ctx.m_out << "const char * " << s.m_name << "::what() const noexcept"
         << ln << "{" << ln
         << indent << "return EvernoteException::what();" << ln
@@ -4709,8 +4708,6 @@ void Generator::generateExceptionClassWhatMethodDefinition(
 void Generator::generateExceptionClassRaiseMethodDefinition(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
-    constexpr const char * indent = "    ";
-
     ctx.m_out << "void " << s.m_name << "::raise() const" << ln
         << "{" << ln
         << indent << "throw *this;" << ln
@@ -4720,8 +4717,6 @@ void Generator::generateExceptionClassRaiseMethodDefinition(
 void Generator::generateExceptionClassCloneMethodDefinition(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
-    constexpr const char * indent = "    ";
-
     ctx.m_out << s.m_name << " * " << s.m_name << "::clone() const" << ln
         << "{" << ln
         << indent << "auto e = std::make_unique<" << s.m_name << ">();" << ln;
@@ -4879,8 +4874,6 @@ void Generator::generateTypeBuilderHeader(
     writeHeaderHeader(
         ctx, fileName, additionalIncludes, HeaderKind::Public);
 
-    const QString indent = QStringLiteral("    ");
-
     ctx.m_out << "class QEVERCLOUD_EXPORT " << s.m_name << "Builder" << ln
         << "{" << ln
         << "public:" << ln;
@@ -4994,8 +4987,6 @@ void Generator::generateTypeBuilderCpp(
     ctx.m_out << "#include <QSharedData>" << ln << ln;
 
     writeNamespaceBegin(ctx);
-
-    constexpr const char * indent = "    ";
 
     ctx.m_out << "class Q_DECL_HIDDEN " << s.m_name << "Builder::"
         << "Impl final:" << ln
@@ -5619,7 +5610,6 @@ void Generator::generateTypeBuildersTestMethod(
         << "()" << ln
         << "{" << ln;
 
-    constexpr const char * indent = "    ";
     ctx.m_out << indent << s.m_name << " value;" << ln;
 
     for (const auto & field: s.m_fields)
@@ -6113,8 +6103,6 @@ void Generator::generateMetaTypesCpp(
 
             return std::make_pair(valueTypeName, valueTypeName);
         };
-
-    constexpr const char * indent = "    ";
 
     auto structsAndExceptions = parser.structures();
     structsAndExceptions << parser.exceptions();
@@ -6729,8 +6717,6 @@ void Generator::generateTestServerCpp(
 
     sortIncludes(additionalIncludes);
 
-    constexpr const char * indent = "    ";
-
     if (!service.m_extends.isEmpty()) {
         throw std::runtime_error("extending services is not supported");
     }
@@ -7214,7 +7200,6 @@ void Generator::generateTestClearLocalIdsCpp(
 
     const auto & structs = parser.structures();
     const auto relevantStructs = collectStructsWithLocalId(parser);
-    constexpr const char * indent = "    ";
     for (const auto & s: qAsConst(relevantStructs))
     {
         ctx.m_out << "void clearLocalIds(" << s.m_name << " & v)" << ln
@@ -7407,7 +7392,7 @@ void Generator::generateTestClearLocalIdsCpp(
 }
 
 void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
-    const Parser::Structure & s, OutputFileContext & ctx, QString indent)
+    const Parser::Structure & s, OutputFileContext & ctx)
 {
     if (shouldGenerateLocalId(s))
     {
@@ -7495,8 +7480,6 @@ void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
 void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
-    constexpr const char * indent = "    ";
-
     if (shouldGenerateLocalId(s))
     {
         ctx.m_out << "const QString & " << s.m_name
@@ -7568,7 +7551,7 @@ void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
 }
 
 void Generator::generateClassAccessoryMethodsForFieldDeclarations(
-    const Parser::Field & field, OutputFileContext & ctx, QString indent)
+    const Parser::Field & field, OutputFileContext & ctx)
 {
     const QString fieldTypeName = fieldTypeToStr(field);
     const bool isPrimitiveType = isFieldOfPrimitiveType(field, fieldTypeName);
@@ -7602,7 +7585,7 @@ void Generator::generateClassAccessoryMethodsForFieldDeclarations(
 }
 
 void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
-    const Parser::Structure & s, OutputFileContext & ctx, QString indent)
+    const Parser::Structure & s, OutputFileContext & ctx)
 {
     if (s.m_name == QStringLiteral("Notebook"))
     {
@@ -7768,7 +7751,6 @@ void Generator::generateClassAccessoryMethodsForFieldDefinitions(
 {
     const QString fieldTypeName = fieldTypeToStr(field);
     const bool isPrimitiveType = isFieldOfPrimitiveType(field, fieldTypeName);
-    constexpr const char * indent = "    ";
 
     // Const getter
     if (isPrimitiveType) {

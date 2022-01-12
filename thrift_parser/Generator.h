@@ -105,6 +105,12 @@ private:
     void generateSerializationJsonCpp(
         const Parser::Structure & s, const QString & outPath);
 
+    void generateSerializeToJsonMethod(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateDeserializeFromJsonMethod(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
     void generateExceptionClassWhatMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 
@@ -191,19 +197,16 @@ private:
         Parser & parser, const QString & outPath);
 
     void generateTypeLocalDataAccessoryMethodDeclarations(
-        const Parser::Structure & s, OutputFileContext & ctx,
-        QString indent = QString{});
+        const Parser::Structure & s, OutputFileContext & ctx);
 
     void generateTypeLocalDataAccessoryMethodDefinitions(
         const Parser::Structure & s, OutputFileContext & ctx);
 
     void generateClassAccessoryMethodsForFieldDeclarations(
-        const Parser::Field & field, OutputFileContext & ctx,
-        QString indent = QString{});
+        const Parser::Field & field, OutputFileContext & ctx);
 
     void generateClassAccessoryMethodsForAuxiliaryFields(
-        const Parser::Structure & s, OutputFileContext & ctx,
-        QString indent = QString{});
+        const Parser::Structure & s, OutputFileContext & ctx);
 
     void generateClassAccessoryMethodsForFieldDefinitions(
         const Parser::Structure & s, const Parser::Field & field,

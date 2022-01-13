@@ -4510,6 +4510,7 @@ void Generator::generateSerializationJsonCpp(
     }
 
     ctx.m_out << "#include <QJsonArray>" << ln << ln;
+    ctx.m_out << "#include <limits>" << ln << ln;
 
     writeNamespaceBegin(ctx);
     generateSerializeToJsonMethod(s, ctx);
@@ -4538,7 +4539,12 @@ void Generator::generateSerializeToJsonMethod(
             {
                 ctx.m_out << "serializeToJson(v);" << ln;
             }
-            else {
+            else if (dynamic_cast<Parser::ByteArrayType*>(type.get()))
+            {
+                ctx.m_out << "QString::fromUtf8(v.toBase64());" << ln;
+            }
+            else
+            {
                 ctx.m_out << "v;" << ln;
             }
         };
@@ -4618,6 +4624,11 @@ void Generator::generateSerializeToJsonMethod(
             {
                 ctx.m_out << "serializeToJson(it.value());" << ln;
             }
+            else if (dynamic_cast<Parser::ByteArrayType*>(
+                     mapType->m_valueType.get()))
+            {
+                ctx.m_out << "QString::fromUtf8(it.value().toBase64());" << ln;
+            }
             else
             {
                 ctx.m_out << "it.value();" << ln;
@@ -4657,7 +4668,15 @@ void Generator::generateSerializeToJsonMethod(
                 ctx.m_out << "serializeToJson(";
             }
 
-            if (field.m_required ==
+            const bool isByteArray =
+                !isComplexType &&
+                (dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()) !=
+                 nullptr);
+
+            if (isByteArray) {
+                ctx.m_out << "QString::fromUtf8(";
+            }
+            else if (field.m_required ==
                 Parser::Field::RequiredFlag::Optional)
             {
                 ctx.m_out << "*";
@@ -4668,6 +4687,10 @@ void Generator::generateSerializeToJsonMethod(
             if (isComplexType) {
                 ctx.m_out << ")";
             }
+            else if (isByteArray) {
+                ctx.m_out << "->toBase64())";
+            }
+
 
             ctx.m_out << ";" << ln;
 
@@ -4688,8 +4711,122 @@ void Generator::generateDeserializeFromJsonMethod(
 {
     ctx.m_out << "bool deserializeFromJson("
         << "const QJsonObject & object, " << s.m_name << " & value)" << ln
-        << "{" << ln
-        << indent << "// TODO: implement" << ln
+        << "{" << ln;
+
+    for (const auto & field: s.m_fields)
+    {
+        const auto * listType =
+            dynamic_cast<Parser::ListType*>(field.m_type.get());
+
+        const auto * setType =
+            dynamic_cast<Parser::SetType*>(field.m_type.get());
+
+        if (listType || setType)
+        {
+            ctx.m_out << indent << "if (object.contains(\""
+                << field.m_name << "\")) {" << ln;
+
+            ctx.m_out << indent << indent << "auto v = object[\""
+                << field.m_name << "\"];" << ln;
+
+            ctx.m_out << indent << indent << "if (v.isArray()) {" << ln;
+            ctx.m_out << indent << indent << indent
+                << "const auto a = v.toArray();" << ln;
+
+            ctx.m_out << indent << indent << indent
+                << "for (const auto & item: qAsConst(a)) {" << ln;
+
+            const auto & valueType =
+                (listType ? listType->m_valueType : setType->m_valueType);
+
+            const auto * primitiveType = dynamic_cast<Parser::PrimitiveType*>(
+                valueType.get());
+
+            const bool isBool =
+                (primitiveType &&
+                 primitiveType->m_type == Parser::PrimitiveType::Type::Bool);
+
+            const bool isByte =
+                (primitiveType &&
+                 primitiveType->m_type == Parser::PrimitiveType::Type::Byte);
+
+            const bool isInt16 =
+                (primitiveType &&
+                 primitiveType->m_type == Parser::PrimitiveType::Type::Int16);
+
+            const bool isInt32 =
+                (primitiveType &&
+                 primitiveType->m_type == Parser::PrimitiveType::Type::Int32);
+
+            const bool isInt64 =
+                (primitiveType &&
+                 primitiveType->m_type == Parser::PrimitiveType::Type::Int64);
+
+            const bool isDouble =
+                (primitiveType &&
+                 primitiveType->m_type == Parser::PrimitiveType::Type::Double);
+
+            const bool isString =
+                (dynamic_cast<Parser::StringType*>(valueType.get()) != nullptr);
+
+            const bool isByteArray =
+                (dynamic_cast<Parser::ByteArrayType*>(valueType.get()) !=
+                 nullptr);
+
+            if (isBool)
+            {
+                ctx.m_out << indent << indent << indent << indent
+                    << "if (item.isBool()) {" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << "value.set" << capitalize(field.m_name)
+                    << "(item.toBool());" << ln;
+
+                ctx.m_out << indent << indent << indent << indent
+                    << "}" << ln;
+            }
+            else if (isByte)
+            {
+                ctx.m_out << indent << indent << indent << indent
+                    << "if (item.isDouble()) {" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << "auto d = item.toDouble();" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << "if ((d >= static_cast<double>("
+                    << "std::numeric_limits<quint8>::min())) && "
+                    << "(d <= static_cast<double>("
+                    << "std::numeric_limits<quint8>::max()))) {" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << indent << "value.set" << capitalize(field.m_name)
+                    << "(static_cast<quint8>(d));" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << "}" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << "else {" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << indent << "return false;" << ln;
+
+                ctx.m_out << indent << indent << indent << indent << indent
+                    << "}" << ln;
+
+                ctx.m_out << indent << indent << indent << indent
+                    << "}" << ln;
+            }
+            // TODO: support other types
+
+            ctx.m_out << indent << indent << indent << "}" << ln;
+            ctx.m_out << indent << indent << "}" << ln;
+            ctx.m_out << indent << "}" << ln << ln;
+        }
+    }
+
+    ctx.m_out << indent << "// TODO: implement" << ln
         << indent << "Q_UNUSED(object)" << ln
         << indent << "Q_UNUSED(value)" << ln
         << indent << "return false;" << ln

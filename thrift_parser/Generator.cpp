@@ -4713,6 +4713,130 @@ void Generator::generateDeserializeFromJsonMethod(
         << "const QJsonObject & object, " << s.m_name << " & value)" << ln
         << "{" << ln;
 
+    const auto processValue = [&](
+        const std::shared_ptr<Parser::Type> & type, const QString & itemName,
+        const QString & indentStr, const QString & setter)
+    {
+        const auto typeName = typeToStr(type, {});
+        const auto actualTypeName = aliasedTypeName(typeName);
+
+        // In json all numeric values are stored as doubles so for int fields
+        // need to use cast but need to do it cautiously
+        const auto processIntegerValue = [&](const QString & intTypeName)
+        {
+            ctx.m_out << indentStr << "if (" << itemName << ".isDouble()) {"
+                << ln;
+
+            ctx.m_out << indentStr << indent
+                << "auto d = " << itemName << ".toDouble();" << ln;
+
+            ctx.m_out << indentStr << indent
+                << "if ((d >= static_cast<double>("
+                << "std::numeric_limits<" << intTypeName << ">::min())) &&"
+                << ln
+                << indentStr << indent << "    "
+                << "(d <= static_cast<double>("
+                << "std::numeric_limits<" << intTypeName << ">::max())))" << ln
+                << indentStr << indent << "{" << ln;
+
+            ctx.m_out << indentStr << indent
+                << indent << setter << "(static_cast<" << intTypeName
+                << ">(d));" << ln;
+
+            ctx.m_out << indentStr << indent << "}" << ln
+                << indentStr << indent << "else {" << ln
+                << indentStr << indent << indent << "return false;" << ln
+                << indentStr << indent << "}" << ln
+                << indentStr << "}" << ln;
+        };
+
+        if (actualTypeName == QStringLiteral("bool"))
+        {
+            ctx.m_out << indentStr << "if (" << itemName << ".isBool()) {"
+                << ln;
+
+            ctx.m_out << indentStr << indent
+                << setter << "(" << itemName << ".toBool());" << ln;
+
+            ctx.m_out << indentStr << "}" << ln;
+        }
+        else if (actualTypeName == QStringLiteral("quint8"))
+        {
+            processIntegerValue(QStringLiteral("quint8"));
+        }
+        else if (actualTypeName == QStringLiteral("qint16"))
+        {
+            processIntegerValue(QStringLiteral("qint16"));
+        }
+        else if (actualTypeName == QStringLiteral("qint32"))
+        {
+            processIntegerValue(QStringLiteral("qint32"));
+        }
+        else if (actualTypeName == QStringLiteral("qint64"))
+        {
+            processIntegerValue(QStringLiteral("qint64"));
+        }
+        else if (actualTypeName == QStringLiteral("double"))
+        {
+            ctx.m_out << indentStr << "if (" << itemName << ".isDouble()) {"
+                << ln;
+
+            ctx.m_out << indentStr << indent
+                << "auto d = " << itemName << ".toDouble();" << ln;
+
+            ctx.m_out << indentStr << indent << setter << "(d);"
+                << ln;
+
+            ctx.m_out << indentStr << "}" << ln;
+        }
+        else if (actualTypeName == QStringLiteral("QString"))
+        {
+            ctx.m_out << indentStr << "if (" << itemName << ".isString()) {"
+                << ln;
+
+            ctx.m_out << indentStr << indent
+                << "auto s = " << itemName << ".toString();" << ln;
+
+            ctx.m_out << indentStr << indent << setter
+                << "(std::move(s));" << ln;
+
+            ctx.m_out << indentStr << "}" << ln;
+        }
+        else if (actualTypeName == QStringLiteral("QByteArray"))
+        {
+            ctx.m_out << indentStr << "if (" << itemName << ".isString()) {"
+                << ln;
+
+            ctx.m_out << indentStr << indent
+                << "auto s = " << itemName << ".toString();" << ln;
+
+            ctx.m_out << indentStr << indent << setter
+                << "(QByteArray::fromBase64(s.toUtf8()));" << ln;
+
+            ctx.m_out << indentStr << "}" << ln;
+        }
+        else
+        {
+            ctx.m_out << indentStr << "if (" << itemName << ".isObject()) {"
+                << ln;
+
+            ctx.m_out << indentStr << indent
+                << "auto o = " << itemName << ".toObject();" << ln;
+
+            ctx.m_out << indentStr << indent
+                << typeName << " f;" << ln;
+
+            ctx.m_out << indentStr << indent
+                << "if (deserializeFromJson(o, f)) {" << ln;
+
+            ctx.m_out << indentStr << indent << indent << setter
+                << "(std::move(f));" << ln;
+
+            ctx.m_out << indentStr << indent << "}" << ln;
+            ctx.m_out << indentStr << "}" << ln;
+        }
+    };
+
     for (const auto & field: s.m_fields)
     {
         const auto * listType =
@@ -4734,96 +4858,52 @@ void Generator::generateDeserializeFromJsonMethod(
                 << "const auto a = v.toArray();" << ln;
 
             ctx.m_out << indent << indent << indent
+                << typeToStr(field.m_type, {}) << " values;" << ln;
+
+            ctx.m_out << indent << indent << indent
                 << "for (const auto & item: qAsConst(a)) {" << ln;
+
+            const QString indentStr = [&]
+            {
+                QString indentStr;
+                QTextStream strm{&indentStr};
+                for (int i = 0; i < 4; ++i) {
+                    strm << indent;
+                }
+                return indentStr;
+            }();
+
+            const QString setter = [&]
+            {
+                QString setter;
+                QTextStream strm{&setter};
+                if (listType) {
+                    strm << "values.push_back";
+                }
+                else {
+                    strm << "values.insert";
+                }
+                return setter;
+            }();
 
             const auto & valueType =
                 (listType ? listType->m_valueType : setType->m_valueType);
 
-            const auto * primitiveType = dynamic_cast<Parser::PrimitiveType*>(
-                valueType.get());
+            processValue(valueType, QStringLiteral("item"), indentStr, setter);
 
-            const bool isBool =
-                (primitiveType &&
-                 primitiveType->m_type == Parser::PrimitiveType::Type::Bool);
+            ctx.m_out << indent << indent << indent << "}" << ln;
+            ctx.m_out << indent << indent << indent
+                << "if (!values.isEmpty()) {" << ln;
 
-            const bool isByte =
-                (primitiveType &&
-                 primitiveType->m_type == Parser::PrimitiveType::Type::Byte);
-
-            const bool isInt16 =
-                (primitiveType &&
-                 primitiveType->m_type == Parser::PrimitiveType::Type::Int16);
-
-            const bool isInt32 =
-                (primitiveType &&
-                 primitiveType->m_type == Parser::PrimitiveType::Type::Int32);
-
-            const bool isInt64 =
-                (primitiveType &&
-                 primitiveType->m_type == Parser::PrimitiveType::Type::Int64);
-
-            const bool isDouble =
-                (primitiveType &&
-                 primitiveType->m_type == Parser::PrimitiveType::Type::Double);
-
-            const bool isString =
-                (dynamic_cast<Parser::StringType*>(valueType.get()) != nullptr);
-
-            const bool isByteArray =
-                (dynamic_cast<Parser::ByteArrayType*>(valueType.get()) !=
-                 nullptr);
-
-            if (isBool)
-            {
-                ctx.m_out << indent << indent << indent << indent
-                    << "if (item.isBool()) {" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << "value.set" << capitalize(field.m_name)
-                    << "(item.toBool());" << ln;
-
-                ctx.m_out << indent << indent << indent << indent
-                    << "}" << ln;
-            }
-            else if (isByte)
-            {
-                ctx.m_out << indent << indent << indent << indent
-                    << "if (item.isDouble()) {" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << "auto d = item.toDouble();" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << "if ((d >= static_cast<double>("
-                    << "std::numeric_limits<quint8>::min())) && "
-                    << "(d <= static_cast<double>("
-                    << "std::numeric_limits<quint8>::max()))) {" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << indent << "value.set" << capitalize(field.m_name)
-                    << "(static_cast<quint8>(d));" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << "}" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << "else {" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << indent << "return false;" << ln;
-
-                ctx.m_out << indent << indent << indent << indent << indent
-                    << "}" << ln;
-
-                ctx.m_out << indent << indent << indent << indent
-                    << "}" << ln;
-            }
-            // TODO: support other types
+            ctx.m_out << indent << indent << indent << indent
+                << "value.set" << capitalize(field.m_name)
+                << "(std::move(values));" << ln;
 
             ctx.m_out << indent << indent << indent << "}" << ln;
             ctx.m_out << indent << indent << "}" << ln;
             ctx.m_out << indent << "}" << ln << ln;
         }
+        // TODO: process map type and singular types as well
     }
 
     ctx.m_out << indent << "// TODO: implement" << ln

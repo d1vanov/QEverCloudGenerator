@@ -4713,9 +4713,11 @@ void Generator::generateDeserializeFromJsonMethod(
         << "const QJsonObject & object, " << s.m_name << " & value)" << ln
         << "{" << ln;
 
+    using ValueSetter = std::function<QString(QString)>;
+
     const auto processValue = [&](
         const std::shared_ptr<Parser::Type> & type, const QString & itemName,
-        const QString & indentStr, const QString & setter)
+        const QString & indentStr, const ValueSetter setter)
     {
         const auto typeName = typeToStr(type, {});
         const auto actualTypeName = aliasedTypeName(typeName);
@@ -4739,9 +4741,14 @@ void Generator::generateDeserializeFromJsonMethod(
                 << "std::numeric_limits<" << intTypeName << ">::max())))" << ln
                 << indentStr << indent << "{" << ln;
 
+            QString valueToSet;
+            {
+                QTextStream strm{&valueToSet};
+                strm << "static_cast<" << intTypeName << ">(d)";
+            }
+
             ctx.m_out << indentStr << indent
-                << indent << setter << "(static_cast<" << intTypeName
-                << ">(d));" << ln;
+                << indent << setter(valueToSet) << ";" << ln;
 
             ctx.m_out << indentStr << indent << "}" << ln
                 << indentStr << indent << "else {" << ln
@@ -4755,8 +4762,14 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << "if (" << itemName << ".isBool()) {"
                 << ln;
 
+            QString valueToSet;
+            {
+                QTextStream strm{&valueToSet};
+                strm << itemName << "toBool()";
+            }
+
             ctx.m_out << indentStr << indent
-                << setter << "(" << itemName << ".toBool());" << ln;
+                << setter(valueToSet) << ";" << ln;
 
             ctx.m_out << indentStr << "}" << ln;
         }
@@ -4784,8 +4797,8 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << indent
                 << "auto d = " << itemName << ".toDouble();" << ln;
 
-            ctx.m_out << indentStr << indent << setter << "(d);"
-                << ln;
+            ctx.m_out << indentStr << indent << setter(QStringLiteral("d"))
+                << ";" << ln;
 
             ctx.m_out << indentStr << "}" << ln;
         }
@@ -4797,8 +4810,8 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << indent
                 << "auto s = " << itemName << ".toString();" << ln;
 
-            ctx.m_out << indentStr << indent << setter
-                << "(std::move(s));" << ln;
+            ctx.m_out << indentStr << indent
+                << setter(QStringLiteral("std::move(s)")) << ";" << ln;
 
             ctx.m_out << indentStr << "}" << ln;
         }
@@ -4810,8 +4823,9 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << indent
                 << "auto s = " << itemName << ".toString();" << ln;
 
-            ctx.m_out << indentStr << indent << setter
-                << "(QByteArray::fromBase64(s.toUtf8()));" << ln;
+            ctx.m_out << indentStr << indent
+                << setter(QStringLiteral("QByteArray::fromBase64(s.toUtf8())"))
+                << ";" << ln;
 
             ctx.m_out << indentStr << "}" << ln;
         }
@@ -4829,8 +4843,8 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << indent
                 << "if (deserializeFromJson(o, f)) {" << ln;
 
-            ctx.m_out << indentStr << indent << indent << setter
-                << "(std::move(f));" << ln;
+            ctx.m_out << indentStr << indent << indent
+                << setter(QStringLiteral("std::move(f)")) << ";" << ln;
 
             ctx.m_out << indentStr << indent << "}" << ln;
             ctx.m_out << indentStr << "}" << ln;
@@ -4873,23 +4887,23 @@ void Generator::generateDeserializeFromJsonMethod(
                 return indentStr;
             }();
 
-            const QString setter = [&]
-            {
-                QString setter;
-                QTextStream strm{&setter};
-                if (listType) {
-                    strm << "values.push_back";
-                }
-                else {
-                    strm << "values.insert";
-                }
-                return setter;
-            }();
-
             const auto & valueType =
                 (listType ? listType->m_valueType : setType->m_valueType);
 
-            processValue(valueType, QStringLiteral("item"), indentStr, setter);
+            processValue(
+                valueType, QStringLiteral("item"), indentStr,
+                [&](const QString & value)
+                {
+                    QString str;
+                    QTextStream strm{&str};
+                    if (listType) {
+                        strm << "values.push_back(" << value << ")";
+                    }
+                    else {
+                        strm << "values.insert(" << value << ")";
+                    }
+                    return str;
+                });
 
             ctx.m_out << indent << indent << indent << "}" << ln;
             ctx.m_out << indent << indent << indent
@@ -4903,7 +4917,73 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indent << indent << "}" << ln;
             ctx.m_out << indent << "}" << ln << ln;
         }
-        // TODO: process map type and singular types as well
+        else if (const auto mapType =
+                 std::dynamic_pointer_cast<Parser::MapType>(field.m_type))
+        {
+            const auto & keyType = mapType->m_keyType;
+            const auto & valueType = mapType->m_valueType;
+
+            const auto keyTypeName = typeToStr(keyType, {});
+            const auto actualKeyTypeName = aliasedTypeName(keyTypeName);
+            if (actualKeyTypeName != QStringLiteral("QString")) {
+                throw std::runtime_error{
+                    "Only strings are supported as keys for maps"};
+            }
+
+            const auto mapTypeName = typeToStr(mapType, {});
+
+            ctx.m_out << indent << "if (object.contains(\""
+                << field.m_name << "\")) {" << ln;
+
+            ctx.m_out << indent << indent << "auto v = object[\""
+                << field.m_name << "\"];" << ln;
+
+            ctx.m_out << indent << indent <<
+                "if (v.isObject()) {" << ln;
+
+            ctx.m_out << indent << indent << indent
+                << "auto o = v.toObject();" << ln;
+
+            ctx.m_out << indent << indent << indent
+                << mapTypeName << " map;" << ln;
+
+            ctx.m_out << indent << indent << indent
+                << "for (auto it: toRange(qAsConst(o))) {" << ln;
+
+            const QString indentStr = [&]
+            {
+                QString indentStr;
+                QTextStream strm{&indentStr};
+                for (int i = 0; i < 4; ++i) {
+                    strm << indent;
+                }
+                return indentStr;
+            }();
+
+            processValue(
+                valueType, QStringLiteral("it.value()"), indentStr,
+                [&](const QString & value)
+                {
+                    QString str;
+                    QTextStream strm{&str};
+                    strm << "map[it.key()] = " << value;
+                    return str;
+                });
+
+            ctx.m_out << indent << indent << indent << "}" << ln;
+
+            ctx.m_out << indent << indent << indent
+                << "if (!map.isEmpty()) {" << ln;
+
+            ctx.m_out << indent << indent << indent << indent
+                << "value.set" << capitalize(field.m_name)
+                << "(std::move(map));" << ln;
+
+            ctx.m_out << indent << indent << indent << "}" << ln;
+            ctx.m_out << indent << indent << "}" << ln << ln;
+            ctx.m_out << indent << "}" << ln << ln;
+        }
+        // TODO: process singular types as well
     }
 
     ctx.m_out << indent << "// TODO: implement" << ln

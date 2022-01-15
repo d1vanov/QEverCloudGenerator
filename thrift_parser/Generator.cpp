@@ -4518,7 +4518,28 @@ void Generator::generateSerializationJsonCpp(
     Parser::Enumerations enums;
     for (const auto & field: s.m_fields)
     {
-        const auto typeName = typeToStr(field.m_type, field.m_name);
+        const auto fieldValueType = [&] () -> std::shared_ptr<Parser::Type>
+        {
+            if (const auto * listType =
+                dynamic_cast<Parser::ListType*>(field.m_type.get()))
+            {
+                return listType->m_valueType;
+            }
+            else if (const auto * setType =
+                     dynamic_cast<Parser::SetType*>(field.m_type.get()))
+            {
+                return setType->m_valueType;
+            }
+            else if (const auto * mapType =
+                     dynamic_cast<Parser::MapType*>(field.m_type.get()))
+            {
+                return mapType->m_valueType;
+            }
+
+            return field.m_type;
+        }();
+
+        const auto typeName = typeToStr(fieldValueType, {});
         const auto actualTypeName = aliasedTypeName(typeName);
 
         const auto it = std::find_if(
@@ -4953,6 +4974,9 @@ void Generator::generateDeserializeFromJsonMethod(
                 << setter(QStringLiteral("std::move(f)")) << ln;
 
             ctx.m_out << indentStr << indent << "}" << ln;
+            ctx.m_out << indentStr << indent << "else {" << ln;
+            ctx.m_out << indentStr << indent << indent << "return false;" << ln;
+            ctx.m_out << indentStr << indent << "}" << ln;
             ctx.m_out << indentStr << "}" << ln;
         }
     };
@@ -5008,16 +5032,34 @@ void Generator::generateDeserializeFromJsonMethod(
                     {
                         QString str;
                         QTextStream strm{&str};
+                        strm << "const auto e = safeCast"
+                            << capitalize(actualValueTypeName)
+                            << "ToEnum(" << value << ");" << ln;
+
+                        strm << indentStr << indent << indent
+                            << "if (e) {" << ln;
+
+                        strm << indentStr << indent << indent << indent;
+
                         if (listType) {
-                            strm << "values.push_back(static_cast<"
-                                << actualValueTypeName << ">(" << value
-                                << "));";
+                            strm << "values.push_back(*e);" << ln;
                         }
                         else {
-                            strm << "values.insert(static_cast<"
-                                << actualValueTypeName << ">(" << value
-                                << "));";
+                            strm << "values.insert(*e);" << ln;
                         }
+
+                        strm << indentStr << indent << indent
+                            << "}" << ln;
+
+                        strm << indentStr << indent << indent
+                            << "else {" << ln;
+
+                        strm << indentStr << indent << indent << indent
+                            << "return false;" << ln;
+
+                        strm << indentStr << indent << indent
+                            << "}";
+
                         return str;
                     });
             }
@@ -5105,8 +5147,29 @@ void Generator::generateDeserializeFromJsonMethod(
                     {
                         QString str;
                         QTextStream strm{&str};
-                        strm << "map[it.key()] = static_cast<"
-                            << actualValueTypeName << ">(" << value << ");";
+
+                        strm << "const auto e = safeCast"
+                            << capitalize(actualValueTypeName)
+                            << "ToEnum(" << value << ");" << ln;
+
+                        strm << indentStr << indent << indent
+                            << "if (e) {" << ln;
+
+                        strm << indentStr << indent << indent << indent
+                            << "map[it.key()] = *e;" << ln;
+
+                        strm << indentStr << indent << indent
+                            << "}" << ln;
+
+                        strm << indentStr << indent << indent
+                            << "else {" << ln;
+
+                        strm << indentStr << indent << indent << indent
+                            << "return false;" << ln;
+
+                        strm << indentStr << indent << indent
+                            << "}";
+
                         return str;
                     });
             }

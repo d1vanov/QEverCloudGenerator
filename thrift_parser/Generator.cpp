@@ -4864,7 +4864,7 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indent << "if (object.contains(\""
                 << field.m_name << "\")) {" << ln;
 
-            ctx.m_out << indent << indent << "auto v = object[\""
+            ctx.m_out << indent << indent << "const auto v = object[\""
                 << field.m_name << "\"];" << ln;
 
             ctx.m_out << indent << indent << "if (v.isArray()) {" << ln;
@@ -4942,7 +4942,7 @@ void Generator::generateDeserializeFromJsonMethod(
                 "if (v.isObject()) {" << ln;
 
             ctx.m_out << indent << indent << indent
-                << "auto o = v.toObject();" << ln;
+                << "const auto o = v.toObject();" << ln;
 
             ctx.m_out << indent << indent << indent
                 << mapTypeName << " map;" << ln;
@@ -4983,13 +4983,40 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indent << indent << "}" << ln << ln;
             ctx.m_out << indent << "}" << ln << ln;
         }
-        // TODO: process singular types as well
+        else
+        {
+            ctx.m_out << indent << "if (object.contains(\""
+                << field.m_name << "\")) {" << ln;
+
+            ctx.m_out << indent << indent << "const auto v = object[\""
+                << field.m_name << "\"];" << ln;
+
+            const QString indentStr = [&]
+            {
+                QString indentStr;
+                QTextStream strm{&indentStr};
+                for (int i = 0; i < 2; ++i) {
+                    strm << indent;
+                }
+                return indentStr;
+            }();
+
+            processValue(
+                field.m_type, QStringLiteral("v"), indentStr,
+                [&](const QString & value)
+                {
+                    QString str;
+                    QTextStream strm{&str};
+                    strm << "value.set" << capitalize(field.m_name)
+                        << "(" << value << ")";
+                    return str;
+                });
+
+            ctx.m_out << indent << "}" << ln << ln;
+        }
     }
 
-    ctx.m_out << indent << "// TODO: implement" << ln
-        << indent << "Q_UNUSED(object)" << ln
-        << indent << "Q_UNUSED(value)" << ln
-        << indent << "return false;" << ln
+    ctx.m_out << indent << "return true;" << ln
         << "}" << ln << ln;
 }
 

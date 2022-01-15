@@ -4533,6 +4533,16 @@ void Generator::generateSerializationJsonCpp(
         }
     }
 
+    enums.erase(
+        std::unique(
+            enums.begin(),
+            enums.end(),
+            [](const Parser::Enumeration & lhs, const Parser::Enumeration & rhs)
+            {
+                return lhs.m_name == rhs.m_name;
+            }),
+        enums.end());
+
     if (!enums.empty())
     {
         ctx.m_out << "namespace {" << ln << ln;
@@ -4650,8 +4660,8 @@ void Generator::generateSerializeToJsonMethod(
 
             ctx.m_out << indent << indent << "}" << ln << ln;
 
-            ctx.m_out << indent << indent << "object[\"" << field.m_name
-                << "\"] = array;" << ln;
+            ctx.m_out << indent << indent << "object[QStringLiteral(\""
+                << field.m_name << "\")] = array;" << ln;
 
             ctx.m_out << indent << "}" << ln << ln;
         }
@@ -4688,8 +4698,8 @@ void Generator::generateSerializeToJsonMethod(
             processItem(mapType->m_valueType, QStringLiteral("it.value()"));
 
             ctx.m_out << indent << indent << "}" << ln;
-            ctx.m_out << indent << indent << "object[\"" << field.m_name
-                << "\"] = subobject;" << ln;
+            ctx.m_out << indent << indent << "object[QStringLiteral(\""
+                << field.m_name << "\")] = subobject;" << ln;
 
             ctx.m_out << indent << "}" << ln << ln;
         }
@@ -4710,8 +4720,8 @@ void Generator::generateSerializeToJsonMethod(
                 ctx.m_out << indent;
             }
 
-            ctx.m_out << "object[\""
-                << field.m_name << "\"] = ";
+            ctx.m_out << "object[QStringLiteral(\""
+                << field.m_name << "\")] = ";
 
             const bool isEnum =
                 (actualFieldTypeName == fieldTypeName &&
@@ -4957,11 +4967,12 @@ void Generator::generateDeserializeFromJsonMethod(
 
         if (listType || setType)
         {
-            ctx.m_out << indent << "if (object.contains(\""
-                << field.m_name << "\")) {" << ln;
+            ctx.m_out << indent << "if (object.contains(QStringLiteral(\""
+                << field.m_name << "\"))) {" << ln;
 
-            ctx.m_out << indent << indent << "const auto v = object[\""
-                << field.m_name << "\"];" << ln;
+            ctx.m_out << indent << indent
+                << "const auto v = object[QStringLiteral(\""
+                << field.m_name << "\")];" << ln;
 
             ctx.m_out << indent << indent << "if (v.isArray()) {" << ln;
             ctx.m_out << indent << indent << indent
@@ -4986,20 +4997,47 @@ void Generator::generateDeserializeFromJsonMethod(
             const auto & valueType =
                 (listType ? listType->m_valueType : setType->m_valueType);
 
-            processValue(
-                valueType, QStringLiteral("item"), indentStr,
-                [&](const QString & value)
-                {
-                    QString str;
-                    QTextStream strm{&str};
-                    if (listType) {
-                        strm << "values.push_back(" << value << ");";
-                    }
-                    else {
-                        strm << "values.insert(" << value << ");";
-                    }
-                    return str;
-                });
+            const auto valueTypeName = typeToStr(valueType, {});
+            const auto actualValueTypeName = aliasedTypeName(valueTypeName);
+
+            if (m_allEnums.contains(actualValueTypeName))
+            {
+                processValue(
+                    valueType, QStringLiteral("item"), indentStr,
+                    [&](const QString & value)
+                    {
+                        QString str;
+                        QTextStream strm{&str};
+                        if (listType) {
+                            strm << "values.push_back(static_cast<"
+                                << actualValueTypeName << ">(" << value
+                                << "));";
+                        }
+                        else {
+                            strm << "values.insert(static_cast<"
+                                << actualValueTypeName << ">(" << value
+                                << "));";
+                        }
+                        return str;
+                    });
+            }
+            else
+            {
+                processValue(
+                    valueType, QStringLiteral("item"), indentStr,
+                    [&](const QString & value)
+                    {
+                        QString str;
+                        QTextStream strm{&str};
+                        if (listType) {
+                            strm << "values.push_back(" << value << ");";
+                        }
+                        else {
+                            strm << "values.insert(" << value << ");";
+                        }
+                        return str;
+                    });
+            }
 
             ctx.m_out << indent << indent << indent << "}" << ln;
             ctx.m_out << indent << indent << indent
@@ -5028,11 +5066,11 @@ void Generator::generateDeserializeFromJsonMethod(
 
             const auto mapTypeName = typeToStr(mapType, {});
 
-            ctx.m_out << indent << "if (object.contains(\""
-                << field.m_name << "\")) {" << ln;
+            ctx.m_out << indent << "if (object.contains(QStringLiteral(\""
+                << field.m_name << "\"))) {" << ln;
 
-            ctx.m_out << indent << indent << "auto v = object[\""
-                << field.m_name << "\"];" << ln;
+            ctx.m_out << indent << indent << "auto v = object[QStringLiteral(\""
+                << field.m_name << "\")];" << ln;
 
             ctx.m_out << indent << indent <<
                 "if (v.isObject()) {" << ln;
@@ -5056,15 +5094,34 @@ void Generator::generateDeserializeFromJsonMethod(
                 return indentStr;
             }();
 
-            processValue(
-                valueType, QStringLiteral("it.value()"), indentStr,
-                [&](const QString & value)
-                {
-                    QString str;
-                    QTextStream strm{&str};
-                    strm << "map[it.key()] = " << value << ";";
-                    return str;
-                });
+            const auto valueTypeName = typeToStr(valueType, {});
+            const auto actualValueTypeName = aliasedTypeName(valueTypeName);
+
+            if (m_allEnums.contains(actualValueTypeName))
+            {
+                processValue(
+                    valueType, QStringLiteral("it.value()"), indentStr,
+                    [&](const QString & value)
+                    {
+                        QString str;
+                        QTextStream strm{&str};
+                        strm << "map[it.key()] = static_cast<"
+                            << actualValueTypeName << ">(" << value << ");";
+                        return str;
+                    });
+            }
+            else
+            {
+                processValue(
+                    valueType, QStringLiteral("it.value()"), indentStr,
+                    [&](const QString & value)
+                    {
+                        QString str;
+                        QTextStream strm{&str};
+                        strm << "map[it.key()] = " << value << ";";
+                        return str;
+                    });
+            }
 
             ctx.m_out << indent << indent << indent << "}" << ln;
 
@@ -5081,11 +5138,12 @@ void Generator::generateDeserializeFromJsonMethod(
         }
         else
         {
-            ctx.m_out << indent << "if (object.contains(\""
-                << field.m_name << "\")) {" << ln;
+            ctx.m_out << indent << "if (object.contains(QStringLiteral(\""
+                << field.m_name << "\"))) {" << ln;
 
-            ctx.m_out << indent << indent << "const auto v = object[\""
-                << field.m_name << "\"];" << ln;
+            ctx.m_out << indent << indent
+                << "const auto v = object[QStringLiteral(\""
+                << field.m_name << "\")];" << ln;
 
             const QString indentStr = [&]
             {

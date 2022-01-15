@@ -103,7 +103,11 @@ private:
         const Parser::Structure & s, const QString & outPath);
 
     void generateSerializationJsonCpp(
-        const Parser::Structure & s, const QString & outPath);
+        const Parser::Structure & s, const Parser::Enumerations & enumerations,
+        const QString & outPath);
+
+    void generateSerializationJsonEnumSafeCastMethod(
+        const Parser::Enumeration & e, OutputFileContext & ctx);
 
     void generateSerializeToJsonMethod(
         const Parser::Structure & s, OutputFileContext & ctx);

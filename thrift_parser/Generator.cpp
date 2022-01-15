@@ -4527,25 +4527,33 @@ void Generator::generateSerializeToJsonMethod(
 
     ctx.m_out << indent << "QJsonObject object;" << ln << ln;
 
-    const auto processArrayElement =
-        [&](const std::shared_ptr<Parser::Type> & type)
+    const auto processItem =
+        [&](const std::shared_ptr<Parser::Type> & type,
+            const QString & itemName)
         {
-            ctx.m_out << indent << indent << indent << "array << ";
-
             const auto typeName = typeToStr(type, {});
             const auto actualTypeName = aliasedTypeName(typeName);
             if (actualTypeName == typeName &&
                 dynamic_cast<Parser::IdentifierType*>(type.get()))
             {
-                ctx.m_out << "serializeToJson(v);" << ln;
+                if (m_allEnums.contains(actualTypeName))
+                {
+                    ctx.m_out << "QString::number(static_cast<qint64>("
+                        << itemName << "));" << ln;
+                }
+                else
+                {
+                    ctx.m_out << "serializeToJson(" << itemName << ");" << ln;
+                }
             }
             else if (dynamic_cast<Parser::ByteArrayType*>(type.get()))
             {
-                ctx.m_out << "QString::fromUtf8(v.toBase64());" << ln;
+                ctx.m_out << "QString::fromUtf8(" << itemName << ".toBase64());"
+                    << ln;
             }
             else
             {
-                ctx.m_out << "v;" << ln;
+                ctx.m_out << itemName << ";" << ln;
             }
         };
 
@@ -4576,8 +4584,11 @@ void Generator::generateSerializeToJsonMethod(
             ctx.m_out << "value." << field.m_name << "()))" << ln
                 << indent << indent << "{" << ln;
 
-            processArrayElement(
-                listType ? listType->m_valueType : setType->m_valueType);
+            ctx.m_out << indent << indent << indent << "array << ";
+
+            processItem(
+                listType ? listType->m_valueType : setType->m_valueType,
+                QStringLiteral("v"));
 
             ctx.m_out << indent << indent << "}" << ln << ln;
 
@@ -4616,23 +4627,7 @@ void Generator::generateSerializeToJsonMethod(
 
             ctx.m_out << indent << indent << indent << "subobject[it.key()] = ";
 
-            const auto valueTypeName = typeToStr(mapType->m_valueType, {});
-            const auto actualValueTypeName = aliasedTypeName(valueTypeName);
-            if (actualValueTypeName == valueTypeName &&
-                dynamic_cast<Parser::IdentifierType*>(
-                    mapType->m_valueType.get()))
-            {
-                ctx.m_out << "serializeToJson(it.value());" << ln;
-            }
-            else if (dynamic_cast<Parser::ByteArrayType*>(
-                     mapType->m_valueType.get()))
-            {
-                ctx.m_out << "QString::fromUtf8(it.value().toBase64());" << ln;
-            }
-            else
-            {
-                ctx.m_out << "it.value();" << ln;
-            }
+            processItem(mapType->m_valueType, QStringLiteral("it.value()"));
 
             ctx.m_out << indent << indent << "}" << ln;
             ctx.m_out << indent << indent << "object[\"" << field.m_name
@@ -4660,37 +4655,49 @@ void Generator::generateSerializeToJsonMethod(
             ctx.m_out << "object[\""
                 << field.m_name << "\"] = ";
 
-            bool isComplexType = false;
-            if (actualFieldTypeName == fieldTypeName &&
-                dynamic_cast<Parser::IdentifierType*>(field.m_type.get()))
-            {
-                isComplexType = true;
-                ctx.m_out << "serializeToJson(";
-            }
+            const bool isEnum =
+                (actualFieldTypeName == fieldTypeName &&
+                 m_allEnums.contains(fieldTypeName));
+
+            const bool isComplexType =
+                !isEnum &&
+                (actualFieldTypeName == fieldTypeName) &&
+                static_cast<bool>(
+                    dynamic_cast<Parser::IdentifierType*>(field.m_type.get()));
 
             const bool isByteArray =
+                !isEnum &&
                 !isComplexType &&
-                (dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()) !=
-                 nullptr);
+                static_cast<bool>(
+                    dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()));
 
-            if (isByteArray) {
+            if (isEnum) {
+                ctx.m_out << "QString::number(static_cast<qint64>(";
+            }
+            else if (isComplexType) {
+                ctx.m_out << "serializeToJson(";
+            }
+            else if (isByteArray) {
                 ctx.m_out << "QString::fromUtf8(";
             }
-            else if (field.m_required ==
-                Parser::Field::RequiredFlag::Optional)
+
+            if (!isComplexType && (field.m_required ==
+                Parser::Field::RequiredFlag::Optional))
             {
                 ctx.m_out << "*";
             }
 
             ctx.m_out << "value." << field.m_name << "()";
 
-            if (isComplexType) {
+            if (isEnum) {
+                ctx.m_out << "))";
+            }
+            else if (isComplexType) {
                 ctx.m_out << ")";
             }
             else if (isByteArray) {
                 ctx.m_out << "->toBase64())";
             }
-
 
             ctx.m_out << ";" << ln;
 

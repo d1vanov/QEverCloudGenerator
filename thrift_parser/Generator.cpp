@@ -4496,6 +4496,10 @@ void Generator::generateSerializationJsonCpp(
     const bool needsToRangeHeader =
         [&]
         {
+            if (shouldGenerateLocalDataMethods(s)) {
+                return true;
+            }
+
             for (const auto & field: s.m_fields)
             {
                 if (dynamic_cast<Parser::MapType*>(field.m_type.get())) {
@@ -4645,6 +4649,74 @@ void Generator::generateSerializeToJsonMethod(
                 ctx.m_out << itemName << ";" << ln;
             }
         };
+
+    if (shouldGenerateLocalDataMethods(s))
+    {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << indent << "object[QStringLiteral(\"localId\")] = "
+                << "value.localId();" << ln;
+        }
+
+        ctx.m_out << indent << "object[QStringLiteral(\"isLocallyModified\")] ="
+            << " value.isLocallyModified();" << ln;
+
+        ctx.m_out << indent << "object[QStringLiteral(\"isLocalOnly\")] = "
+            << "value.isLocalOnly();" << ln;
+
+        ctx.m_out << indent << "object[QStringLiteral(\"isLocallyFavorited\")]"
+            << " = value.isLocallyFavorited();" << ln;
+
+        ctx.m_out << indent << "object[QStringLiteral(\"localData\")] = "
+            << "QJsonObject::fromVariantHash(value.localData());" << ln << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook") ||
+        s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "if (value.linkedNotebookGuid()) {" << ln
+            << indent << indent
+            << "object[QStringLiteral(\"linkedNotebookGuid\")] = "
+            << "*value.linkedNotebookGuid();" << ln
+            << indent << "}" << ln << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "object[QStringLiteral(\"parentTagLocalId\")] = "
+            << "value.parentTagLocalId();" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "object[QStringLiteral(\"notebookLocalId\")] = "
+            << "value.notebookLocalId();" << ln << ln;
+
+        ctx.m_out << indent << "QJsonArray tagLocalIds;" << ln;
+        ctx.m_out << indent
+            << "for (const auto & tagLocalId: qAsConst(value.tagLocalIds())) {"
+            << ln
+            << indent << indent << "tagLocalIds.append(QJsonValue{tagLocalId});"
+            << ln
+            << indent << "}" << ln
+            << indent << "object[QStringLiteral(\"tagLocalIds\")] = "
+            << "tagLocalIds;" << ln << ln;
+
+        ctx.m_out << indent
+            << "object[QStringLiteral(\"thumbnailData\")] = QString::fromUtf8("
+            << "value.thumbnailData().toBase64());" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "object[QStringLiteral(\"noteLocalId\")] = "
+            << "value.noteLocalId();" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "if (value.noteGuid()) {" << ln
+            << indent << indent << "object[QStringLiteral(\"noteGuid\")] = "
+            << "*value.noteGuid();" << ln
+            << indent << "}" << ln << ln;
+    }
 
     for (const auto & field: s.m_fields)
     {
@@ -4850,6 +4922,9 @@ void Generator::generateDeserializeFromJsonMethod(
                 << indentStr << indent << "else {" << ln
                 << indentStr << indent << indent << "return false;" << ln
                 << indentStr << indent << "}" << ln
+                << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
                 << indentStr << "}" << ln;
         };
 
@@ -4866,7 +4941,10 @@ void Generator::generateDeserializeFromJsonMethod(
 
             ctx.m_out << indentStr << indent << setter(valueToSet) << ln;
 
-            ctx.m_out << indentStr << "}" << ln;
+            ctx.m_out << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
+                << indentStr << "}" << ln;
         }
         else if (actualTypeName == QStringLiteral("quint8"))
         {
@@ -4895,7 +4973,10 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << indent << setter(QStringLiteral("d"))
                 << ln;
 
-            ctx.m_out << indentStr << "}" << ln;
+            ctx.m_out << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
+                << indentStr << "}" << ln;
         }
         else if (actualTypeName == QStringLiteral("QString"))
         {
@@ -4908,7 +4989,10 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << indent
                 << setter(QStringLiteral("std::move(s)")) << ln;
 
-            ctx.m_out << indentStr << "}" << ln;
+            ctx.m_out << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
+                << indentStr << "}" << ln;
         }
         else if (actualTypeName == QStringLiteral("QByteArray"))
         {
@@ -4922,7 +5006,10 @@ void Generator::generateDeserializeFromJsonMethod(
                 << setter(QStringLiteral("QByteArray::fromBase64(s.toUtf8())"))
                 << ln;
 
-            ctx.m_out << indentStr << "}" << ln;
+            ctx.m_out << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
+                << indentStr << "}" << ln;
         }
         else if (m_allEnums.contains(actualTypeName))
         {
@@ -4977,9 +5064,204 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indentStr << indent << "else {" << ln;
             ctx.m_out << indentStr << indent << indent << "return false;" << ln;
             ctx.m_out << indentStr << indent << "}" << ln;
-            ctx.m_out << indentStr << "}" << ln;
+            ctx.m_out << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
+                << indentStr << "}" << ln;
         }
     };
+
+    if (shouldGenerateLocalDataMethods(s))
+    {
+        if (shouldGenerateLocalId(s))
+        {
+            ctx.m_out << indent
+                << "if (object.contains(QStringLiteral(\"localId\"))) {" << ln
+                << indent << indent << "const auto s = "
+                << "object[QStringLiteral(\"localId\")];" << ln
+                << indent << indent << "if (s.isString()) {" << ln
+                << indent << indent << indent
+                << "value.setLocalId(s.toString());" << ln
+                << indent << indent << "}" << ln
+                << indent << indent << "else {" << ln
+                << indent << indent << indent << "return false;" << ln
+                << indent << indent << "}" << ln
+                << indent << "}" << ln
+                << indent << "else {" << ln
+                << indent << indent << "return false;" << ln
+                << indent << "}" << ln << ln;
+        }
+
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"isLocallyModified\"))) {" << ln
+            << indent << indent << "const auto v = object[QStringLiteral("
+            << "\"isLocallyModified\")];" << ln
+            << indent << indent << "if (v.isBool()) {" << ln
+            << indent << indent << indent << "value.setLocallyModified("
+            << "v.toBool());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"isLocalOnly\"))) {" << ln
+            << indent << indent << "const auto v = object[QStringLiteral("
+            << "\"isLocalOnly\")];" << ln
+            << indent << indent << "if (v.isBool()) {" << ln
+            << indent << indent << indent << "value.setLocalOnly("
+            << "v.toBool());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"isLocallyFavorited\"))) {" << ln
+            << indent << indent << "const auto v = object[QStringLiteral("
+            << "\"isLocallyFavorited\")];" << ln
+            << indent << indent << "if (v.isBool()) {" << ln
+            << indent << indent << indent << "value.setLocallyFavorited("
+            << "v.toBool());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"localData\"))) {" << ln
+            << indent << indent << "const auto v = "
+            << "object[QStringLiteral(\"localData\")];" << ln
+            << indent << indent << "if (v.isObject()) {" << ln
+            << indent << indent << indent << "value.setLocalData("
+            << "v.toObject().toVariantHash());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Notebook") ||
+        s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"linkedNotebookGuid\"))) {" << ln
+            << indent << indent << "const auto g = "
+            << "object[QStringLiteral(\"linkedNotebokGuid\")];" << ln
+            << indent << indent << "if (g.isString()) {" << ln
+            << indent << indent << indent << "value.setLinkedNotebookGuid("
+            << "g.toString());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+    }
+
+    if (s.m_name == QStringLiteral("Tag"))
+    {
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"parentTagLocalId\"))) {" << ln
+            << indent << indent << "const auto p = "
+            << "object[QStringLiteral(\"parentTagLocalId\")];" << ln
+            << indent << indent << "if (p.isString()) {" << ln
+            << indent << indent << indent << "value.setParentTagLocalId("
+            << "p.toString());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Note"))
+    {
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"notebookLocalId\"))) {" << ln
+            << indent << indent << "const auto n = "
+            << "object[QStringLiteral(\"notebookLocalId\")];" << ln
+            << indent << indent << "if (n.isString()) {" << ln
+            << indent << indent << indent << "value.setNotebookLocalId("
+            << "n.toString());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"tagLocalIds\"))) {" << ln
+            << indent << indent << "const auto t = "
+            << "object[QStringLiteral(\"tagLocalIds\")];" << ln
+            << indent << indent << "if (t.isArray()) {" << ln
+            << indent << indent << indent << "const auto a = t.toArray();" << ln
+            << indent << indent << indent << "QStringList tagLocalIds;" << ln
+            << indent << indent << indent
+            << "for (const auto & item: qAsConst(a)) {" << ln
+            << indent << indent << indent << indent << "if (item.isString()) {"
+            << ln
+            << indent << indent << indent << indent << indent
+            << "tagLocalIds << item.toString();" << ln
+            << indent << indent << indent << indent << "}" << ln
+            << indent << indent << indent << indent << "else {" << ln
+            << indent << indent << indent << indent << indent << "return false;"
+            << ln
+            << indent << indent << indent << indent << "}" << ln
+            << indent << indent << indent << "}" << ln
+            << indent << indent << indent << "value.setTagLocalIds("
+            << "std::move(tagLocalIds));" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"thumbnailData\"))) {" << ln
+            << indent << indent << "const auto s = "
+            << "object[QStringLiteral(\"thumbnailData\")];" << ln
+            << indent << indent << "if (s.isString()) {" << ln
+            << indent << indent << indent << "value.setThumbnailData("
+            << "QByteArray::fromBase64(s.toString().toUtf8()));" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("Resource"))
+    {
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"noteLocalId\"))) {" << ln
+            << indent << indent << "const auto n = "
+            << "object[QStringLiteral(\"noteLocalId\")];" << ln
+            << indent << indent << "if (n.isString()) {" << ln
+            << indent << indent << indent << "value.setNoteLocalId("
+            << "n.toString());" << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+    }
+    else if (s.m_name == QStringLiteral("SharedNote"))
+    {
+        ctx.m_out << indent << "if (object.contains(QStringLiteral("
+            << "\"noteGuid\"))) {" << ln
+            << indent << indent << "const auto n = "
+            << "object[QStringLiteral(\"noteGuid\")];" << ln
+            << indent << indent << "if (n.isString()) {" << ln
+            << indent << indent << indent << "value.setNoteGuid(n.toString());"
+            << ln
+            << indent << indent << "}" << ln
+            << indent << indent << "else {" << ln
+            << indent << indent << indent << "return false;" << ln
+            << indent << indent << "}" << ln
+            << indent << "}" << ln << ln;
+    }
 
     for (const auto & field: s.m_fields)
     {
@@ -5082,15 +5364,15 @@ void Generator::generateDeserializeFromJsonMethod(
             }
 
             ctx.m_out << indent << indent << indent << "}" << ln;
-            ctx.m_out << indent << indent << indent
-                << "if (!values.isEmpty()) {" << ln;
 
-            ctx.m_out << indent << indent << indent << indent
+            ctx.m_out << indent << indent << indent
                 << "value.set" << capitalize(field.m_name)
                 << "(std::move(values));" << ln;
 
-            ctx.m_out << indent << indent << indent << "}" << ln;
             ctx.m_out << indent << indent << "}" << ln;
+            ctx.m_out << indent << indent << "else {" << ln
+                << indent << indent << indent << "return false;" << ln
+                << indent << indent << "}" << ln;
             ctx.m_out << indent << "}" << ln << ln;
         }
         else if (const auto mapType =
@@ -5189,14 +5471,13 @@ void Generator::generateDeserializeFromJsonMethod(
             ctx.m_out << indent << indent << indent << "}" << ln;
 
             ctx.m_out << indent << indent << indent
-                << "if (!map.isEmpty()) {" << ln;
-
-            ctx.m_out << indent << indent << indent << indent
                 << "value.set" << capitalize(field.m_name)
                 << "(std::move(map));" << ln;
 
-            ctx.m_out << indent << indent << indent << "}" << ln;
-            ctx.m_out << indent << indent << "}" << ln << ln;
+            ctx.m_out << indent << indent << "}" << ln
+                << indent << indent << "else {" << ln
+                << indent << indent << indent << "return false;" << ln
+                << indent << indent << "}" << ln;
             ctx.m_out << indent << "}" << ln << ln;
         }
         else
@@ -8236,14 +8517,15 @@ void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
             << " * Local id of a tag which is this tag's parent" << ln
             << indent
             << " */" << ln
-            << "[[nodiscard]] QString parentTagLocalId() const;" << ln << ln;
+            << indent << "[[nodiscard]] QString parentTagLocalId() const;" << ln
+            << ln;
 
         ctx.m_out << indent << "/**" << ln
             << indent
             << " * Set local id of a parent tag to this tag" << ln
-            << " */" << ln
-            << "void setParentTagLocalId(QString parentTagLocalId);" << ln
-            << ln;
+            << indent << " */" << ln
+            << indent << "void setParentTagLocalId(QString parentTagLocalId);"
+            << ln << ln;
     }
     else if (s.m_name == QStringLiteral("Note"))
     {

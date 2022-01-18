@@ -28,6 +28,8 @@
 
 #include <QObject>
 
+namespace qevercloud_generator {
+
 class Lexer : public QObject
 {
     Q_OBJECT
@@ -105,5 +107,7 @@ private:
 private:
     QList<TerminalSymbol> m_terminals;
 };
+
+} // namespace qevercloud_generator
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_LEXER_H

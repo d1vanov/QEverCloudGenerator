@@ -35,6 +35,8 @@
 #include <memory>
 #include <optional>
 
+namespace qevercloud_generator {
+
 ////////////////////////////////////////////////////////////////////////////////
 
 enum class OutputFileType
@@ -476,5 +478,7 @@ private:
     QSet<QString> m_allExceptions;
     QSet<QString> m_allEnums;
 };
+
+} // namespace qevercloud_generator
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_GENERATOR_H

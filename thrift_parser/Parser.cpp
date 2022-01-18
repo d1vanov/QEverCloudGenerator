@@ -36,7 +36,11 @@ void * ParseAlloc(void *(*mallocProc)(std::size_t));
 
 void ParseFree(void *p, void (*freeProc)(void*));
 
-void Parse(void * lemon, int yymajor, Term * yyminor, Parser * m_parser);
+void Parse(
+    void * lemon, int yymajor, qevercloud_generator::Term * yyminor,
+    qevercloud_generator::Parser * m_parser);
+
+namespace qevercloud_generator {
 
 Parser::Parser(QObject *parent) :
     QObject(parent)
@@ -319,3 +323,5 @@ void Parser::Structure::parseStructComment(QString rawComment)
             QStringLiteral("/**\n") + fieldComment + QStringLiteral("\n*/");
     }
 }
+
+} // namespace qevercloud_generator

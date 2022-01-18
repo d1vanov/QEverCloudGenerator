@@ -36,6 +36,8 @@
 
 #include <memory>
 
+namespace qevercloud_generator {
+
 using Term = QString;
 
 class Parser : public QObject
@@ -405,5 +407,7 @@ private:
 
 inline Parser::Type::~Type() {}
 inline Parser::ConstValue::~ConstValue() {}
+
+} // namespace qevercloud_generator
 
 #endif // QEVERCLOUD_GENERATOR_PARSER_H

@@ -31,6 +31,8 @@
 
 #include <stdexcept>
 
+namespace qevercloud_generator {
+
 Lexer::Lexer(QObject *parent) :
     QObject(parent)
 {}
@@ -322,3 +324,5 @@ bool Lexer::isNextNextChar(
 
     return text.at(pos + 2) == testChar;
 }
+
+} // namespace qevercloud_generator

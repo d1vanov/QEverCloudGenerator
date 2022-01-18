@@ -36,6 +36,8 @@
 
 int main(int argc, char *argv[])
 {
+    using namespace qevercloud_generator;
+
     // Fixed seed for rand() calls
     std::srand(1575003691);
 

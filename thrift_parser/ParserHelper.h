@@ -33,6 +33,8 @@
 #include <memory>
 #include <stdexcept>
 
+namespace qevercloud_generator {
+
 ////////////////////////////////////////////////////////////////////////////////
 
 class AbstractNoterminal
@@ -214,5 +216,7 @@ public:
 public:
     std::shared_ptr<Parser::Type> m_valueType;
 };
+
+} // namespace qevercloud_generator
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_PARSER_HELPER_H

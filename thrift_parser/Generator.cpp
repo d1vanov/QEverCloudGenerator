@@ -39,6 +39,8 @@
 #include <set>
 #include <stdexcept>
 
+namespace qevercloud_generator {
+
 namespace {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4482,6 +4484,10 @@ void Generator::generateSerializationJsonCpp(
     auto dependentQEverCloudTypeNames = dependentTypeNames(s);
     dependentQEverCloudTypeNames.removeOne(QStringLiteral("QByteArray"));
     dependentQEverCloudTypeNames.removeOne(QStringLiteral("QString"));
+
+    std::sort(
+        dependentQEverCloudTypeNames.begin(),
+        dependentQEverCloudTypeNames.end());
 
     for (const auto & typeName: qAsConst(dependentQEverCloudTypeNames))
     {
@@ -10191,3 +10197,5 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
     generateTestClearLocalIdsHeader(parser, outPath);
     generateTestClearLocalIdsCpp(parser, outPath);
 }
+
+} // namespace qevercloud_generator

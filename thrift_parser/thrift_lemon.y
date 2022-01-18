@@ -13,7 +13,7 @@
 
 %token_prefix TERM_
 
-%extra_argument { Parser* pParser }
+%extra_argument { qevercloud_generator::Parser* pParser }
 
 %token_type    { QString* }
 %token_destructor {delete $$;}
@@ -63,16 +63,16 @@ const      ::= constbody .
 const      ::= constbody LISTSEP .
 constbody  ::= DOC_COMMENT(D) CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 {
-  std::shared_ptr<Parser::Type> t = A->type();
-  pParser->addConst(t, *B, std::shared_ptr<Parser::ConstValue>(C), *D);
+  std::shared_ptr<qevercloud_generator::Parser::Type> t = A->type();
+  pParser->addConst(t, *B, std::shared_ptr<qevercloud_generator::Parser::ConstValue>(C), *D);
   delete A;
   delete B;
   delete D;
 }
 constbody  ::= CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 {
-  std::shared_ptr<Parser::Type> t = A->type();
-  pParser->addConst(t, *B, std::shared_ptr<Parser::ConstValue>(C), QString());
+  std::shared_ptr<qevercloud_generator::Parser::Type> t = A->type();
+  pParser->addConst(t, *B, std::shared_ptr<qevercloud_generator::Parser::ConstValue>(C), QString());
   delete A;
   delete B;
 }
@@ -80,7 +80,7 @@ constbody  ::= CONST fieldtype(A) IDENTIFIER(B) EQ constvalue(C) .
 
 typedef    ::= DOC_COMMENT(D) TYPEDEF definitiontype(B) IDENTIFIER(C).
 {
-  std::shared_ptr<Parser::Type> t = B->type();
+  std::shared_ptr<qevercloud_generator::Parser::Type> t = B->type();
   pParser->addTypedef(*C, t, *D);
   delete B;
   delete C;
@@ -89,7 +89,7 @@ typedef    ::= DOC_COMMENT(D) TYPEDEF definitiontype(B) IDENTIFIER(C).
 
 typedef    ::= TYPEDEF definitiontype(B) IDENTIFIER(C).
 {
-  std::shared_ptr<Parser::Type> t = B->type();
+  std::shared_ptr<qevercloud_generator::Parser::Type> t = B->type();
   pParser->addTypedef(*C, t, QString());
   delete B;
   delete C;
@@ -186,11 +186,11 @@ struct     ::= DOC_COMMENT(D) STRUCT IDENTIFIER(A) CURLY_OPEN fieldlist(B) CURLY
   delete D;
 }
 
-%type fieldlist {QList<Parser::Field>*}
+%type fieldlist {QList<qevercloud_generator::Parser::Field>*}
 %destructor fieldlist {delete $$;}
 fieldlist(A)  ::= .
 {
-  A = new QList<Parser::Field>;
+  A = new QList<qevercloud_generator::Parser::Field>;
 }
 fieldlist(A)  ::= fieldlist(B) field(C).
 {
@@ -199,21 +199,21 @@ fieldlist(A)  ::= fieldlist(B) field(C).
   delete C;
 }
 
-%type field {Parser::Field*}
+%type field {qevercloud_generator::Parser::Field*}
 %destructor field {delete $$;}
 field(A) ::= fieldbody(B) . {A = B;}
 field(A) ::= fieldbody(B) LISTSEP . {A = B;}
 
-%type fieldbody {Parser::Field*}
+%type fieldbody {qevercloud_generator::Parser::Field*}
 %destructor fieldbody {delete $$;}
 fieldbody(A) ::= fieldidoption(B) fieldreq(C) fieldtype(D) IDENTIFIER(E) fieldinitializer(F) .
 {
-  A = new Parser::Field;
+  A = new qevercloud_generator::Parser::Field;
   A->m_id = B;
   A->m_required = C;
-  A->m_type = std::shared_ptr<Parser::Type>(D->type());
+  A->m_type = std::shared_ptr<qevercloud_generator::Parser::Type>(D->type());
   A->m_name = *E;
-  A->m_initializer = std::shared_ptr<Parser::ConstValue>(F);
+  A->m_initializer = std::shared_ptr<qevercloud_generator::Parser::ConstValue>(F);
   delete E;
 }
 
@@ -227,7 +227,7 @@ fieldidoption(A) ::= fieldid(B).
   A = B;
 }
 
-%type fieldinitializer {Parser::ConstValue*}
+%type fieldinitializer {qevercloud_generator::Parser::ConstValue*}
 %destructor fieldinitializer {delete $$;}
 fieldinitializer(A) ::= .
 {
@@ -245,18 +245,18 @@ fieldid(A)    ::=  INTEGER_VALUE(B) COLON.
   delete B;
 }
 
-%type fieldreq {Parser::Field::RequiredFlag}
+%type fieldreq {qevercloud_generator::Parser::Field::RequiredFlag}
 fieldreq(A)   ::= .
 {
-  A = Parser::Field::RequiredFlag::Default;
+  A = qevercloud_generator::Parser::Field::RequiredFlag::Default;
 }
 fieldreq(A)   ::= REQUIRED.
 {
-  A = Parser::Field::RequiredFlag::Required;
+  A = qevercloud_generator::Parser::Field::RequiredFlag::Required;
 }
 fieldreq(A)   ::= OPTIONAL.
 {
-  A = Parser::Field::RequiredFlag::Optional;
+  A = qevercloud_generator::Parser::Field::RequiredFlag::Optional;
 }
 
 
@@ -286,11 +286,11 @@ extends(A)    ::= EXTENDS IDENTIFIER(B) .
   A = B;
 }
 
-%type functionlist {QList<Parser::Function>*}
+%type functionlist {QList<qevercloud_generator::Parser::Function>*}
 %destructor functionlist {delete $$; }
 functionlist(A) ::= .
 {
-  A = new QList<Parser::Function>;
+  A = new QList<qevercloud_generator::Parser::Function>;
 }
 functionlist(A) ::= functionlist(B) function(C).
 {
@@ -299,17 +299,17 @@ functionlist(A) ::= functionlist(B) function(C).
   delete C;
 }
 
-%type function {Parser::Function*}
+%type function {qevercloud_generator::Parser::Function*}
 %destructor function {delete $$; }
 function(A) ::= functionbody(B). {A = B;}
 function(A) ::= functionbody(B) LISTSEP. {A = B;}
 
-%type functionbody {Parser::Function*}
+%type functionbody {qevercloud_generator::Parser::Function*}
 %destructor functionbody {delete $$; }
 
 functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist(E) PAREN_CLOSE throws(F).
 {
-  A = new Parser::Function;
+  A = new qevercloud_generator::Parser::Function;
   A->m_isOneway = B;
   A->m_type = C->type();
   A->m_name = *D;
@@ -323,7 +323,7 @@ functionbody(A) ::= oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist
 }
 functionbody(A) ::= DOC_COMMENT(X) oneway(B) functiontype(C) IDENTIFIER(D) PAREN_OPEN fieldlist(E) PAREN_CLOSE throws(F).
 {
-  A = new Parser::Function;
+  A = new qevercloud_generator::Parser::Function;
   A->m_isOneway = B;
   A->m_type = C->type();
   A->m_name = *D;
@@ -341,7 +341,7 @@ functionbody(A) ::= DOC_COMMENT(X) oneway(B) functiontype(C) IDENTIFIER(D) PAREN
 oneway(A) ::= . {A = false;}
 oneway(A) ::= ONEWAY. {A = true;}
 
-%type functiontype {Fieldtype*}
+%type functiontype {qevercloud_generator::Fieldtype*}
 %destructor functiontype {delete $$;}
 functiontype(A) ::=  fieldtype(B).
 {
@@ -349,25 +349,25 @@ functiontype(A) ::=  fieldtype(B).
 }
 functiontype(A) ::=  VOID.
 {
-  A = new VoidType;
+  A = new qevercloud_generator::VoidType;
 }
 
-%type throws {QList<Parser::Field>*}
+%type throws {QList<qevercloud_generator::Parser::Field>*}
 %destructor throws {delete $$;}
 throws(A)  ::= .
 {
-  A = new QList<Parser::Field>;
+  A = new QList<qevercloud_generator::Parser::Field>;
 }
 throws(A)  ::=  THROWS PAREN_OPEN fieldlist(B) PAREN_CLOSE.
 {
   A = B;
 }
 
-%type fieldtype {Fieldtype*}
+%type fieldtype {qevercloud_generator::Fieldtype*}
 %destructor fieldtype {delete $$; }
 fieldtype(A)    ::=  IDENTIFIER(B).
 {
-  IdentifierFieldType* p = new IdentifierFieldType();
+  qevercloud_generator::IdentifierFieldType* p = new qevercloud_generator::IdentifierFieldType();
   p->m_identifier = *B;
   A = p;
   delete B;
@@ -378,38 +378,38 @@ fieldtype(A)    ::=  definitiontype(B) .
 }
 
 
-%type definitiontype {DefinitionType*}
+%type definitiontype {qevercloud_generator::DefinitionType*}
 %destructor definitiontype {delete $$; }
 definitiontype(A)  ::=  primitivetype(B) .
 {
-  PrimitiveTypeDefinitionType* p = new PrimitiveTypeDefinitionType();
+  qevercloud_generator::PrimitiveTypeDefinitionType* p = new qevercloud_generator::PrimitiveTypeDefinitionType();
   p->m_type = B;
   A = p;
 }
 definitiontype(A)  ::=  stringtype(B) .
 {
-  A = new StringTypeDefinitionType;
+  A = new qevercloud_generator::StringTypeDefinitionType;
   (void)B;
 }
 definitiontype(A)  ::=  bytearraytype(B) .
 {
-  A = new ByteArrayDefinitionType();
+  A = new qevercloud_generator::ByteArrayDefinitionType();
   (void)B;
 }
 definitiontype(A)  ::=  containertype(B) .
 {
-  ContainerTypeDefinitionType* p = new ContainerTypeDefinitionType();
+  qevercloud_generator::ContainerTypeDefinitionType* p = new qevercloud_generator::ContainerTypeDefinitionType();
   p->m_containerType = B;
   A = p;
 }
 
-%type primitivetype {Parser::PrimitiveType::Type}
-primitivetype(A)   ::=  BOOL. {A = Parser::PrimitiveType::Type::Bool;}
-primitivetype(A)   ::=  BYTE. {A = Parser::PrimitiveType::Type::Byte;}
-primitivetype(A)   ::=  I16. {A = Parser::PrimitiveType::Type::Int16;}
-primitivetype(A)   ::=  I32. {A = Parser::PrimitiveType::Type::Int32;}
-primitivetype(A)   ::=  I64. {A = Parser::PrimitiveType::Type::Int64;}
-primitivetype(A)   ::=  DOUBLE. {A = Parser::PrimitiveType::Type::Double;}
+%type primitivetype {qevercloud_generator::Parser::PrimitiveType::Type}
+primitivetype(A)   ::=  BOOL. {A = qevercloud_generator::Parser::PrimitiveType::Type::Bool;}
+primitivetype(A)   ::=  BYTE. {A = qevercloud_generator::Parser::PrimitiveType::Type::Byte;}
+primitivetype(A)   ::=  I16. {A = qevercloud_generator::Parser::PrimitiveType::Type::Int16;}
+primitivetype(A)   ::=  I32. {A = qevercloud_generator::Parser::PrimitiveType::Type::Int32;}
+primitivetype(A)   ::=  I64. {A = qevercloud_generator::Parser::PrimitiveType::Type::Int64;}
+primitivetype(A)   ::=  DOUBLE. {A = qevercloud_generator::Parser::PrimitiveType::Type::Double;}
 
 %type stringtype {void*}
 stringtype(A)      ::=  STRING. {A = nullptr;}
@@ -417,7 +417,7 @@ stringtype(A)      ::=  STRING. {A = nullptr;}
 %type bytearraytype {void*}
 bytearraytype(A)   ::=  BINARY. {A = nullptr;}
 
-%type containertype {ContainerType*}
+%type containertype {qevercloud_generator::ContainerType*}
 containertype(A)   ::=  maptype(B) .
 {
   A = B;
@@ -431,83 +431,83 @@ containertype(A)   ::=  listtype(B).
   A = B;
 }
 
-%type maptype {MapType*}
+%type maptype {qevercloud_generator::MapType*}
 %destructor maptype {delete $$;}
 maptype(A)         ::=  MAP LT fieldtype(B) LISTSEP fieldtype(C) GT.
 {
-  A = new MapType();
+  A = new qevercloud_generator::MapType();
   A->m_keyType = B->type();
   A->m_valueType = C->type();
   delete B;
   delete C;
 }
 
-%type settype {SetType*}
+%type settype {qevercloud_generator::SetType*}
 %destructor settype {delete $$;}
 settype(A)         ::=  SET LT fieldtype(B) GT.
 {
-  A = new SetType();
+  A = new qevercloud_generator::SetType();
   A->m_valueType = B->type();
   delete B;
 }
 
-%type listtype {ListType*}
+%type listtype {qevercloud_generator::ListType*}
 %destructor listtype {delete $$;}
 listtype(A)         ::=  LIST LT fieldtype(B) GT.
 {
-  A = new ListType();
+  A = new qevercloud_generator::ListType();
   A->m_valueType = B->type();
   delete B;
 }
 
-%type constvalue {Parser::ConstValue*}
+%type constvalue {qevercloud_generator::Parser::ConstValue*}
 %destructor constvalue {delete $$;}
 constvalue(A)    ::=  INTEGER_VALUE(B) .
 {
-  Parser::IntegerValue* p = new Parser::IntegerValue;
+  qevercloud_generator::Parser::IntegerValue* p = new qevercloud_generator::Parser::IntegerValue;
   p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  DOUBLE_VALUE(B) .
 {
-  Parser::DoubleValue* p = new Parser::DoubleValue;
+  qevercloud_generator::Parser::DoubleValue* p = new qevercloud_generator::Parser::DoubleValue;
   p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  STRING_VALUE(B) .
 {
-  Parser::StringValue* p = new Parser::StringValue;
+  qevercloud_generator::Parser::StringValue* p = new qevercloud_generator::Parser::StringValue;
   p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  IDENTIFIER(B) .
 {
-  Parser::IdentifierValue* p = new Parser::IdentifierValue;
+  qevercloud_generator::Parser::IdentifierValue* p = new qevercloud_generator::Parser::IdentifierValue;
   p->m_value = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  constlist(B) .
 {
-  Parser::ListValue* p = new Parser::ListValue;
+  qevercloud_generator::Parser::ListValue* p = new qevercloud_generator::Parser::ListValue;
   p->m_values = *B;
   A = p;
   delete B;
 }
 constvalue(A)    ::=  constmap(B) .
 {
-  Parser::MapValue* p = new Parser::MapValue;
+  qevercloud_generator::Parser::MapValue* p = new qevercloud_generator::Parser::MapValue;
   p->m_values = *B;
   A = p;
   delete B;
 }
 
-%type constlist {QList<std::shared_ptr<Parser::ConstValue>>*}
+%type constlist {QList<std::shared_ptr<qevercloud_generator::Parser::ConstValue>>*}
 %destructor constvaluelist {delete $$;}
-%type constvaluelist {QList<std::shared_ptr<Parser::ConstValue>>*}
+%type constvaluelist {QList<std::shared_ptr<qevercloud_generator::Parser::ConstValue>>*}
 %destructor constvaluelist {delete $$;}
 constlist(A)     ::=  BRACKET_OPEN constvaluelist(B) BRACKET_CLOSE .
 {
@@ -515,22 +515,22 @@ constlist(A)     ::=  BRACKET_OPEN constvaluelist(B) BRACKET_CLOSE .
 }
 constvaluelist(A) ::= .
 {
-  A = new QList<std::shared_ptr<Parser::ConstValue>>;
+  A = new QList<std::shared_ptr<qevercloud_generator::Parser::ConstValue>>;
 }
 constvaluelist(A) ::= constvalue(B) constvaluelist(C).
 {
   A = C;
-  A->prepend(std::shared_ptr<Parser::ConstValue>(B));
+  A->prepend(std::shared_ptr<qevercloud_generator::Parser::ConstValue>(B));
 }
 constvaluelist(A) ::= constvalue(B) LISTSEP constvaluelist(C).
 {
   A = C;
-  A->prepend(std::shared_ptr<Parser::ConstValue>(B));
+  A->prepend(std::shared_ptr<qevercloud_generator::Parser::ConstValue>(B));
 }
 
-%type constmap {QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
+%type constmap {QList<std::pair<std::shared_ptr<qevercloud_generator::Parser::ConstValue>, std::shared_ptr<qevercloud_generator::Parser::ConstValue>>>*}
 %destructor constmap {delete $$;}
-%type constmapvaluelist {QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>*}
+%type constmapvaluelist {QList<std::pair<std::shared_ptr<qevercloud_generator::Parser::ConstValue>, std::shared_ptr<qevercloud_generator::Parser::ConstValue>>>*}
 %destructor constmapvaluelist {delete $$;}
 constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 {
@@ -538,18 +538,18 @@ constmap(A)     ::=  CURLY_OPEN constmapvaluelist(B) CURLY_CLOSE .
 }
 constmapvaluelist(A) ::= .
 {
-  A = new QList<std::pair<std::shared_ptr<Parser::ConstValue>, std::shared_ptr<Parser::ConstValue>>>;
+  A = new QList<std::pair<std::shared_ptr<qevercloud_generator::Parser::ConstValue>, std::shared_ptr<qevercloud_generator::Parser::ConstValue>>>;
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) constmapvaluelist(D).
 {
   A = D;
-  auto p = std::make_pair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
+  auto p = std::make_pair(std::shared_ptr<qevercloud_generator::Parser::ConstValue>(B), std::shared_ptr<qevercloud_generator::Parser::ConstValue>(C));
   A->prepend(p);
 }
 constmapvaluelist(A) ::= constvalue(B) COLON constvalue(C) LISTSEP constmapvaluelist(D).
 {
   A = D;
-  auto p = std::make_pair(std::shared_ptr<Parser::ConstValue>(B), std::shared_ptr<Parser::ConstValue>(C));
+  auto p = std::make_pair(std::shared_ptr<qevercloud_generator::Parser::ConstValue>(B), std::shared_ptr<qevercloud_generator::Parser::ConstValue>(C));
   A->prepend(p);
 }
 

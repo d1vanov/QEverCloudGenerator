@@ -211,6 +211,7 @@ fieldbody(A) ::= fieldidoption(B) fieldreq(C) fieldtype(D) IDENTIFIER(E) fieldin
   A = new qevercloud_generator::Parser::Field;
   A->m_id = B;
   A->m_required = C;
+  A->m_affiliation = qevercloud_generator::Parser::Field::Affiliation::Evernote;
   A->m_type = std::shared_ptr<qevercloud_generator::Parser::Type>(D->type());
   A->m_name = *E;
   A->m_initializer = std::shared_ptr<qevercloud_generator::Parser::ConstValue>(F);

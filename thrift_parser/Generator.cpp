@@ -549,7 +549,8 @@ void Generator::generateGetRandomValueExpression(
 {
     if (dynamic_cast<Parser::PrimitiveType*>(field.m_type.get()) ||
         dynamic_cast<Parser::StringType*>(field.m_type.get()) ||
-        dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()))
+        dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()) ||
+        dynamic_cast<Parser::VariantType*>(field.m_type.get()))
     {
         out << prefix;
         if (!field.m_name.isEmpty()) {
@@ -567,8 +568,8 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto identifierType = std::dynamic_pointer_cast<Parser::IdentifierType>(
-        field.m_type);
+    const auto identifierType =
+        std::dynamic_pointer_cast<Parser::IdentifierType>(field.m_type);
     if (identifierType)
     {
         out << prefix;
@@ -656,7 +657,8 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto listType = std::dynamic_pointer_cast<Parser::ListType>(field.m_type);
+    const auto listType =
+        std::dynamic_pointer_cast<Parser::ListType>(field.m_type);
     if (listType)
     {
         verifyTypeIsValueOrIdentifier(listType->m_valueType);
@@ -695,7 +697,8 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto setType = std::dynamic_pointer_cast<Parser::SetType>(field.m_type);
+    const auto setType =
+        std::dynamic_pointer_cast<Parser::SetType>(field.m_type);
     if (setType)
     {
         verifyTypeIsValueOrIdentifier(setType->m_valueType);
@@ -734,25 +737,44 @@ void Generator::generateGetRandomValueExpression(
         return;
     }
 
-    auto mapType = std::dynamic_pointer_cast<Parser::MapType>(field.m_type);
-    if (mapType)
+    const auto mapType =
+        std::dynamic_pointer_cast<Parser::MapType>(field.m_type);
+
+    const auto hashType =
+        std::dynamic_pointer_cast<Parser::HashType>(field.m_type);
+
+    if (mapType || hashType)
     {
-        verifyTypeIsValueOrIdentifier(mapType->m_keyType);
-        verifyTypeIsValueOrIdentifier(mapType->m_valueType);
+        const auto & keyType =
+            (mapType ? mapType->m_keyType : hashType->m_keyType);
+
+        const auto & valueType =
+            (mapType ? mapType->m_valueType : hashType->m_valueType);
+
+        verifyTypeIsValueOrIdentifier(keyType);
+        verifyTypeIsValueOrIdentifier(valueType);
 
         if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-            const auto keyType = typeToStr(
-                mapType->m_keyType,
+            const auto keyTypeName = typeToStr(
+                keyType,
                 {},
                 MethodType::TypeName);
 
-            const auto valueType = typeToStr(
-                mapType->m_valueType,
+            const auto valueTypeName = typeToStr(
+                valueType,
                 {},
                 MethodType::TypeName);
 
-            out << prefix << "set" << capitalize(field.m_name) << "(QMap<"
-                << keyType << ", " << valueType << ">());" << ln;
+            out << prefix << "set" << capitalize(field.m_name) << "(";
+            if (mapType) {
+                out << "QMap";
+            }
+            else {
+                out << "QHash";
+            }
+
+            out << "<"
+                << keyTypeName << ", " << valueTypeName << ">());" << ln;
         }
 
         for(size_t i = 0; i < 3; ++i)
@@ -769,19 +791,21 @@ void Generator::generateGetRandomValueExpression(
             out << "insert(";
 
             Parser::Field pseudoKeyField;
-            pseudoKeyField.m_type = mapType->m_keyType;
+            pseudoKeyField.m_type = keyType;
             pseudoKeyField.m_required = Parser::Field::RequiredFlag::Required;
             pseudoKeyField.m_name.clear();
 
-            generateGetRandomValueExpression(pseudoKeyField, {}, parser, out, {});
+            generateGetRandomValueExpression(
+                pseudoKeyField, {}, parser, out, {});
 
             out << ", ";
 
             Parser::Field pseudoValueField;
-            pseudoValueField.m_type = mapType->m_valueType;
+            pseudoValueField.m_type = valueType;
             pseudoValueField.m_required = Parser::Field::RequiredFlag::Required;
 
-            generateGetRandomValueExpression(pseudoValueField, {}, parser, out, QStringLiteral(");\n"));
+            generateGetRandomValueExpression(
+                pseudoValueField, {}, parser, out, QStringLiteral(");\n"));
         }
 
         return;
@@ -798,6 +822,7 @@ void Generator::verifyTypeIsValueOrIdentifier(
     if (!dynamic_cast<Parser::PrimitiveType*>(type.get()) &&
         !dynamic_cast<Parser::StringType*>(type.get()) &&
         !dynamic_cast<Parser::ByteArrayType*>(type.get()) &&
+        !dynamic_cast<Parser::VariantType*>(type.get()) &&
         !dynamic_cast<Parser::IdentifierType*>(type.get()))
     {
         auto typeName = typeToStr(type, {}, MethodType::TypeName);
@@ -813,7 +838,8 @@ QString Generator::getGenerateRandomValueFunction(const QString & typeName) cons
     {
         return QStringLiteral("generateRandomBool()");
     }
-    else if (typeName == QStringLiteral("QString"))
+    else if (typeName == QStringLiteral("QString") ||
+             typeName == QStringLiteral("QVariant"))
     {
         return QStringLiteral("generateRandomString()");
     }
@@ -2289,6 +2315,9 @@ QString Generator::typeToStr(
     const auto byteArrayType =
         std::dynamic_pointer_cast<Parser::ByteArrayType>(type);
 
+    const auto variantType =
+        std::dynamic_pointer_cast<Parser::VariantType>(type);
+
     const auto voidType = std::dynamic_pointer_cast<Parser::VoidType>(type);
 
     const auto identifierType =
@@ -2297,6 +2326,7 @@ QString Generator::typeToStr(
     const auto mapType = std::dynamic_pointer_cast<Parser::MapType>(type);
     const auto setType = std::dynamic_pointer_cast<Parser::SetType>(type);
     const auto listType = std::dynamic_pointer_cast<Parser::ListType>(type);
+    const auto hashType = std::dynamic_pointer_cast<Parser::HashType>(type);
 
     QString result;
 
@@ -2512,6 +2542,21 @@ QString Generator::typeToStr(
             result = QLatin1String("");
         }
     }
+    else if (variantType)
+    {
+        switch(methodType)
+        {
+        case MethodType::TypeName:
+        case MethodType::ReadTypeName:
+            result = QStringLiteral("QVariant");
+            break;
+        case MethodType::FuncParamType:
+            result = typeName;
+            break;
+        default:
+            result = QLatin1String("");
+        }
+    }
     else if (voidType)
     {
         switch(methodType)
@@ -2714,6 +2759,26 @@ QString Generator::typeToStr(
             result = QLatin1String("");
         }
     }
+    else if (hashType)
+    {
+        switch(methodType)
+        {
+        case MethodType::TypeName:
+        case MethodType::ReadTypeName:
+            {
+                QTextStream strm(&result);
+                strm << "QHash<" << typeToStr(hashType->m_keyType, identifier)
+                    << ", " << typeToStr(hashType->m_valueType, identifier)
+                    << ">";
+            }
+            break;
+        case MethodType::FuncParamType:
+            result = typeName;
+            break;
+        default:
+            result = QLatin1String("");
+        }
+    }
 
     if (result.isEmpty() &&
         (methodType == MethodType::TypeName ||
@@ -2722,8 +2787,8 @@ QString Generator::typeToStr(
          methodType == MethodType::ThriftFieldType))
     {
         throw std::runtime_error(
-            QString::fromUtf8("Error! unrecognized type (%1)")
-            .arg(identifier).toStdString());
+            QString::fromUtf8("Error! unrecognized type (%1 of type %2, method type %3)")
+            .arg(identifier, typeName, QString::number(static_cast<int>(methodType))).toStdString());
     }
 
     return result;
@@ -2885,6 +2950,10 @@ void Generator::writeThriftWriteFields(
 {
     for(const auto & field: fields)
     {
+        if (field.m_affiliation != Parser::Field::Affiliation::Evernote) {
+            continue;
+        }
+
         QString indentStr = QLatin1String("");
 
         const bool isOptional =
@@ -3496,6 +3565,10 @@ void Generator::generateTypesIOCpp(Parser & parser, const QString & outPath)
 
         for(const auto & field : s.m_fields)
         {
+            if (field.m_affiliation != Parser::Field::Affiliation::Evernote) {
+                continue;
+            }
+
             bool isOptional =
                 (field.m_required == Parser::Field::RequiredFlag::Optional);
             ctx.m_out << "        if (fieldId == " << field.m_id

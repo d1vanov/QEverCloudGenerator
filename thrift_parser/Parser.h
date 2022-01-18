@@ -106,6 +106,12 @@ public:
         ~ByteArrayType() override {}
     };
 
+    class VariantType final: public Type
+    {
+    public:
+        ~VariantType() override {}
+    };
+
     class IdentifierType: public Type
     {
     public:
@@ -137,6 +143,15 @@ public:
         std::shared_ptr<Type> m_valueType;
 
         ~ListType() override {}
+    };
+
+    class HashType: public Type
+    {
+    public:
+        std::shared_ptr<Type> m_keyType;
+        std::shared_ptr<Type> m_valueType;
+
+        ~HashType() override {}
     };
 
     struct TypeAlias
@@ -212,12 +227,19 @@ public:
             Required
         };
 
+        enum class Affiliation {
+            Evernote,
+            Local
+        };
+
         int m_id;
         RequiredFlag m_required;
+        Affiliation m_affiliation;
 
         std::shared_ptr<Type> m_type;
         QString m_name;
         std::shared_ptr<ConstValue> m_initializer;
+        std::shared_ptr<ConstValue> m_setterDefaultValue;
     };
 
     struct Structure

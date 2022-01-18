@@ -42,6 +42,226 @@ void Parse(
 
 namespace qevercloud_generator {
 
+namespace {
+
+void addLocalFields(Parser::Structures & structures)
+{
+    const auto shouldGenerateLocalDataFields =
+        [&](const Parser::Structure & s) noexcept
+        {
+            if ((s.m_name == QStringLiteral("User")) ||
+                (s.m_name == QStringLiteral("SharedNotebook")) ||
+                (s.m_name == QStringLiteral("SharedNote")))
+            {
+                return true;
+            }
+
+            for (const auto & f: s.m_fields)
+            {
+                const auto * identifierType =
+                    dynamic_cast<Parser::IdentifierType*>(f.m_type.get());
+
+                if (!identifierType) {
+                    continue;
+                }
+
+                if (f.m_name == QStringLiteral("guid") &&
+                    ((identifierType->m_identifier ==
+                      QStringLiteral("Types.Guid")) ||
+                     (identifierType->m_identifier ==
+                      QStringLiteral("Guid"))))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+    const auto shouldGenerateLocalId =
+        [&](const Parser::Structure & s) noexcept
+        {
+            if (s.m_name == QStringLiteral("LinkedNotebook") ||
+                s.m_name == QStringLiteral("SharedNote") ||
+                s.m_name == QStringLiteral("SharedNotebook") ||
+                s.m_name == QStringLiteral("User"))
+            {
+                return false;
+            }
+
+            return true;
+        };
+
+    for (auto & s: structures)
+    {
+        if (shouldGenerateLocalDataFields(s))
+        {
+            // QHash<QString, QVariant> localData;
+            {
+                Parser::Field localDataField;
+                localDataField.m_id = -1;
+                localDataField.m_required =
+                    Parser::Field::RequiredFlag::Required;
+                localDataField.m_affiliation =
+                    Parser::Field::Affiliation::Local;
+
+                auto hashType = std::make_shared<Parser::HashType>();
+                hashType->m_keyType = std::make_shared<Parser::StringType>();
+                hashType->m_valueType = std::make_shared<Parser::VariantType>();
+                localDataField.m_type = std::move(hashType);
+
+                localDataField.m_name = QStringLiteral("localData");
+
+                s.m_fields.push_front(localDataField);
+
+                s.m_fieldComments[localDataField.m_name] = QStringLiteral(
+                    "/**\n"
+                    " localData property can be used to store any additional\n"
+                    " data which might be needed to be set for the type object"
+                    "\n"
+                    " by QEverCloud's client code.\n"
+                    "*/");
+            }
+
+            // bool isLocallyFavorited = false;
+            {
+                Parser::Field isLocallyFavoritedField;
+                isLocallyFavoritedField.m_id = -1;
+                isLocallyFavoritedField.m_required =
+                    Parser::Field::RequiredFlag::Required;
+                isLocallyFavoritedField.m_affiliation =
+                    Parser::Field::Affiliation::Local;
+                isLocallyFavoritedField.m_type =
+                    std::make_shared<Parser::PrimitiveType>(
+                        Parser::PrimitiveType::Type::Bool);
+                isLocallyFavoritedField.m_name =
+                    QStringLiteral("isLocallyFavorited");
+
+                auto initializer = std::make_shared<Parser::LiteralValue>();
+                initializer->m_value = QStringLiteral("false");
+                isLocallyFavoritedField.m_initializer = std::move(initializer);
+
+                auto setterDefaultValue =
+                    std::make_shared<Parser::LiteralValue>();
+                setterDefaultValue->m_value = QStringLiteral("true");
+                isLocallyFavoritedField.m_setterDefaultValue =
+                    std::move(setterDefaultValue);
+
+                s.m_fields.push_front(isLocallyFavoritedField);
+
+                s.m_fieldComments[isLocallyFavoritedField.m_name] =
+                    QStringLiteral(
+                        "/**\n"
+                        " locallyFavorited property can be used to keep "
+                        "track which\n"
+                        " data items were favorited in the client. "
+                        "Unfortunately,\n"
+                        " Evernote has never provided a way to synchronize\n"
+                        " such a property between different clients.\n"
+                        "*/");
+            }
+
+            // bool isLocalOnly = false;
+            {
+                Parser::Field isLocalOnlyField;
+                isLocalOnlyField.m_id = -1;
+                isLocalOnlyField.m_required =
+                    Parser::Field::RequiredFlag::Required;
+                isLocalOnlyField.m_affiliation =
+                    Parser::Field::Affiliation::Local;
+                isLocalOnlyField.m_type =
+                    std::make_shared<Parser::PrimitiveType>(
+                        Parser::PrimitiveType::Type::Bool);
+                isLocalOnlyField.m_name = QStringLiteral("isLocalOnly");
+
+                auto initializer = std::make_shared<Parser::LiteralValue>();
+                initializer->m_value = QStringLiteral("false");
+                isLocalOnlyField.m_initializer = std::move(initializer);
+
+                auto setterDefaultValue =
+                    std::make_shared<Parser::LiteralValue>();
+                setterDefaultValue->m_value = QStringLiteral("true");
+                isLocalOnlyField.m_setterDefaultValue =
+                    std::move(setterDefaultValue);
+
+                s.m_fields.push_front(isLocalOnlyField);
+
+                s.m_fieldComments[isLocalOnlyField.m_name] = QStringLiteral(
+                    "/**\n"
+                    " localOnly flag can be used to keep track which\n"
+                    " data items are meant to be local only and thus never "
+                    "be synchronized\n"
+                    " with Evernote service.\n"
+                    "*/");
+            }
+
+            // bool isLocallyModified = false;
+            {
+                Parser::Field isLocallyModifiedField;
+                isLocallyModifiedField.m_id = -1;
+                isLocallyModifiedField.m_required =
+                    Parser::Field::RequiredFlag::Required;
+                isLocallyModifiedField.m_affiliation =
+                    Parser::Field::Affiliation::Local;
+                isLocallyModifiedField.m_type =
+                    std::make_shared<Parser::PrimitiveType>(
+                        Parser::PrimitiveType::Type::Bool);
+                isLocallyModifiedField.m_name =
+                    QStringLiteral("isLocallyModified");
+
+                auto initializer = std::make_shared<Parser::LiteralValue>();
+                initializer->m_value = QStringLiteral("false");
+                isLocallyModifiedField.m_initializer = std::move(initializer);
+
+                auto setterDefaultValue =
+                    std::make_shared<Parser::LiteralValue>();
+                setterDefaultValue->m_value = QStringLiteral("true");
+                isLocallyModifiedField.m_setterDefaultValue =
+                    std::move(setterDefaultValue);
+
+                s.m_fields.push_front(isLocallyModifiedField);
+
+                s.m_fieldComments[isLocallyModifiedField.m_name] =
+                    QStringLiteral(
+                        "/**\n"
+                        " locallyModified flag can be used to keep track which"
+                        "\n"
+                        "objects have been modified locally and thus need to "
+                        "be synchronized\n"
+                        " with Evernote service.\n"
+                        "*/");
+            }
+
+            if (shouldGenerateLocalId(s))
+            {
+                Parser::Field localIdField;
+                localIdField.m_id = -1;
+                localIdField.m_required =
+                    Parser::Field::RequiredFlag::Required;
+                localIdField.m_affiliation =
+                    Parser::Field::Affiliation::Local;
+                localIdField.m_type =
+                    std::make_shared<Parser::StringType>();
+                localIdField.m_name = QStringLiteral("localId");
+
+                s.m_fields.push_front(localIdField);
+
+                s.m_fieldComments[localIdField.m_name] = QStringLiteral(
+                    "/**\n"
+                    " localId can be used as a local unique identifier\n"
+                    " for any data item before it has been synchronized with\n"
+                    " Evernote and thus before it can be identified using its "
+                    "guid.\n"
+                    " localId is generated automatically on construction for\n"
+                    " convenience but can be overridden manually\n"
+                    "*/");
+            }
+        }
+    }
+}
+
+} // namespace
+
 Parser::Parser(QObject *parent) :
     QObject(parent)
 {
@@ -151,6 +371,7 @@ void Parser::feed(Lexer::TerminalSymbolType type, const QString & value)
 void Parser::complete()
 {
     Parse(m_parser, TERM_END_OF_FILE, nullptr, this);
+    // addLocalFields(m_structures);
 }
 
 void Parser::addTypedef(

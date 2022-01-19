@@ -202,9 +202,6 @@ private:
     void generateTestClearLocalIdsCpp(
         Parser & parser, const QString & outPath);
 
-    void generateTypeLocalDataAccessoryMethodDeclarations(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
     void generateTypeLocalDataAccessoryMethodDefinitions(
         const Parser::Structure & s, OutputFileContext & ctx);
 
@@ -433,10 +430,6 @@ private:
         const Parser & parser) const;
 
     [[nodiscard]] QString camelCaseToSnakeCase(const QString & input) const;
-
-    [[nodiscard]] QString capitalize(const QString & input) const;
-
-    [[nodiscard]] QString decapitalize(const QString & input) const;
 
     [[nodiscard]] QString fieldTypeToStr(const Parser::Field & field) const;
 

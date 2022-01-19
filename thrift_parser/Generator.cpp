@@ -103,6 +103,83 @@ constexpr const char * ln = "\n";
     return path;
 }
 
+[[nodiscard]] QString capitalize(const QString & input)
+{
+    if (input.isEmpty()) {
+        return input;
+    }
+
+    if (input[0].isUpper()) {
+        return input;
+    }
+
+    QString result;
+    result.reserve(input.size());
+
+    result.push_back(input.at(0).toUpper());
+    for(int i = 1, size = input.size(); i < size; ++i) {
+        result.push_back(input.at(i));
+    }
+
+    return result;
+}
+
+[[nodiscard]] QString decapitalize(const QString & input)
+{
+    if (input.isEmpty()) {
+        return input;
+    }
+
+    if (input[0].isLower()) {
+        return input;
+    }
+
+    QString result;
+    result.reserve(input.size());
+
+    result.push_back(input.at(0).toLower());
+    for(int i = 1, size = input.size(); i < size; ++i) {
+        result.push_back(input.at(i));
+    }
+
+    return result;
+}
+
+[[nodiscard]] QString fieldPropertyName(const Parser::Field & field)
+{
+    if (!field.m_overridePropertyName.isEmpty()) {
+        return field.m_overridePropertyName;
+    }
+
+    QString res;
+    QTextStream strm{&res};
+
+    if (field.m_name.startsWith(QStringLiteral("is"))) {
+        strm << decapitalize(field.m_name.mid(2));
+    }
+    else {
+        strm << decapitalize(field.m_name);
+    }
+
+    return res;
+}
+
+[[nodiscard]] QString fieldSetterName(const Parser::Field & field)
+{
+    QString res;
+    QTextStream strm{&res};
+    strm << "set";
+
+    if (field.m_name.startsWith(QStringLiteral("is"))) {
+        strm << capitalize(field.m_name.mid(2));
+    }
+    else {
+        strm << capitalize(field.m_name);
+    }
+
+    return res;
+}
+
 void ensureDirExists(const QString & path)
 {
     QDir dir(path);
@@ -501,40 +578,6 @@ QString Generator::camelCaseToSnakeCase(const QString & input) const
         }
 
         result += it->toLower();
-    }
-
-    return result;
-}
-
-QString Generator::capitalize(const QString & input) const
-{
-    if (input.isEmpty()) {
-        return input;
-    }
-
-    QString result;
-    result.reserve(input.size());
-
-    result.push_back(input.at(0).toUpper());
-    for(int i = 1, size = input.size(); i < size; ++i) {
-        result.push_back(input.at(i));
-    }
-
-    return result;
-}
-
-QString Generator::decapitalize(const QString & input) const
-{
-    if (input.isEmpty()) {
-        return input;
-    }
-
-    QString result;
-    result.reserve(input.size());
-
-    result.push_back(input.at(0).toLower());
-    for(int i = 1, size = input.size(); i < size; ++i) {
-        result.push_back(input.at(i));
     }
 
     return result;
@@ -942,42 +985,8 @@ void Generator::writeTypeProperties(
         }
 
         ctx.m_out << indent << "Q_PROPERTY(" << fieldTypeName
-            << " " << f.m_name << " READ " << f.m_name
-            << " WRITE set" << capitalize(f.m_name) << ")" << ln;
-    }
-
-    if (s.m_name == QStringLiteral("Notebook") ||
-        s.m_name == QStringLiteral("Tag"))
-    {
-        ctx.m_out << indent << "Q_PROPERTY(std::optional<Guid> "
-            << "linkedNotebookGuid READ linkedNotebookGuid "
-            << "WRITE setLinkedNotebookGuid)" << ln;
-
-        if (s.m_name == QStringLiteral("Tag")) {
-            ctx.m_out << indent << "Q_PROPERTY(QString parentTagLocalId READ "
-            << "parentTagLocalId WRITE setParentTagLocalId)" << ln;
-        }
-    }
-    else if (s.m_name == QStringLiteral("Note"))
-    {
-        ctx.m_out << indent << "Q_PROPERTY(QString notebookLocalId "
-            << "READ notebookLocalId WRITE setNotebookLocalId)" << ln;
-
-        ctx.m_out << indent << "Q_PROPERTY(QStringList tagLocalIds "
-            << "READ tagLocalIds WRITE setTagLocalIds)" << ln;
-
-        ctx.m_out << indent << "Q_PROPERTY(QByteArray thumbnailData "
-            << "READ thumbnailData WRITE setThumbnailData)" << ln;
-    }
-    else if (s.m_name == QStringLiteral("Resource"))
-    {
-        ctx.m_out << indent << "Q_PROPERTY(QString noteLocalId "
-            << "READ noteLocalId WRITE setNoteLocalId)" << ln;
-    }
-    else if (s.m_name == QStringLiteral("SharedNote"))
-    {
-        ctx.m_out << indent << "Q_PROPERTY(std::optional<Guid> noteGuid "
-            << "READ noteGuid WRITE setNoteGuid)" << ln;
+            << " " << fieldPropertyName(f) << " READ " << f.m_name
+            << " WRITE " << fieldSetterName(f) << ")" << ln;
     }
 }
 
@@ -3822,10 +3831,24 @@ void Generator::generateTypeHeader(
             << QStringLiteral("<qevercloud/exceptions/EverCloudException.h>");
     }
 
-    const bool generateLocalData =
-        !isExceptionsSection && shouldGenerateLocalDataMethods(s);
+    const bool hasLocalDataField = [&]
+    {
+        if (isExceptionsSection) {
+            return false;
+        }
 
-    if (generateLocalData) {
+        const auto it = std::find_if(
+            s.m_fields.constBegin(),
+            s.m_fields.constEnd(),
+            [](const Parser::Field & field)
+            {
+                return field.m_name == QStringLiteral("localData") &&
+                    dynamic_cast<Parser::HashType*>(field.m_type.get());
+            });
+        return it != s.m_fields.constEnd();
+    }();
+
+    if (hasLocalDataField) {
         additionalIncludes << QStringLiteral("<QHash>")
             << QStringLiteral("<QVariant>");
     }
@@ -3895,24 +3918,28 @@ void Generator::generateTypeHeader(
     ctx.m_out << indent << s.m_name << " & operator=(" << s.m_name
         << " && other) noexcept;" << ln << ln;
 
-    if (generateLocalData) {
-        generateTypeLocalDataAccessoryMethodDeclarations(s, ctx);
-    }
-
     for(const auto & f: qAsConst(s.m_fields))
     {
         if (const auto cit = s.m_fieldComments.constFind(f.m_name);
             cit != s.m_fieldComments.constEnd())
         {
             const auto lines = cit.value().split(QChar::fromLatin1('\n'));
-            for(const auto & line: qAsConst(lines)) {
-                if (&line != &lines.front() && &line != &lines.back()) {
+            for(const auto & line: qAsConst(lines))
+            {
+                if (&line != &lines.front() && &line != &lines.back())
+                {
                     const auto simplifiedLine = line.simplified();
-                    if (simplifiedLine != QStringLiteral("<br/>")) {
-                        ctx.m_out << indent << " * " << simplifiedLine << ln;
+                    if (simplifiedLine != QStringLiteral("<br/>"))
+                    {
+                        ctx.m_out << indent << " *";
+                        if (!simplifiedLine.isEmpty()) {
+                            ctx.m_out << " " << simplifiedLine;
+                        }
+                        ctx.m_out << ln;
                     }
                 }
-                else {
+                else
+                {
                     ctx.m_out << indent;
                     if (&line == &lines.back()) {
                         ctx.m_out << " ";
@@ -3958,26 +3985,6 @@ void Generator::generateTypeHeader(
     }
 
     ctx.m_out << ln;
-
-    if (generateLocalData)
-    {
-        if (shouldGenerateLocalId(s))
-        {
-            ctx.m_out << indent
-                << "Q_PROPERTY(QString localId READ localId WRITE setLocalId)"
-                << ln;
-        }
-
-        ctx.m_out << indent
-            << "Q_PROPERTY(bool locallyModified READ isLocallyModified "
-            << "WRITE setLocallyModified)" << ln
-            << indent
-            << "Q_PROPERTY(bool localOnly READ isLocalOnly "
-            << "WRITE setLocalOnly)" << ln
-            << indent
-            << "Q_PROPERTY(bool favorited READ isLocallyFavorited "
-            << "WRITE setLocallyFavorited)" << ln;
-    }
 
     writeTypeProperties(s, ctx);
 
@@ -8329,92 +8336,6 @@ void Generator::generateTestClearLocalIdsCpp(
     writeNamespaceEnd(ctx.m_out);
 }
 
-void Generator::generateTypeLocalDataAccessoryMethodDeclarations(
-    const Parser::Structure & s, OutputFileContext & ctx)
-{
-    if (shouldGenerateLocalId(s))
-    {
-        ctx.m_out << indent << "/**" << ln
-            << indent
-            << " * @brief localId can be used as a local unique identifier"
-            << ln << indent
-            << " * for any data item before it has been synchronized with" << ln
-            << indent
-            << " * Evernote and thus before it can be identified using its "
-            << "guid." << ln
-            << indent << " *" << ln
-            << indent << " * localId is generated automatically on" << ln
-            << indent << " * construction for convenience but can be "
-            << "overridden manually" << ln
-            << indent << " */" << ln;
-
-        ctx.m_out << indent
-            << "[[nodiscard]] const QString & localId() const noexcept;"
-            << ln << indent << "void setLocalId(QString id);" << ln << ln;
-    }
-
-    ctx.m_out << indent << "/**" << ln
-        << indent
-        << " * @brief locallyModified flag can be used to keep track which"
-        << ln
-        << indent
-        << " * objects have been modified locally and thus need to be "
-        << "synchronized" << ln
-        << indent << " * with Evernote service" << ln
-        << indent << " */" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] bool isLocallyModified() const "
-        << "noexcept;" << ln
-        << indent << "void setLocallyModified(bool modified = true);"
-        << ln << ln;
-
-    ctx.m_out << indent << "/**" << ln
-        << indent << " * @brief localOnly flag can be used to keep track which"
-        << ln
-        << indent << " * data items are meant to be local only and thus never "
-        << "be synchronized" << ln
-        << indent << " * with Evernote service" << ln
-        << indent << " */" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] bool isLocalOnly() const noexcept;"
-        << ln << indent << "void setLocalOnly(bool localOnly = true);" << ln
-        << ln;
-
-    ctx.m_out << indent << "/**" << ln
-        << indent
-        << " * @brief locallyFavorited property can be used to keep track which"
-        << ln << indent
-        << " * data items were favorited in the client. Unfortunately," << ln
-        << indent
-        << " * Evernote has never provided a way to synchronize such" << ln
-        << indent << " * a property between different clients" << ln
-        << indent << " */" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] bool isLocallyFavorited() const "
-        << "noexcept;" << ln
-        << indent << "void setLocallyFavorited(bool favorited = true);"
-        << ln << ln;
-
-    ctx.m_out << indent << "/**" << ln
-        << indent
-        << " * @brief localData property can be used to store any additional"
-        << ln
-        << indent
-        << " * data which might be needed to be set for the type object" << ln
-        << indent
-        << " * by QEverCloud's client code" << ln
-        << indent << " */" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] const QHash<QString, QVariant> & "
-        << "localData() const noexcept;" << ln;
-
-    ctx.m_out << indent << "[[nodiscard]] QHash<QString, QVariant> & "
-        << "mutableLocalData();" << ln;
-
-    ctx.m_out << indent << "void setLocalData(QHash<QString, QVariant> "
-        "localData);" << ln << ln;
-}
-
 void Generator::generateTypeLocalDataAccessoryMethodDefinitions(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
@@ -8518,8 +8439,17 @@ void Generator::generateClassAccessoryMethodsForFieldDeclarations(
     }
 
     // Setter
-    ctx.m_out << indent << "void set" << capitalize(field.m_name) << "("
-        << fieldTypeName << " " << field.m_name << ");" << ln;
+    ctx.m_out << indent << "void " << fieldSetterName(field);
+
+    ctx.m_out << "("
+        << fieldTypeName << " " << field.m_name;
+
+    if (field.m_setterDefaultValue)
+    {
+        ctx.m_out << " = " << field.m_setterDefaultValue->m_value;
+    }
+
+    ctx.m_out << ");" << ln;
 }
 
 void Generator::generateClassAccessoryMethodsForAuxiliaryFields(
@@ -8718,8 +8648,9 @@ void Generator::generateClassAccessoryMethodsForFieldDefinitions(
     }
 
     // Setter
-    ctx.m_out << "void " << s.m_name << "::set" << capitalize(field.m_name)
-        << "(" << fieldTypeName << " " << field.m_name << ")" << ln
+    ctx.m_out << "void " << s.m_name << "::set" << fieldSetterName(field);
+
+    ctx.m_out << "(" << fieldTypeName << " " << field.m_name << ")" << ln
         << "{" << ln
         << indent << "d->m_" << field.m_name << " = " << field.m_name << ";"
         << ln

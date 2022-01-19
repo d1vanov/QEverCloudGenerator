@@ -239,7 +239,11 @@ public:
         std::shared_ptr<Type> m_type;
         QString m_name;
         std::shared_ptr<ConstValue> m_initializer;
-        std::shared_ptr<ConstValue> m_setterDefaultValue;
+        std::shared_ptr<LiteralValue> m_setterDefaultValue;
+
+        // If not empty, overrides the name assigned to field's corresponding
+        // Q_PROPERTY
+        QString m_overridePropertyName;
     };
 
     struct Structure

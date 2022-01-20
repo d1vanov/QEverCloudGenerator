@@ -8,12 +8,14 @@ project(thrift_parser)
 set(HEADERS
     Generator.h
     Lexer.h
+    LocalFields.h
     Parser.h
     ParserHelper.h)
 
 set(SOURCES
     Generator.cpp
     Lexer.cpp
+    LocalFields.cpp
     main.cpp
     Parser.cpp)
 

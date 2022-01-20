@@ -208,9 +208,6 @@ private:
     void generateClassAccessoryMethodsForFieldDeclarations(
         const Parser::Field & field, OutputFileContext & ctx);
 
-    void generateClassAccessoryMethodsForAuxiliaryFields(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
     void generateClassAccessoryMethodsForFieldDefinitions(
         const Parser::Structure & s, const Parser::Field & field,
         OutputFileContext & ctx);

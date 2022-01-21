@@ -202,9 +202,6 @@ private:
     void generateTestClearLocalIdsCpp(
         Parser & parser, const QString & outPath);
 
-    void generateTypeLocalDataAccessoryMethodDefinitions(
-        const Parser::Structure & s, OutputFileContext & ctx);
-
     void generateClassAccessoryMethodsForFieldDeclarations(
         const Parser::Field & field, OutputFileContext & ctx);
 

@@ -196,10 +196,10 @@ private:
     void generateTestRandomDataGeneratorsCpp(
         Parser & parser, const QString & outPath);
 
-    void generateTestClearLocalIdsHeader(
+    void generateTestClearLocalFieldsHeader(
         Parser & parser, const QString & outPath);
 
-    void generateTestClearLocalIdsCpp(
+    void generateTestClearLocalFieldsCpp(
         Parser & parser, const QString & outPath);
 
     void generateClassAccessoryMethodsForFieldDeclarations(
@@ -408,15 +408,18 @@ private:
 
     [[nodiscard]] bool shouldGenerateLocalId(const Parser::Structure & s) const;
 
-    [[nodiscard]] bool structContainsFieldsWithLocalId(
+    [[nodiscard]] bool structContainsLocalFields(
+        const Parser::Structure & s) const;
+
+    [[nodiscard]] bool structContainsFieldsWithLocalFields(
         const Parser::Structure & s, const Parser::Structures & structs) const;
 
     /**
      * @return                  The list of structs which either contain local
-     *                          id themselves or have fields which contain
-     *                          local id
+     *                          fields themselves or have fields of types which
+     *                          contain local fields.
      */
-    [[nodiscard]] Parser::Structures collectStructsWithLocalId(
+    [[nodiscard]] Parser::Structures collectStructsWithLocalFields(
         Parser & parser) const;
 
     [[nodiscard]] std::optional<Parser::Structure> structForType(

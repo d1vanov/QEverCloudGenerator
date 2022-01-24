@@ -403,44 +403,6 @@ QList<Parser::Field> Generator::loggableFields(
     return result;
 }
 
-bool Generator::shouldGenerateLocalDataMethods(const Parser::Structure & s) const
-{
-    if ( (s.m_name == QStringLiteral("User")) ||
-         (s.m_name == QStringLiteral("SharedNotebook")) ||
-         (s.m_name == QStringLiteral("SharedNote")) )
-    {
-        return true;
-    }
-
-    if (m_allExceptions.contains(s.m_name)) {
-        return false;
-    }
-
-    for (const auto & f: s.m_fields)
-    {
-        if (typeToStr(f.m_type) == QStringLiteral("Guid") &&
-            f.m_name == QStringLiteral("guid"))
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool Generator::shouldGenerateLocalId(const Parser::Structure & s) const
-{
-    if (s.m_name == QStringLiteral("LinkedNotebook") ||
-        s.m_name == QStringLiteral("SharedNote") ||
-        s.m_name == QStringLiteral("SharedNotebook") ||
-        s.m_name == QStringLiteral("User"))
-    {
-        return false;
-    }
-
-    return true;
-}
-
 bool Generator::structContainsLocalFields(const Parser::Structure & s) const
 {
     for (const auto & f: qAsConst(s.m_fields))
@@ -453,11 +415,15 @@ bool Generator::structContainsLocalFields(const Parser::Structure & s) const
     return false;
 }
 
-bool Generator::structContainsFieldsWithLocalFields(
+bool Generator::structContainsLocalFieldsRecursive(
     const Parser::Structure & s, const Parser::Structures & structs) const
 {
     for (const auto & f: s.m_fields)
     {
+        if (f.m_affiliation == Parser::Field::Affiliation::Local) {
+            return true;
+        }
+
         auto identifierType =
             std::dynamic_pointer_cast<Parser::IdentifierType>(f.m_type);
 
@@ -483,6 +449,13 @@ bool Generator::structContainsFieldsWithLocalFields(
                 identifierType =
                     std::dynamic_pointer_cast<Parser::IdentifierType>(
                         mapType->m_valueType);
+            }
+            else if (const auto hashType =
+                     std::dynamic_pointer_cast<Parser::HashType>(f.m_type))
+            {
+                identifierType =
+                    std::dynamic_pointer_cast<Parser::IdentifierType>(
+                        hashType->m_valueType);
             }
 
             if (!identifierType) {
@@ -518,7 +491,22 @@ bool Generator::structContainsFieldsWithLocalFields(
             return true;
         }
 
-        if (structContainsFieldsWithLocalFields(*sit, structs)) {
+        if (structContainsLocalFieldsRecursive(*sit, structs)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool Generator::structContainsLocalIdField(const Parser::Structure & s) const
+{
+    for (const auto & f: qAsConst(s.m_fields))
+    {
+        if ((f.m_affiliation == Parser::Field::Affiliation::Local) &&
+            (f.m_name == QStringLiteral("localId")) &&
+            dynamic_cast<Parser::StringType*>(f.m_type.get()))
+        {
             return true;
         }
     }
@@ -533,12 +521,7 @@ Parser::Structures Generator::collectStructsWithLocalFields(
     const auto & structs = parser.structures();
     for (const auto & s: qAsConst(structs))
     {
-        if (structContainsLocalFields(s)) {
-            relevantStructs.push_back(s);
-            continue;
-        }
-
-        if (structContainsFieldsWithLocalFields(s, structs)) {
+        if (structContainsLocalFieldsRecursive(s, structs)) {
             relevantStructs.push_back(s);
             continue;
         }
@@ -1818,8 +1801,7 @@ void Generator::generateTestServerHelperLambda(
         }
 
         if (const auto s = structForType(param.m_type, parser); s &&
-            (structContainsLocalFields(*s) ||
-             structContainsFieldsWithLocalFields(*s, parser.structures())))
+            structContainsLocalFieldsRecursive(*s, parser.structures()))
         {
             ctx.m_out << indent << indent << indent
                 << "compareValuesWithoutLocalFields("
@@ -1830,8 +1812,7 @@ void Generator::generateTestServerHelperLambda(
         {
             if (const auto s =
                 structForType(listType->m_valueType, parser); s &&
-                (structContainsLocalFields(*s) ||
-                 structContainsFieldsWithLocalFields(*s, parser.structures())))
+                structContainsLocalFieldsRecursive(*s, parser.structures()))
             {
                 ctx.m_out << indent << indent << indent
                     << "compareListValuesWithoutLocalFields("
@@ -1849,8 +1830,7 @@ void Generator::generateTestServerHelperLambda(
         {
             if (const auto s =
                 structForType(setType->m_valueType, parser); s &&
-                (structContainsLocalFields(*s) ||
-                 structContainsFieldsWithLocalFields(*s, parser.structures())))
+                structContainsLocalFieldsRecursive(*s, parser.structures()))
             {
                 ctx.m_out << indent << indent << indent
                     << "compareSetValuesWithoutLocalFields("
@@ -1868,8 +1848,7 @@ void Generator::generateTestServerHelperLambda(
         {
             if (const auto s =
                 structForType(setType->m_valueType, parser); s &&
-                (structContainsLocalFields(*s) ||
-                 structContainsFieldsWithLocalFields(*s, parser.structures())))
+                structContainsLocalFieldsRecursive(*s, parser.structures()))
             {
                 ctx.m_out << indent << indent << indent
                     << "compareMapValuesWithoutLocalFields("
@@ -2075,9 +2054,7 @@ void Generator::generateTestServerServiceCall(
             if (funcReturnTypeName != QStringLiteral("void")) {
                 ctx.m_out << ln;
                 if (const auto s = structForType(func.m_type, parser); s &&
-                    (structContainsLocalFields(*s) ||
-                     structContainsFieldsWithLocalFields(
-                         *s, parser.structures())))
+                    structContainsLocalFieldsRecursive(*s, parser.structures()))
                 {
                     ctx.m_out << indentStr << "compareValuesWithoutLocalFields("
                         << "qvariant_cast<" << funcReturnTypeName
@@ -2088,9 +2065,8 @@ void Generator::generateTestServerServiceCall(
                 {
                     if (const auto s =
                         structForType(listType->m_valueType, parser); s &&
-                        (structContainsLocalFields(*s) ||
-                         structContainsFieldsWithLocalFields(
-                             *s, parser.structures())))
+                        structContainsLocalFieldsRecursive(
+                            *s, parser.structures()))
                     {
                         ctx.m_out << indentStr
                             << "compareListValuesWithoutLocalFields("
@@ -2105,13 +2081,13 @@ void Generator::generateTestServerServiceCall(
                     }
                 }
                 else if (const auto setType =
-                            std::dynamic_pointer_cast<Parser::SetType>(func.m_type))
+                         std::dynamic_pointer_cast<Parser::SetType>(
+                             func.m_type))
                 {
                     if (const auto s =
                         structForType(setType->m_valueType, parser); s &&
-                        (structContainsLocalFields(*s) ||
-                         structContainsFieldsWithLocalFields(
-                             *s, parser.structures())))
+                        structContainsLocalFieldsRecursive(
+                            *s, parser.structures()))
                     {
                         ctx.m_out << indentStr
                             << "compareSetValuesWithoutLocalFields("
@@ -2130,9 +2106,8 @@ void Generator::generateTestServerServiceCall(
                 {
                     if (const auto s =
                         structForType(mapType->m_valueType, parser); s &&
-                        (structContainsLocalFields(*s) ||
-                         structContainsFieldsWithLocalFields(
-                             *s, parser.structures())))
+                        structContainsLocalFieldsRecursive(
+                            *s, parser.structures()))
                     {
                         ctx.m_out << indentStr
                             << "compareMapValuesWithoutLocalFields("
@@ -2184,8 +2159,7 @@ void Generator::generateTestServerServiceCall(
         (funcReturnTypeName != QStringLiteral("void")))
     {
         if (const auto s = structForType(func.m_type, parser); s &&
-            (structContainsLocalFields(*s) ||
-             structContainsFieldsWithLocalFields(*s, parser.structures())))
+            structContainsLocalFieldsRecursive(*s, parser.structures()))
         {
             ctx.m_out << indent
                 << "compareValuesWithoutLocalFields(res, response);" << ln;
@@ -2195,8 +2169,7 @@ void Generator::generateTestServerServiceCall(
         {
             if (const auto s =
                 structForType(listType->m_valueType, parser); s &&
-                (structContainsLocalFields(*s) ||
-                 structContainsFieldsWithLocalFields(*s, parser.structures())))
+                structContainsLocalFieldsRecursive(*s, parser.structures()))
             {
                 ctx.m_out << indent
                     << "compareListValuesWithoutLocalFields(res, response);" << ln;
@@ -2212,8 +2185,7 @@ void Generator::generateTestServerServiceCall(
         {
             if (const auto s =
                 structForType(setType->m_valueType, parser); s &&
-                (structContainsLocalFields(*s) ||
-                 structContainsFieldsWithLocalFields(*s, parser.structures())))
+                structContainsLocalFieldsRecursive(*s, parser.structures()))
             {
                 ctx.m_out << indent
                     << "compareSetValuesWithoutLocalFields(res, response);" << ln;
@@ -2229,8 +2201,7 @@ void Generator::generateTestServerServiceCall(
         {
             if (const auto s =
                 structForType(mapType->m_valueType, parser); s &&
-                (structContainsLocalFields(*s) ||
-                 structContainsFieldsWithLocalFields(*s, parser.structures())))
+                structContainsLocalFieldsRecursive(*s, parser.structures()))
             {
                 ctx.m_out << indent
                     << "compareMapValuesWithoutLocalFields(res, response);"
@@ -4229,8 +4200,7 @@ void Generator::generateTypeImplHeader(
     QStringList additionalIncludes = QStringList()
         << publicHeaderInclude << QStringLiteral("<QSharedData>");
 
-    const auto generateLocalData = shouldGenerateLocalDataMethods(s);
-    if (generateLocalData) {
+    if (structContainsLocalFields(s)) {
         additionalIncludes << QStringLiteral("<QHash>")
             << QStringLiteral("<QVariant>");
     }
@@ -4247,7 +4217,7 @@ void Generator::generateTypeImplHeader(
         << "{" << ln
         << "public:" << ln;
 
-    if (shouldGenerateLocalDataMethods(s) && shouldGenerateLocalId(s)) {
+    if (structContainsLocalIdField(s)) {
         ctx.m_out << indent << "Impl();" << ln;
     }
     else {
@@ -4345,9 +4315,7 @@ void Generator::generateTypeImplCpp(
     ctx.m_out << "#include \"../../Impl.h\"" << ln << ln;
     ctx.m_out << "#include <QTextStream>" << ln;
 
-    const bool isTypeWithLocalId =
-        shouldGenerateLocalDataMethods(s) && shouldGenerateLocalId(s);
-
+    const bool isTypeWithLocalId = structContainsLocalIdField(s);
     if (isTypeWithLocalId) {
         ctx.m_out << "#include <QUuid>" << ln;
     }
@@ -4359,13 +4327,11 @@ void Generator::generateTypeImplCpp(
         ctx.m_out << s.m_name << "::Impl::Impl()" << ln
             << "{" << ln;
 
-        if (shouldGenerateLocalId(s)) {
-            ctx.m_out << indent << "m_localId = QUuid::createUuid().toString();"
-                << ln
-                << indent << "// Remove curvy braces" << ln
-                << indent << "m_localId.remove(m_localId.size() - 1, 1);" << ln
-                << indent << "m_localId.remove(0, 1);" << ln;
-        }
+        ctx.m_out << indent << "m_localId = QUuid::createUuid().toString();"
+            << ln
+            << indent << "// Remove curvy braces" << ln
+            << indent << "m_localId.remove(m_localId.size() - 1, 1);" << ln
+            << indent << "m_localId.remove(0, 1);" << ln;
 
         ctx.m_out << "}" << ln << ln;
     }
@@ -4457,7 +4423,7 @@ void Generator::generateSerializationJsonCpp(
     const bool needsToRangeHeader =
         [&]
         {
-            if (shouldGenerateLocalDataMethods(s)) {
+            if (structContainsLocalFields(s)) {
                 return true;
             }
 
@@ -5438,10 +5404,7 @@ void Generator::generateTypeBuilderHeader(
             << QStringLiteral("<qevercloud/exceptions/EverCloudException.h>");
     }
 
-    const bool generateLocalData =
-        !isExceptionsSection && shouldGenerateLocalDataMethods(s);
-
-    if (generateLocalData) {
+    if (!isExceptionsSection && structContainsLocalFields(s)) {
         additionalIncludes << QStringLiteral("<QHash>")
             << QStringLiteral("<QVariant>");
     }
@@ -7433,8 +7396,7 @@ void Generator::generateTestClearLocalFieldsCpp(
                     });
 
                 if ((sit != structs.constEnd()) &&
-                    (structContainsLocalFields(*sit) ||
-                     structContainsFieldsWithLocalFields(*sit, structs)))
+                    structContainsLocalFieldsRecursive(*sit, structs))
                 {
                     if (f.m_required == Parser::Field::RequiredFlag::Optional) {
                         ctx.m_out << indent << "if (v." << f.m_name << "()) {"
@@ -7469,8 +7431,7 @@ void Generator::generateTestClearLocalFieldsCpp(
                         });
 
                     if ((sit != structs.constEnd()) &&
-                        (structContainsLocalFields(*sit) ||
-                         structContainsFieldsWithLocalFields(*sit, structs)))
+                        structContainsLocalFieldsRecursive(*sit, structs))
                     {
                         if (f.m_required ==
                             Parser::Field::RequiredFlag::Optional)
@@ -7514,8 +7475,7 @@ void Generator::generateTestClearLocalFieldsCpp(
                         });
 
                     if ((sit != structs.constEnd()) &&
-                        (structContainsLocalFields(*sit) ||
-                         structContainsFieldsWithLocalFields(*sit, structs)))
+                        structContainsLocalFieldsRecursive(*sit, structs))
                     {
                         if (f.m_required ==
                             Parser::Field::RequiredFlag::Optional)
@@ -7565,8 +7525,7 @@ void Generator::generateTestClearLocalFieldsCpp(
                         });
 
                     if ((sit != structs.constEnd()) &&
-                        (structContainsLocalFields(*sit) ||
-                         structContainsFieldsWithLocalFields(*sit, structs)))
+                        structContainsLocalFieldsRecursive(*sit, structs))
                     {
                         if (f.m_required ==
                             Parser::Field::RequiredFlag::Optional)

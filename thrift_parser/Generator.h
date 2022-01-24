@@ -403,16 +403,33 @@ private:
     [[nodiscard]] QList<Parser::Field> loggableFields(
         const QList<Parser::Field> & fields) const;
 
-    [[nodiscard]] bool shouldGenerateLocalDataMethods(
-        const Parser::Structure & s) const;
-
-    [[nodiscard]] bool shouldGenerateLocalId(const Parser::Structure & s) const;
-
+    /**
+     * @brief checks whether passed in struct contains fields with local
+     *        affiliation
+     * @return true if the passed in struct contains fields with local
+     *         affiliation, false otherwise
+     */
     [[nodiscard]] bool structContainsLocalFields(
         const Parser::Structure & s) const;
 
-    [[nodiscard]] bool structContainsFieldsWithLocalFields(
+    /**
+     * @brief checks recursively whether struct contains fields with local
+     *        affiliation or fields which are themselves structs containing
+     *        fields with local affiliation or if those fields are themselves
+     *        structs containing such fields etc.
+     * @return true if the passed in struct contains local data inside it
+     *         somehow, false otherwise
+     */
+    [[nodiscard]] bool structContainsLocalFieldsRecursive(
         const Parser::Structure & s, const Parser::Structures & structs) const;
+
+    /**
+     * @brief checks whether the passed in struct contains local id field
+     * @return true if the passed in struct contains local id field, false
+     *         otherwise
+     */
+    [[nodiscard]] bool structContainsLocalIdField(
+        const Parser::Structure & s) const;
 
     /**
      * @return                  The list of structs which either contain local

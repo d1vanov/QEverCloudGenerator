@@ -117,6 +117,12 @@ private:
     void generateDeserializeFromJsonMethod(
         const Parser::Structure & s, OutputFileContext & ctx);
 
+    void generateSerializationJsonTestHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateSerializationJsonTestCpp(
+        const Parser & parser, const QString & outPath);
+
     void generateExceptionClassWhatMethodDefinition(
         const Parser::Structure & s, OutputFileContext & ctx);
 

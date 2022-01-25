@@ -194,6 +194,24 @@ void ensureDirExists(const QString & path)
     }
 }
 
+[[nodiscard]] Parser::Structures sortedStructsAndExceptions(
+    const Parser & parser)
+{
+    Parser::Structures structsAndExceptions;
+    structsAndExceptions << parser.structures();
+    structsAndExceptions << parser.exceptions();
+
+    std::sort(
+        structsAndExceptions.begin(),
+        structsAndExceptions.end(),
+        [](const Parser::Structure & lhs, const Parser::Structure & rhs)
+        {
+            return lhs.m_name.localeAwareCompare(rhs.m_name) < 0;
+        });
+
+    return structsAndExceptions;
+}
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -5263,6 +5281,90 @@ void Generator::generateDeserializeFromJsonMethod(
         << "}" << ln << ln;
 }
 
+void Generator::generateSerializationJsonTestHeader(
+    const Parser & parser, const QString & outPath)
+{
+    const QString fileName = QStringLiteral("TestSerializationJson.h");
+
+    OutputFileContext ctx(
+        fileName, outPath, OutputFileType::Test);
+
+    const auto additionalIncludes =
+        QStringList{} << QStringLiteral("<QObject>");
+
+    writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
+
+    ctx.m_out << blockSeparator << ln << ln;
+
+    ctx.m_out << "class SerializationJsonTester: public QObject" << ln
+        << "{" << ln
+        << "    Q_OBJECT" << ln
+        << "public:" << ln
+        << "    explicit SerializationJsonTester(QObject * parent = "
+        << "nullptr);" << ln << ln;
+
+    ctx.m_out << "private Q_SLOTS:" << ln;
+
+    const auto structsAndExceptions = sortedStructsAndExceptions(parser);
+    for (const auto & s: qAsConst(structsAndExceptions))
+    {
+        ctx.m_out << "    void shouldSerializeAndDeserialize" << s.m_name
+            << "();" << ln;
+    }
+
+    ctx.m_out << "};" << ln << ln;
+
+    writeHeaderFooter(ctx.m_out, fileName);
+}
+
+void Generator::generateSerializationJsonTestCpp(
+    const Parser & parser, const QString & outPath)
+{
+    auto additionalIncludes = QStringList{}
+        << QStringLiteral("RandomDataGenerators.h")
+        << QStringLiteral("<QtTest/QtTest>");
+
+    const auto structsAndExceptions = sortedStructsAndExceptions(parser);
+    for (const auto & s: qAsConst(structsAndExceptions)) {
+        additionalIncludes << QStringLiteral("<qevercloud/serialization/json/")
+            + s.m_name + QStringLiteral(".h>");
+    }
+
+    sortIncludes(additionalIncludes);
+
+    const QString fileName = QStringLiteral("TestSerializationJson.cpp");
+    OutputFileContext ctx(fileName, outPath, OutputFileType::Test);
+
+    writeHeaderBody(
+        ctx,
+        QStringLiteral("TestSerializationJson.h"),
+        additionalIncludes,
+        HeaderKind::Test);
+
+    ctx.m_out << "SerializationJsonTester::SerializationJsonTester("
+        << "QObject * parent) :" << ln
+        << "    QObject(parent)" << ln
+        << "{}" << ln << ln;
+
+    for (const auto & s: qAsConst(structsAndExceptions))
+    {
+        ctx.m_out << "void SerializationJsonTester::"
+            << "shouldSerializeAndDeserialize" << s.m_name
+            << "()" << ln
+            << "{" << ln
+            << indent << "const auto original = generateRandom" << s.m_name
+            << "();" << ln
+            << indent << "const auto object = serializeToJson(original);" << ln
+            << indent << s.m_name << " deserialized;" << ln
+            << indent << "const bool res = deserializeFromJson("
+            << "object, deserialized);" << ln
+            << indent << "QVERIFY(deserialized == original);" << ln
+            << "}" << ln << ln;
+    }
+
+    writeNamespaceEnd(ctx.m_out);
+}
+
 void Generator::generateExceptionClassWhatMethodDefinition(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
@@ -9219,6 +9321,9 @@ void Generator::generateSources(Parser & parser, const QString & outPath)
         generateSerializationJsonHeader(s, outPath);
         generateSerializationJsonCpp(s, enumerations, outPath);
     }
+
+    generateSerializationJsonTestHeader(parser, outPath);
+    generateSerializationJsonTestCpp(parser, outPath);
 
     generateAllTypeBuildersHeader(parser, outPath);
     generateTypeBuildersFwdHeader(parser, outPath);

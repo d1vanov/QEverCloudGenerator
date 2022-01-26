@@ -4571,6 +4571,7 @@ void Generator::generateSerializeToJsonMethod(
         {
             const auto typeName = typeToStr(type, {});
             const auto actualTypeName = aliasedTypeName(typeName);
+
             if (actualTypeName == typeName &&
                 dynamic_cast<Parser::IdentifierType*>(type.get()))
             {
@@ -4594,6 +4595,11 @@ void Generator::generateSerializeToJsonMethod(
                 if (actualTypeName == QStringLiteral("QVariant")) {
                     ctx.m_out << "QJsonValue::fromVariant(" << itemName
                         << ");" << ln;
+                }
+                else if (actualTypeName == QStringLiteral("qint64") ||
+                         actualTypeName == QStringLiteral("quint64"))
+                {
+                    ctx.m_out << "QString::number(" << itemName << ");" << ln;
                 }
                 else {
                     ctx.m_out << itemName << ";" << ln;
@@ -4726,6 +4732,11 @@ void Generator::generateSerializeToJsonMethod(
                 static_cast<bool>(
                     dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()));
 
+            const bool isLargeInt =
+                !isEnum &&
+                ((actualFieldTypeName == QStringLiteral("qint64") ||
+                 actualFieldTypeName == QStringLiteral("quint64")));
+
             if (isEnum) {
                 ctx.m_out << "QString::number(static_cast<qint64>(";
             }
@@ -4734,6 +4745,9 @@ void Generator::generateSerializeToJsonMethod(
             }
             else if (isByteArray) {
                 ctx.m_out << "QString::fromUtf8(";
+            }
+            else if (isLargeInt) {
+                ctx.m_out << "QString::number(";
             }
 
             if (!isByteArray && (field.m_required ==
@@ -4758,6 +4772,9 @@ void Generator::generateSerializeToJsonMethod(
                     ctx.m_out << ".";
                 }
                 ctx.m_out << "toBase64())";
+            }
+            else if (isLargeInt) {
+                ctx.m_out << ")";
             }
 
             ctx.m_out << ";" << ln;
@@ -4790,8 +4807,9 @@ void Generator::generateDeserializeFromJsonMethod(
         const auto typeName = typeToStr(type, {});
         const auto actualTypeName = aliasedTypeName(typeName);
 
-        // In json all numeric values are stored as doubles so for int fields
-        // need to use cast but need to do it cautiously
+        // In json all numbers except 64 bit integers are stored as doubles so
+        // for int of size < 64 fields need to use cast but need to do it
+        // cautiously, taking the type limits into account
         const auto processIntegerValue = [&](const QString & intTypeName)
         {
             ctx.m_out << indentStr << "if (" << itemName << ".isDouble()) {"
@@ -4828,6 +4846,40 @@ void Generator::generateDeserializeFromJsonMethod(
                 << indentStr << "}" << ln;
         };
 
+        // All 64 bit integers are stored in json as strings because otherwise
+        // converting them to double and back has proved to lose precision
+        const auto processLargeIntegerValue = [&](const QString & intTypeName)
+        {
+            ctx.m_out << indentStr << "if (" << itemName << ".isString()) {"
+                << ln;
+
+            ctx.m_out << indentStr << indent
+                << "const auto s = " << itemName << ".toString();" << ln;
+
+            ctx.m_out << indentStr << indent
+                << "bool conversionResult = false;" << ln;
+
+            ctx.m_out << indentStr << indent
+                << intTypeName << " i = s.to"
+                << (intTypeName.startsWith(QStringLiteral("quint"))
+                    ? "UlongLong"
+                    : "LongLong")
+                << "(&conversionResult);" << ln;
+
+            ctx.m_out << indentStr << indent
+                << "if (!conversionResult) {" << ln
+                << indentStr << indent << indent << "return false;" << ln
+                << indentStr << indent << "}" << ln << ln;
+
+            ctx.m_out << indentStr << indent << setter(QStringLiteral("i"))
+                << ln;
+
+            ctx.m_out << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
+                << indentStr << "}" << ln;
+        };
+
         if (actualTypeName == QStringLiteral("bool"))
         {
             ctx.m_out << indentStr << "if (" << itemName << ".isBool()) {"
@@ -4846,6 +4898,10 @@ void Generator::generateDeserializeFromJsonMethod(
                 << indentStr << indent << "return false;" << ln
                 << indentStr << "}" << ln;
         }
+        else if (actualTypeName == QStringLiteral("qint8"))
+        {
+            processIntegerValue(QStringLiteral("qint8"));
+        }
         else if (actualTypeName == QStringLiteral("quint8"))
         {
             processIntegerValue(QStringLiteral("quint8"));
@@ -4854,13 +4910,21 @@ void Generator::generateDeserializeFromJsonMethod(
         {
             processIntegerValue(QStringLiteral("qint16"));
         }
+        else if (actualTypeName == QStringLiteral("quint16"))
+        {
+            processIntegerValue(QStringLiteral("quint16"));
+        }
         else if (actualTypeName == QStringLiteral("qint32"))
         {
             processIntegerValue(QStringLiteral("qint32"));
         }
+        else if (actualTypeName == QStringLiteral("quint32"))
+        {
+            processLargeIntegerValue(QStringLiteral("quint32"));
+        }
         else if (actualTypeName == QStringLiteral("qint64"))
         {
-            processIntegerValue(QStringLiteral("qint64"));
+            processLargeIntegerValue(QStringLiteral("qint64"));
         }
         else if (actualTypeName == QStringLiteral("double"))
         {
@@ -4920,34 +4984,29 @@ void Generator::generateDeserializeFromJsonMethod(
         }
         else if (m_allEnums.contains(actualTypeName))
         {
-            ctx.m_out << indentStr << "if (" << itemName << ".isDouble()) {"
+            ctx.m_out << indentStr << "if (" << itemName << ".isString()) {"
                 << ln;
 
             ctx.m_out << indentStr << indent
-                << "const auto d = " << itemName << ".toDouble();" << ln;
+                << "const auto s = " << itemName << ".toString();" << ln;
 
             ctx.m_out << indentStr << indent
-                << "if ((d >= static_cast<double>("
-                << "std::numeric_limits<qint64>::min())) &&"
-                << ln
-                << indentStr << indent << "    "
-                << "(d <= static_cast<double>("
-                << "std::numeric_limits<qint64>::max())))" << ln
-                << indentStr << indent << "{" << ln;
+                << "bool conversionResult = false;" << ln;
 
-            QString valueToSet;
-            {
-                QTextStream strm{&valueToSet};
-                strm << "static_cast<qint64>(d)";
-            }
+            ctx.m_out << indentStr << indent
+                << "qint64 i = s.toLongLong(&conversionResult);" << ln;
 
-            ctx.m_out << indentStr << indent << indent << setter(valueToSet)
-                << ln;
-
-            ctx.m_out << indentStr << indent << "}" << ln
-                << indentStr << indent << "else {" << ln
+            ctx.m_out << indentStr << indent
+                << "if (!conversionResult) {" << ln
                 << indentStr << indent << indent << "return false;" << ln
-                << indentStr << indent << "}" << ln
+                << indentStr << indent << "}" << ln << ln;
+
+            ctx.m_out << indentStr << indent << setter(QStringLiteral("i"))
+                << ln;
+
+            ctx.m_out << indentStr << "}" << ln
+                << indentStr << "else {" << ln
+                << indentStr << indent << "return false;" << ln
                 << indentStr << "}" << ln;
         }
         else
@@ -5039,10 +5098,10 @@ void Generator::generateDeserializeFromJsonMethod(
                             << capitalize(actualValueTypeName)
                             << "ToEnum(" << value << ");" << ln;
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "if (e) {" << ln;
 
-                        strm << indentStr << indent << indent << indent;
+                        strm << indentStr << indent << indent;
 
                         if (listType) {
                             strm << "values.push_back(*e);" << ln;
@@ -5051,16 +5110,16 @@ void Generator::generateDeserializeFromJsonMethod(
                             strm << "values.insert(*e);" << ln;
                         }
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "}" << ln;
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "else {" << ln;
 
-                        strm << indentStr << indent << indent << indent
+                        strm << indentStr << indent << indent
                             << "return false;" << ln;
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "}";
 
                         return str;
@@ -5160,22 +5219,22 @@ void Generator::generateDeserializeFromJsonMethod(
                             << capitalize(actualValueTypeName)
                             << "ToEnum(" << value << ");" << ln;
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "if (e) {" << ln;
 
-                        strm << indentStr << indent << indent << indent
+                        strm << indentStr << indent << indent
                             << "map[it.key()] = *e;" << ln;
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "}" << ln;
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "else {" << ln;
 
-                        strm << indentStr << indent << indent << indent
+                        strm << indentStr << indent << indent
                             << "return false;" << ln;
 
-                        strm << indentStr << indent << indent
+                        strm << indentStr << indent
                             << "}";
 
                         return str;
@@ -5239,23 +5298,23 @@ void Generator::generateDeserializeFromJsonMethod(
                             << capitalize(actualTypeName) << "ToEnum("
                             << value << ");" << ln;
 
-                        strm << indent << indent << indent << indent
+                        strm << indent << indent << indent
                             << "if (e) {" << ln;
 
-                        strm << indent << indent << indent << indent << indent
+                        strm << indent << indent << indent << indent
                             << "value." << fieldSetterName(field)
                             << "(*e);" << ln;
 
-                        strm << indent << indent << indent << indent << "}"
+                        strm << indent << indent << indent << "}"
                             << ln;
 
-                        strm << indent << indent << indent << indent << "else {"
+                        strm << indent << indent << indent << "else {"
                             << ln;
 
-                        strm << indent << indent << indent << indent
+                        strm << indent << indent << indent
                             << indent << "return false;" << ln;
 
-                        strm << indent << indent << indent << indent << "}";
+                        strm << indent << indent << indent << "}";
                         return str;
                     });
             }
@@ -5358,6 +5417,18 @@ void Generator::generateSerializationJsonTestCpp(
             << indent << s.m_name << " deserialized;" << ln
             << indent << "const bool res = deserializeFromJson("
             << "object, deserialized);" << ln
+            << indent << "if (deserialized != original) {" << ln
+            << indent << indent
+            << "qWarning() << \"Serialization/deserialization failed: "
+            << "original = \"" << ln
+            << indent << indent << indent
+            << "<< original << \"\\nDeserialized = \""
+            << " << deserialized" << ln
+            << indent << indent << indent
+            << "<< \"\\nJSON: \"" << ln
+            << indent << indent << indent
+            << "<< QJsonDocument(object).toJson(QJsonDocument::Indented);" << ln
+            << indent << "}" << ln
             << indent << "QVERIFY(deserialized == original);" << ln
             << "}" << ln << ln;
     }

@@ -9,6 +9,8 @@ project(QEverCloudGenerator)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(BUILD_WITH_QT6 "Build with Qt6" OFF)
+
 include(QEverCloudGeneratorSetupQt)
 include(QEverCloudGeneratorCompilerSettings)
 

@@ -80,29 +80,25 @@ private:
 
     struct LexContext
     {
-        LexContext(const QString & fileName, const QString & text) :
-            m_fileName(fileName),
-            m_state(TerminalSymbolType::NoState),
-            m_pos(0),
-            m_lineNum(1),
-            m_savedLineNum(0),
-            m_text(&text)
+        LexContext(QString fileName, QString text) :
+            m_fileName{std::move(fileName)},
+            m_text{std::move(text)}
         {}
 
         QString m_fileName;
-        TerminalSymbolType m_state;
+        TerminalSymbolType m_state = TerminalSymbolType::NoState;
 
-        int m_pos;
-        int m_lineNum;
-        int m_savedLineNum;
+        int m_pos = 0;
+        int m_lineNum = 1;
+        int m_savedLineNum = 0;
 
-        QStringRef m_text;
+        QString m_text;
     };
 
     void lexChar(const QChar ch, LexContext & ctx, QString & data);
 
-    bool isNextChar(const QChar testChar, const QStringRef & text, int pos);
-    bool isNextNextChar(const QChar testChar, const QStringRef & text, int pos);
+    bool isNextChar(const QChar testChar, const QString & text, int pos);
+    bool isNextNextChar(const QChar testChar, const QString & text, int pos);
 
 private:
     QList<TerminalSymbol> m_terminals;

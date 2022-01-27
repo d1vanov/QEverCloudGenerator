@@ -40,10 +40,21 @@ set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/thrift_lemon.h" PROPERTY SKIP_A
 set_property(SOURCE "${CMAKE_CURRENT_BINARY_DIR}/thrift_lemon.cpp" PROPERTY SKIP_AUTOMOC ON)
 
 add_executable(QEverCloudGenerator ${HEADERS} ${SOURCES} ${IDL_COMPILED_FILES})
-target_link_libraries(QEverCloudGenerator ${QT_LIBRARIES})
+
+if (BUILD_WITH_QT6)
+  target_link_libraries(QEverCloudGenerator Qt6::Core)
+else()
+  target_link_libraries(QEverCloudGenerator Qt5::Core)
+endif()
 
 target_compile_features(QEverCloudGenerator PRIVATE
   cxx_std_17)
+
+target_compile_definitions(QEverCloudGenerator PRIVATE
+  "-DQT_NO_CAST_FROM_ASCII"
+  "-DQT_NO_CAST_TO_ASCII"
+  "-DQT_NO_CAST_FROM_BYTEARRAY"
+  "-DQT_NO_NARROWING_CONVERSIONS_IN_CONNECT")
 
 add_dependencies(QEverCloudGenerator pre_build)
 

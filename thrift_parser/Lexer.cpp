@@ -48,7 +48,13 @@ void Lexer::feedFile(QString fileName)
     }
 
     QTextStream in(&file);
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    in.setEncoding(QStringEncoder::Utf8);
+#else
     in.setCodec("UTF-8");
+#endif
+
     lex(QFileInfo(fileName).fileName(), in.readAll());
 }
 
@@ -306,7 +312,7 @@ void Lexer::lexChar(const QChar ch, LexContext & ctx, QString & data)
     }
 }
 
-bool Lexer::isNextChar(const QChar testChar, const QStringRef & text, int pos)
+bool Lexer::isNextChar(const QChar testChar, const QString & text, int pos)
 {
     if (text.length() <= (pos + 1)) {
         return false;
@@ -316,7 +322,7 @@ bool Lexer::isNextChar(const QChar testChar, const QStringRef & text, int pos)
 }
 
 bool Lexer::isNextNextChar(
-    const QChar testChar, const QStringRef & text, int pos)
+    const QChar testChar, const QString & text, int pos)
 {
     if (text.length() <= (pos + 2)) {
         return false;

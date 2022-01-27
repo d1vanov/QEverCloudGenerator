@@ -235,7 +235,12 @@ Generator::OutputFileContext::OutputFileContext(
     m_type = type;
 
     m_out.setDevice(&m_file);
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    m_out.setEncoding(QStringEncoder::Utf8);
+#else
     m_out.setCodec("UTF-8");
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////

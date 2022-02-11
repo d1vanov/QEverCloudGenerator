@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2021 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2022 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -6575,6 +6575,7 @@ void Generator::generateServiceHeader(
         << QStringLiteral("<qevercloud/RequestContext.h>")
         << QStringLiteral("<qevercloud/Constants.h>")
         << QStringLiteral("<qevercloud/Types.h>")
+        << QStringLiteral("<qevercloud/services/Fwd.h>")
         << QStringLiteral("<QFuture>")
         << QStringLiteral("<QObject>")
         << QStringLiteral("<QVariant>");
@@ -6698,8 +6699,6 @@ void Generator::generateServiceHeader(
     }
 
     ctx.m_out << "};" << ln << ln;
-    ctx.m_out << "using I" << service.m_name << "Ptr = std::shared_ptr<I"
-        << service.m_name << ">;" << ln << ln;
 
     ctx.m_out << blockSeparator << ln << ln;
 
@@ -6855,9 +6854,13 @@ void Generator::generateServicesFwdHeader(
 
     const QString guard = getIncludeGuard(fileName, section);
 
+    ctx.m_out << "#include <memory>" << ln << ln;
+
     ctx.m_out << "#ifndef " << guard << ln;
     ctx.m_out << "#define " << guard << ln;
     ctx.m_out << ln;
+
+    ctx.m_out << "namespace qevercloud {" << ln << ln;
 
     const auto & services = parser.services();
     QStringList serviceClasses;
@@ -6871,8 +6874,15 @@ void Generator::generateServicesFwdHeader(
 
     for (const auto & serviceClass: qAsConst(serviceClasses)) {
         ctx.m_out << "class " << serviceClass << ";" << ln;
-    }
 
+        if (!serviceClass.endsWith(QStringLiteral("Server"))) {
+            ctx.m_out << "using " << serviceClass << "Ptr = "
+                << "std::shared_ptr<" << serviceClass << ">;" << ln << ln;
+        }
+    }
+    ctx.m_out << ln;
+
+    writeNamespaceEnd(ctx.m_out);
     ctx.m_out << ln;
     ctx.m_out << "#endif // " << guard << ln;
 }
@@ -6892,9 +6902,15 @@ void Generator::generateFwdHeader(const QString & outPath)
     ctx.m_out << ln;
     ctx.m_out << "#include \"exceptions/Fwd.h\"" << ln;
     ctx.m_out << "#include \"services/Fwd.h\"" << ln;
-    ctx.m_out << "#include \"types/Fwd.h\"" << ln;
+    ctx.m_out << "#include \"types/Fwd.h\"" << ln << ln;
+    ctx.m_out << "#include <memory>" << ln << ln;
 
-    ctx.m_out << ln;
+    ctx.m_out << "namespace qevercloud {" << ln << ln
+        << "class IRequestContext;" << ln
+        << "using IRequestContextPtr = std::shared_ptr<IRequestContext>;" << ln
+        << ln
+        << "} // namespace qevercloud" << ln << ln;
+
     ctx.m_out << "#endif // " << guard << ln;
 }
 

@@ -2039,8 +2039,9 @@ void Generator::generateTestServerServiceCall(
     }
     else if (callKind == ServiceCallKind::Async)
     {
-        ctx.m_out << indentStr << "QFuture<QVariant> result = "
-            << serviceName << "->" << func.m_name << "Async(" << ln;
+        ctx.m_out << indentStr << "QFuture<" << funcReturnTypeName
+            << "> result = " << serviceName << "->" << func.m_name << "Async("
+            << ln;
     }
     else
     {
@@ -2063,11 +2064,13 @@ void Generator::generateTestServerServiceCall(
 
     if (callKind == ServiceCallKind::Async)
     {
-        ctx.m_out << indentStr << "QFutureWatcher<QVariant> watcher;" << ln
+        ctx.m_out << indentStr << "QFutureWatcher<" << funcReturnTypeName
+            << "> watcher;" << ln
             << indentStr << "QEventLoop loop;" << ln
             << indentStr << "QObject::connect(" << ln
             << indentStr << indent << "&watcher, "
-            << "&QFutureWatcher<QVariant>::finished, &loop," << ln
+            << "&QFutureWatcher<" << funcReturnTypeName << ">::finished, &loop,"
+            << ln
             << indentStr << indent << "&QEventLoop::quit);" << ln << ln
             << indentStr << "watcher.setFuture(result);" << ln
             << indentStr << "loop.exec();" << ln;
@@ -2080,8 +2083,7 @@ void Generator::generateTestServerServiceCall(
                     structContainsLocalFieldsRecursive(*s, parser.structures()))
                 {
                     ctx.m_out << indentStr << "compareValuesWithoutLocalFields("
-                        << "qvariant_cast<" << funcReturnTypeName
-                        << ">(result.result()), response);" << ln;
+                        << "result.result(), response);" << ln;
                 }
                 else if (const auto listType =
                     std::dynamic_pointer_cast<Parser::ListType>(func.m_type))
@@ -2093,14 +2095,12 @@ void Generator::generateTestServerServiceCall(
                     {
                         ctx.m_out << indentStr
                             << "compareListValuesWithoutLocalFields("
-                            << "qvariant_cast<" << funcReturnTypeName
-                            << ">(result.result()), response);" << ln;
+                            << "result.result(), response);" << ln;
                     }
                     else
                     {
                         ctx.m_out << indentStr
-                            << "QVERIFY(qvariant_cast<" << funcReturnTypeName
-                            << ">(result.result()) == response);" << ln;
+                            << "QVERIFY(result.result() == response);" << ln;
                     }
                 }
                 else if (const auto setType =
@@ -2114,14 +2114,12 @@ void Generator::generateTestServerServiceCall(
                     {
                         ctx.m_out << indentStr
                             << "compareSetValuesWithoutLocalFields("
-                            << "qvariant_cast<" << funcReturnTypeName
-                            << ">(result.result()), response);" << ln;
+                            << "result.result(), response);" << ln;
                     }
                     else
                     {
                         ctx.m_out << indentStr
-                            << "QVERIFY(qvariant_cast<" << funcReturnTypeName
-                            << ">(result.result()) == response);" << ln;
+                            << "QVERIFY(result.result() == response);" << ln;
                     }
                 }
                 else if (const auto mapType =
@@ -2134,21 +2132,18 @@ void Generator::generateTestServerServiceCall(
                     {
                         ctx.m_out << indentStr
                             << "compareMapValuesWithoutLocalFields("
-                            << "qvariant_cast<" << funcReturnTypeName
-                            << ">(result.result()), response);" << ln;
+                            << "result.result(), response);" << ln;
                     }
                     else
                     {
                         ctx.m_out << indentStr
-                            << "QVERIFY(qvariant_cast<" << funcReturnTypeName
-                            << ">(result.result()) == response);" << ln;
+                            << "QVERIFY(result.result() == response);" << ln;
                     }
                 }
                 else
                 {
                     ctx.m_out << indentStr
-                        << "QVERIFY(qvariant_cast<" << funcReturnTypeName
-                        << ">(result.result()) == response);" << ln;
+                        << "QVERIFY(result.result() == response);" << ln;
                 }
             }
         }
@@ -6603,14 +6598,14 @@ void Generator::generateServiceHeader(
     ctx.m_out << "        QObject(parent)" << ln;
     ctx.m_out << "    {}" << ln << ln;
     ctx.m_out << "public:" << ln;
-    ctx.m_out << "    virtual QString " << decapitalize(service.m_name)
-        << "Url() const = 0;" << ln;
+    ctx.m_out << "    [[nodiscard]] virtual QString "
+        << decapitalize(service.m_name) << "Url() const = 0;" << ln;
     ctx.m_out << "    virtual void set" << service.m_name
         << "Url(QString url) = 0;" << ln << ln;
 
     if (service.m_name == QStringLiteral("NoteStore"))
     {
-        ctx.m_out << "    virtual const std::optional<Guid> & "
+        ctx.m_out << "    [[nodiscard]] virtual const std::optional<Guid> & "
             << "linkedNotebookGuid() const = 0;"
             << ln
             << "    virtual void setLinkedNotebookGuid("
@@ -6634,8 +6629,15 @@ void Generator::generateServiceHeader(
             }
         }
 
-        ctx.m_out << "    virtual " << typeToStr(func.m_type, func.m_name)
-            << " " << func.m_name << "(";
+        const auto funcReturnTypeName = typeToStr(func.m_type, func.m_name);
+
+        ctx.m_out << "    ";
+        if (funcReturnTypeName != QStringLiteral("void")) {
+            ctx.m_out << "[[nodiscard]] ";
+        }
+
+        ctx.m_out << "virtual " << funcReturnTypeName << " " << func.m_name
+            << "(";
 
         if (!func.m_params.isEmpty()) {
             ctx.m_out << ln;
@@ -6670,8 +6672,9 @@ void Generator::generateServiceHeader(
 
         ctx.m_out << "    /** Asynchronous version of @link " << func.m_name
             << " @endlink */" << ln;
-        ctx.m_out << "    virtual QFuture<QVariant> " << func.m_name << "Async("
-            << ln;
+        ctx.m_out << "    [[nodiscard]] virtual QFuture<" << funcReturnTypeName
+            << "> " << func.m_name << "Async(" << ln;
+
         for(const auto & param: qAsConst(func.m_params))
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
@@ -6733,6 +6736,7 @@ void Generator::generateServiceCpp(
     auto additionalIncludes = QStringList()
         << QStringLiteral("../Types_io.h")
         << QStringLiteral("../Http.h")
+        << QStringLiteral("../Future.h")
         << QStringLiteral("<qevercloud/utility/Log.h>")
         << QStringLiteral("<qevercloud/DurableService.h>")
         << QStringLiteral("<algorithm>") << QStringLiteral("<cmath>");
@@ -7053,7 +7057,8 @@ void Generator::generateTestServerCpp(
 {
     auto additionalIncludes = QStringList()
         << QStringLiteral("../RandomDataGenerators.h")
-        << QStringLiteral("../SocketHelpers.h");
+        << QStringLiteral("../SocketHelpers.h")
+        << QStringLiteral("../../src/Future.h");
 
     additionalIncludes
         << (QStringLiteral("<qevercloud/services/I") + service.m_name +
@@ -8009,7 +8014,7 @@ void Generator::generateServiceClassDeclaration(
             << "    }"
             << ln << ln;
 
-        ctx.m_out << "    QString " << serviceName
+        ctx.m_out << "    [[nodiscard]] QString " << serviceName
             << "Url() const override" << ln
             << "    {" << ln
             << "        return m_url;" << ln
@@ -8018,7 +8023,7 @@ void Generator::generateServiceClassDeclaration(
 
         if (service.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    const std::optional<Guid> & "
+            ctx.m_out << "    [[nodiscard]] const std::optional<Guid> & "
                 << "linkedNotebookGuid() const override" << ln
                 << "    {" << ln
                 << "        return m_linkedNotebookGuid;" << ln
@@ -8051,7 +8056,7 @@ void Generator::generateServiceClassDeclaration(
             << "    }"
             << ln << ln;
 
-        ctx.m_out << "    QString " << serviceName
+        ctx.m_out << "    [[nodiscard]] QString " << serviceName
             << "Url() const override" << ln
             << "    {" << ln
             << "        return m_service->" << serviceName << "Url();" << ln
@@ -8060,7 +8065,7 @@ void Generator::generateServiceClassDeclaration(
 
         if (service.m_name == QStringLiteral("NoteStore"))
         {
-            ctx.m_out << "    const std::optional<Guid> & "
+            ctx.m_out << "    [[nodiscard]] const std::optional<Guid> & "
                 << "linkedNotebookGuid() const override" << ln
                 << "    {" << ln
                 << "        return m_service->linkedNotebookGuid();" << ln
@@ -8083,7 +8088,14 @@ void Generator::generateServiceClassDeclaration(
             throw std::runtime_error("oneway functions are not supported");
         }
 
-        ctx.m_out << "    " << typeToStr(func.m_type, func.m_name) << " "
+        const auto funcReturnTypeName = typeToStr(func.m_type, func.m_name);
+
+        ctx.m_out << "    ";
+        if (funcReturnTypeName != QStringLiteral("void")) {
+            ctx.m_out << "[[nodiscard]] ";
+        }
+
+        ctx.m_out << funcReturnTypeName << " "
             << func.m_name << "(";
         if (!func.m_params.isEmpty()) {
             ctx.m_out << ln;
@@ -8113,7 +8125,7 @@ void Generator::generateServiceClassDeclaration(
         ctx.m_out << "        IRequestContextPtr ctx = {}";
         ctx.m_out << ") override;" << ln << ln;
 
-        ctx.m_out << "    QFuture<QVariant> " << func.m_name
+        ctx.m_out << "    QFuture<" << funcReturnTypeName << "> " << func.m_name
             << "Async(" << ln;
         for(const auto & param: qAsConst(func.m_params))
         {
@@ -8178,6 +8190,10 @@ void Generator::generateServiceClassDefinition(
         bool isVoidResult =
             (std::dynamic_pointer_cast<Parser::VoidType>(f.m_type) != nullptr);
 
+        const auto funcReturnTypeName = (isVoidResult
+                                         ? QStringLiteral("void")
+                                         : typeToStr(f.m_type, f.m_name));
+
         ctx.m_out << "namespace {" << ln << ln;
 
         ctx.m_out << "QByteArray " << prepareParamsName << "(" << ln;
@@ -8219,9 +8235,7 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << "    return writer.buffer();" << ln;
         ctx.m_out << "}" << ln << ln;
 
-        ctx.m_out << (isVoidResult
-                      ? QStringLiteral("void")
-                      : typeToStr(f.m_type, f.m_name))
+        ctx.m_out << funcReturnTypeName
             << " " << readReplyName << "(QByteArray reply)" << ln;
         ctx.m_out << "{" << ln;
 
@@ -8360,8 +8374,8 @@ void Generator::generateServiceClassDefinition(
             << "(QByteArray reply)" << ln;
         ctx.m_out << "{" << ln;
         if (isVoidResult) {
-            ctx.m_out << "    " << readReplyName << "(reply);" << ln
-                << "    return QVariant();" << ln;
+            ctx.m_out << "    " << readReplyName << "(reply);" << ln;
+            ctx.m_out << "    return QVariant{};" << ln;
         }
         else {
             ctx.m_out << "    return QVariant::fromValue(" << readReplyName
@@ -8456,8 +8470,8 @@ void Generator::generateServiceClassDefinition(
 
         ctx.m_out << "}" << ln << ln;
 
-        ctx.m_out << "QFuture<QVariant> " << service.m_name << "::" << f.m_name
-            << "Async(" << ln;
+        ctx.m_out << "QFuture<" << funcReturnTypeName << "> " << service.m_name
+            << "::" << f.m_name << "Async(" << ln;
         for(const auto & param : f.m_params)
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
@@ -8517,12 +8531,16 @@ void Generator::generateServiceClassDefinition(
                 ctx.m_out << "," << ln;
             }
         }
-        ctx.m_out << ");" << ln << ln
-            << "    return sendRequest(" << ln
+        ctx.m_out << ");" << ln << ln;
+
+        ctx.m_out << "    auto variantFuture = sendRequest(" << ln
             << "        m_url," << ln
             << "        params," << ln
             << "        ctx," << ln
-            << "        " << asyncReadFunctionName << ");" << ln;
+            << "        " << asyncReadFunctionName << ");" << ln << ln;
+
+        ctx.m_out << "    return convertFromVariantFuture<"
+            << funcReturnTypeName << ">(std::move(variantFuture));" << ln;
 
         ctx.m_out << "}" << ln << ln;
     }
@@ -8671,8 +8689,8 @@ void Generator::generateDurableServiceClassDefinition(
 
         // Asynchronous version
 
-        ctx.m_out << "QFuture<QVariant> Durable" << service.m_name << "::"
-            << func.m_name << "Async(" << ln;
+        ctx.m_out << "QFuture<" << funcReturnTypeName << "> Durable"
+            << service.m_name << "::" << func.m_name << "Async(" << ln;
         for(const auto & param : func.m_params)
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
@@ -8700,7 +8718,8 @@ void Generator::generateDurableServiceClassDefinition(
             << "IDurableService::AsyncServiceCall(" << ln
             << "        [=, service=m_service] (IRequestContextPtr ctx)" << ln
             << "        {" << ln
-            << "            return service->" << func.m_name << "Async("
+            << "            return convertToVariantFuture<"
+            << funcReturnTypeName << ">(service->" << func.m_name << "Async("
             << ln;
 
         for(const auto & param : func.m_params)
@@ -8711,7 +8730,7 @@ void Generator::generateDurableServiceClassDefinition(
 
             ctx.m_out << "                " << param.m_name << "," << ln;
         }
-        ctx.m_out << "                ctx);" << ln
+        ctx.m_out << "                ctx));" << ln
             << "        });" << ln << ln;
 
         if (!requestDescriptionIsEmpty)
@@ -8742,9 +8761,10 @@ void Generator::generateDurableServiceClassDefinition(
 
         ctx.m_out  << "        std::move(call));" << ln << ln;
 
-        ctx.m_out << "    return m_durableService->executeAsyncRequest("
+        ctx.m_out << "    return convertFromVariantFuture<"
+            << funcReturnTypeName << ">(m_durableService->executeAsyncRequest("
             << ln
-            << "        std::move(request), ctx);" << ln << ln;
+            << "        std::move(request), ctx));" << ln;
 
         ctx.m_out << "}" << ln << ln;
     }

@@ -2003,8 +2003,8 @@ void Generator::generateTestServerServiceCall(
 
     auto serviceName = decapitalize(service.m_name);
 
-    ctx.m_out << "    std::unique_ptr<I" << service.m_name << "> "
-        << serviceName << "(" << ln
+    ctx.m_out << "    auto "
+        << serviceName << " = " << ln
         << "        new" << service.m_name << "(" << ln
         << "            QStringLiteral(\"http://127.0.0.1:\") + "
         << "QString::number(port)," << ln;
@@ -2014,8 +2014,7 @@ void Generator::generateTestServerServiceCall(
     }
 
     ctx.m_out << "            nullptr," << ln
-        << "            nullptr," << ln
-        << "            nullRetryPolicy()));" << ln << ln;
+        << "            nullRetryPolicy());" << ln << ln;
 
     QString indentStr = QStringLiteral("    ");
     if (!exceptionTypeToCatch.isEmpty())
@@ -6571,9 +6570,7 @@ void Generator::generateServiceHeader(
         << QStringLiteral("<qevercloud/Constants.h>")
         << QStringLiteral("<qevercloud/Types.h>")
         << QStringLiteral("<qevercloud/services/Fwd.h>")
-        << QStringLiteral("<QFuture>")
-        << QStringLiteral("<QObject>")
-        << QStringLiteral("<QVariant>");
+        << QStringLiteral("<QFuture>");
     sortIncludes(additionalIncludes);
 
     writeHeaderHeader(
@@ -6589,15 +6586,11 @@ void Generator::generateServiceHeader(
         ctx.m_out << service.m_docComment << ln;
     }
 
-    ctx.m_out << "class QEVERCLOUD_EXPORT I" << service.m_name
-        << ": public QObject" << ln << "{" << ln;
-    ctx.m_out << "    Q_OBJECT" << ln;
-    ctx.m_out << "    Q_DISABLE_COPY(I" << service.m_name << ")" << ln;
-    ctx.m_out << "protected:"<< ln;
-    ctx.m_out << "    I" << service.m_name << "(QObject * parent) :" << ln;
-    ctx.m_out << "        QObject(parent)" << ln;
-    ctx.m_out << "    {}" << ln << ln;
+    ctx.m_out << "class QEVERCLOUD_EXPORT I" << service.m_name << ln
+        << "{" << ln;
     ctx.m_out << "public:" << ln;
+    ctx.m_out << "    virtual ~I" << service.m_name << "() = default;" << ln
+        << ln;
     ctx.m_out << "    [[nodiscard]] virtual QString "
         << decapitalize(service.m_name) << "Url() const = 0;" << ln;
     ctx.m_out << "    virtual void set" << service.m_name
@@ -6705,7 +6698,7 @@ void Generator::generateServiceHeader(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    ctx.m_out << "QEVERCLOUD_EXPORT I" << service.m_name << " * new"
+    ctx.m_out << "QEVERCLOUD_EXPORT I" << service.m_name << "Ptr new"
         << service.m_name << "(" << ln;
 
     ctx.m_out << "    QString " << decapitalize(service.m_name)
@@ -6718,7 +6711,6 @@ void Generator::generateServiceHeader(
     }
 
     ctx.m_out << "    IRequestContextPtr ctx = {}," << ln
-        << "    QObject * parent = nullptr," << ln
         << "    IRetryPolicyPtr retryPolicy = {});" << ln << ln;
 
     writeHeaderFooter(ctx.m_out, fileName);
@@ -6758,7 +6750,7 @@ void Generator::generateServiceCpp(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    ctx.m_out << "I" << service.m_name << " * new" << service.m_name << "("
+    ctx.m_out << "I" << service.m_name << "Ptr new" << service.m_name << "("
         << ln;
 
     auto serviceName = decapitalize(service.m_name);
@@ -6772,13 +6764,12 @@ void Generator::generateServiceCpp(
     }
 
     ctx.m_out << "    IRequestContextPtr ctx," << ln
-        << "    QObject * parent," << ln
         << "    IRetryPolicyPtr retryPolicy)" << ln
         << "{" << ln
         << "    if (ctx && ctx->maxRequestRetryCount() == 0)" << ln
         << "    {" << ln
-        << "        return new " << service.m_name << "(std::move("
-        << serviceName << "Url), ";
+        << "        return std::make_shared<" << service.m_name
+        << ">(std::move(" << serviceName << "Url), ";
 
     if (isNoteStore) {
         ctx.m_out << "std::move(linkedNotebookGuid), ";
@@ -6791,7 +6782,8 @@ void Generator::generateServiceCpp(
         << "        if (!retryPolicy) {" << ln
         << "            retryPolicy = newRetryPolicy();" << ln
         << "        }" << ln << ln
-        << "        return new Durable" << service.m_name << "(" << ln
+        << "        return std::make_shared<Durable" << service.m_name << ">("
+        << ln
         << "            std::make_shared<" << service.m_name << ">(std::move("
         << serviceName << "Url), ";
 
@@ -6801,8 +6793,7 @@ void Generator::generateServiceCpp(
 
     ctx.m_out << "ctx)," << ln
         << "            ctx," << ln
-        << "            retryPolicy," << ln
-        << "            parent);" << ln
+        << "            retryPolicy);" << ln
         << "    }" << ln
         << "}" << ln
         << ln;
@@ -7937,7 +7928,6 @@ void Generator::generateServiceClassDeclaration(
 
     ctx.m_out << "class Q_DECL_HIDDEN " << className
         << ": public I" << service.m_name << ln << "{" << ln;
-    ctx.m_out << "    Q_OBJECT" << ln;
     ctx.m_out << "    Q_DISABLE_COPY(" << className << ")" << ln;
     ctx.m_out << "public:" << ln;
 
@@ -7957,15 +7947,15 @@ void Generator::generateServiceClassDeclaration(
             << ln;
     }
 
-    ctx.m_out << "            IRequestContextPtr ctx = {}," << ln;
+    ctx.m_out << "            IRequestContextPtr ctx = {}";
 
     if (serviceClassType == ServiceClassType::Durable) {
+        ctx.m_out << "," << ln;
         ctx.m_out << "            "
-            << "IRetryPolicyPtr retryPolicy = newRetryPolicy()," << ln;
+            << "IRetryPolicyPtr retryPolicy = newRetryPolicy()";
     }
 
-    ctx.m_out << "            QObject * parent = nullptr) :" << ln
-        << "        I" << service.m_name << "(parent)," << ln;
+    ctx.m_out << ") :" << ln;
 
     if (serviceClassType == ServiceClassType::NonDurable) {
         ctx.m_out << "        m_url(std::move(" << serviceName << "Url)),"
@@ -7987,25 +7977,16 @@ void Generator::generateServiceClassDeclaration(
         << "    {" << ln
         << "        if (!m_ctx) {" << ln
         << "            m_ctx = newRequestContext();" << ln
-        << "        }" << ln;
-
-    if (serviceClassType == ServiceClassType::Durable) {
-        ctx.m_out << ln
-            << "        m_service->setParent(this);" << ln;
-    }
-
-    ctx.m_out << "    }" << ln
+        << "        }" << ln
+        << "    }" << ln
         << ln;
 
     if (serviceClassType == ServiceClassType::NonDurable)
     {
-        ctx.m_out << "    explicit " << className
-            << "(QObject * parent) :" << ln
-            << "        I" << service.m_name << "(parent)" << ln
-            << "    {" << ln
-            << "        m_ctx = newRequestContext();" << ln
-            << "    }" << ln
-            << ln;
+        ctx.m_out << "    " << className
+            << "() :" << ln
+            << "        m_ctx{newRequestContext()}" << ln
+            << "    {}" << ln << ln;
 
         ctx.m_out << "    void set" << service.m_name
             << "Url(QString " << serviceName << "Url) override" << ln
@@ -8041,12 +8022,7 @@ void Generator::generateServiceClassDeclaration(
     }
     else
     {
-        ctx.m_out << "    ~" << className << "()" << ln
-            << "    {" << ln
-            << "        // Don't interfere with std::shared_ptr's lifetime"
-            << " tracking" << ln
-            << "        m_service->setParent(nullptr);" << ln
-            << "    }" << ln << ln;
+        ctx.m_out << "    ~" << className << "() = default;" << ln << ln;
 
         ctx.m_out << "    void set" << service.m_name
             << "Url(QString " << serviceName << "Url) override" << ln

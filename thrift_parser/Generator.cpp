@@ -2004,7 +2004,7 @@ void Generator::generateTestServerServiceCall(
     auto serviceName = decapitalize(service.m_name);
 
     ctx.m_out << "    auto "
-        << serviceName << " = " << ln
+        << serviceName << " =" << ln
         << "        new" << service.m_name << "(" << ln
         << "            QStringLiteral(\"http://127.0.0.1:\") + "
         << "QString::number(port)," << ln;

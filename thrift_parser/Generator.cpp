@@ -6799,9 +6799,6 @@ void Generator::generateServiceCpp(
         << ln;
 
     writeNamespaceEnd(ctx.m_out);
-
-    ctx.m_out << ln;
-    ctx.m_out << "#include <" << service.m_name << ".moc>" << ln;
 }
 
 void Generator::generateAllServicesHeader(

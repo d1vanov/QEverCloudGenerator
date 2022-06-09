@@ -45,15 +45,6 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-constexpr const char * auxiliaryMethodsDisclaimer =
-    "    /**\n"
-    "     * Methods below correspond to fields which are NOT set by QEverCloud "
-    "itself.\n"
-    "     * They exist for convenience of client code and are intended to be "
-    "called\n"
-    "     * and used by QEverCloud's client code if/when appropriate\n"
-    "     */\n";
-
 constexpr const char * blockSeparator =
     "////////////////////////////////////////"
     "////////////////////////////////////////";
@@ -6347,8 +6338,9 @@ void Generator::generateMetaTypesHeader(
 
     QStringList extraLinesOutsideNamespace;
     extraLinesOutsideNamespace.reserve(
-        dependentOptionalTypeNames.size() +
-        dependentOptionalMapTypes.size() * 3 + 1);
+        static_cast<int>(
+            dependentOptionalTypeNames.size() +
+            dependentOptionalMapTypes.size() * 3 + 1));
 
     for (const auto & typeName: qAsConst(dependentOptionalTypeNames))
     {
@@ -7690,9 +7682,6 @@ void Generator::generateTestClearLocalFieldsCpp(
             }
             else if (mapType || hashType)
             {
-                const auto & keyType =
-                    (mapType ? mapType->m_keyType : hashType->m_keyType);
-
                 const auto & valueType =
                     (mapType ? mapType->m_valueType : hashType->m_valueType);
 

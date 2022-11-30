@@ -6583,6 +6583,10 @@ void Generator::generateServiceHeader(
     ctx.m_out << "public:" << ln;
     ctx.m_out << "    virtual ~I" << service.m_name << "() = default;" << ln
         << ln;
+    ctx.m_out << "    [[nodiscard]] virtual IRequestContextPtr "
+        << "defaultRequestContext() const = 0;" << ln;
+    ctx.m_out << "    virtual void setDefaultRequestContext(IRequestContextPtr "
+        << "ctx) = 0;" << ln << ln;
     ctx.m_out << "    [[nodiscard]] virtual QString "
         << decapitalize(service.m_name) << "Url() const = 0;" << ln;
     ctx.m_out << "    virtual void set" << service.m_name
@@ -6893,6 +6897,8 @@ void Generator::generateFwdHeader(const QString & outPath)
         << "class IRequestContext;" << ln
         << "using IRequestContextPtr = std::shared_ptr<IRequestContext>;" << ln
         << ln
+        << "struct IRetryPolicy;" << ln
+        << "using IRetryPolicyPtr = std::shared_ptr<IRetryPolicy>;" << ln << ln
         << "} // namespace qevercloud" << ln << ln;
 
     ctx.m_out << "#endif // " << guard << ln;
@@ -7974,17 +7980,29 @@ void Generator::generateServiceClassDeclaration(
             << "        m_ctx{newRequestContext()}" << ln
             << "    {}" << ln << ln;
 
-        ctx.m_out << "    void set" << service.m_name
-            << "Url(QString " << serviceName << "Url) override" << ln
+        ctx.m_out << "    [[nodiscard]] IRequestContextPtr "
+            << "defaultRequestContext() const override" << ln
             << "    {" << ln
-            << "        m_url = std::move(" << serviceName << "Url);" << ln
-            << "    }"
-            << ln << ln;
+            << "        return m_ctx;" << ln
+            << "    }" << ln << ln;
+
+        ctx.m_out << "    void " << "setDefaultRequestContext("
+            << "IRequestContextPtr ctx) override" << ln
+            << "    {" << ln
+            << "        m_ctx = std::move(ctx);" << ln
+            << "    }" << ln << ln;
 
         ctx.m_out << "    [[nodiscard]] QString " << serviceName
             << "Url() const override" << ln
             << "    {" << ln
             << "        return m_url;" << ln
+            << "    }"
+            << ln << ln;
+
+        ctx.m_out << "    void set" << service.m_name
+            << "Url(QString " << serviceName << "Url) override" << ln
+            << "    {" << ln
+            << "        m_url = std::move(" << serviceName << "Url);" << ln
             << "    }"
             << ln << ln;
 
@@ -8010,18 +8028,31 @@ void Generator::generateServiceClassDeclaration(
     {
         ctx.m_out << "    ~" << className << "() = default;" << ln << ln;
 
-        ctx.m_out << "    void set" << service.m_name
-            << "Url(QString " << serviceName << "Url) override" << ln
+        ctx.m_out << "    [[nodiscard]] IRequestContextPtr "
+            << "defaultRequestContext() const override" << ln
             << "    {" << ln
-            << "        m_service->set" << service.m_name << "Url("
-            << serviceName << "Url);" << ln
-            << "    }"
-            << ln << ln;
+            << "        return m_service->defaultRequestContext();" << ln
+            << "    }" << ln << ln;
+
+        ctx.m_out << "    void setDefaultRequestContext("
+            << "IRequestContextPtr ctx) override" << ln
+            << "    {" << ln
+            << "        m_service->setDefaultRequestContext(std::move(ctx));"
+            << ln
+            << "    }" << ln << ln;
 
         ctx.m_out << "    [[nodiscard]] QString " << serviceName
             << "Url() const override" << ln
             << "    {" << ln
             << "        return m_service->" << serviceName << "Url();" << ln
+            << "    }"
+            << ln << ln;
+
+        ctx.m_out << "    void set" << service.m_name
+            << "Url(QString " << serviceName << "Url) override" << ln
+            << "    {" << ln
+            << "        m_service->set" << service.m_name << "Url("
+            << serviceName << "Url);" << ln
             << "    }"
             << ln << ln;
 

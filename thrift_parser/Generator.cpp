@@ -33,6 +33,10 @@
 #include <QString>
 #include <QTextStream>
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+#include <QStringEncoder>
+#endif
+
 #include <algorithm>
 #include <map>
 #include <memory>

@@ -6898,6 +6898,12 @@ void Generator::generateFwdHeader(const QString & outPath)
     ctx.m_out << "#include <memory>" << ln << ln;
 
     ctx.m_out << "namespace qevercloud {" << ln << ln
+        << "struct IInkNoteImageDownloader;" << ln
+        << "using IInkNoteImageDownloaderPtr = std::shared_ptr<IInkNoteImageDownloader>;" << ln
+        << ln
+        << "struct INoteThumbnailDownloader;" << ln
+        << "using INoteThumbnailDownloaderPtr = std::shared_ptr<INoteThumbnailDownloader>;" << ln
+        << ln
         << "class IRequestContext;" << ln
         << "using IRequestContextPtr = std::shared_ptr<IRequestContext>;" << ln
         << ln

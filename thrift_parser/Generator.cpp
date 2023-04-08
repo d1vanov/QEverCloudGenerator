@@ -1330,7 +1330,7 @@ void Generator::generateTestServerSocketSetup(
         << ln
         << "            }" << ln << ln
         << "            QByteArray requestData = "
-        << "readThriftRequestFromSocket(*pSocket);" << ln
+        << "readRequestBodyFromSocket(*pSocket);" << ln
         << "            server.onRequest(requestData);" << ln
         << "        });" << ln << ln;
 
@@ -3456,7 +3456,7 @@ void Generator::generateTestServerHeaders(
     Parser * parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../SocketHelpers.h") << QStringLiteral("<QObject>");
+        << QStringLiteral("<QObject>");
     sortIncludes(additionalIncludes);
 
     const auto & services = parser->services();
@@ -3538,7 +3538,7 @@ void Generator::generateTestServerHeaders(
 void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../SocketHelpers.h")
+        << QStringLiteral("../../Http.h")
         << QStringLiteral("RandomDataGenerators.h")
         << QStringLiteral("<generated/Servers.h>")
         << QStringLiteral("<generated/Services.h>")

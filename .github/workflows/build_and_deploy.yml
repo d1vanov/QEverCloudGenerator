@@ -28,10 +28,10 @@ jobs:
           - qt_version: '5.12.8'
             compiler_c: 'clang'
             compiler_cpp: 'clang++'
-          - qt_version: '5.15.2'
+          - qt_version: '5.15.4'
             compiler_c: 'gcc'
             compiler_cpp: 'g++'
-          - qt_version: '5.15.2'
+          - qt_version: '5.15.4'
             compiler_c: 'clang'
             compiler_cpp: 'clang++'
 
@@ -61,13 +61,13 @@ jobs:
           sudo apt-get -qq install qtbase5-dev qttools5-dev qttools5-dev-tools
         if: ${{ matrix.qt_version == '5.12.8' }}
 
-      - name: Install Qt 5.15.2
+      - name: Install Qt 5.15.4
         id: install_qt_modern
         run: |
-          sudo apt-add-repository -y ppa:beineri/opt-qt-5.15.2-bionic
+          sudo apt-add-repository -y ppa:beineri/opt-qt-5.15.4-focal
           sudo apt-get -qq update
           sudo apt-get -qq install qt515tools qt515base mesa-common-dev libgl1-mesa-dev
-        if: ${{ matrix.qt_version == '5.15.2' }}
+        if: ${{ matrix.qt_version == '5.15.4' }}
         shell: bash
 
       - name: Configure for gcc and Qt 5.12.8
@@ -78,13 +78,13 @@ jobs:
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ ..
         if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.12.8' }}
       
-      - name: Configure for gcc and Qt 5.15.2
+      - name: Configure for gcc and Qt 5.15.4
         id: configure_for_gcc_and_qt_modern
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_PREFIX_PATH=/opt/qt515 ..
-        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.15.2' }}
+        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.15.4' }}
 
       - name: Configure for clang and Qt 5.12.8
         id: configure_for_clang_and_qt_old
@@ -94,13 +94,13 @@ jobs:
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ ..
         if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.12.8' }}
 
-      - name: Configure for clang and Qt 5.15.2
+      - name: Configure for clang and Qt 5.15.4
         id: configure_for_clang_and_qt_modern
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=/opt/qt515 ..
-        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.15.2' }}
+        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.15.4' }}
 
       - name: Build and install
         id: build_and_install
@@ -115,7 +115,7 @@ jobs:
         with:
           name: QEverCloudGenerator_linux
           path: '${{ github.workspace }}/build/installdir/bin/QEverCloudGenerator'
-        if: ${{ matrix.qt_version == '5.15.2' && matrix.compiler_cpp == 'g++' }}
+        if: ${{ matrix.qt_version == '5.15.4' && matrix.compiler_cpp == 'g++' }}
 
   build_macos:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"

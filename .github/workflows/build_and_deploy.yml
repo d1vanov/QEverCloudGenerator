@@ -18,14 +18,14 @@ on:
 jobs:
   build_linux:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         include:
-          - qt_version: '5.9.5'
+          - qt_version: '5.12.8'
             compiler_c: 'gcc'
             compiler_cpp: 'g++'
-          - qt_version: '5.9.5'
+          - qt_version: '5.12.8'
             compiler_c: 'clang'
             compiler_cpp: 'clang++'
           - qt_version: '5.15.2'
@@ -55,11 +55,11 @@ jobs:
           sudo apt-get -qq install clang
         if: ${{ matrix.compiler_cpp == 'clang++' }}
 
-      - name: Install Qt 5.9.5
+      - name: Install Qt 5.12.8
         id: install_qt_old
         run: |
           sudo apt-get -qq install qtbase5-dev qttools5-dev qttools5-dev-tools
-        if: ${{ matrix.qt_version == '5.9.5' }}
+        if: ${{ matrix.qt_version == '5.12.8' }}
 
       - name: Install Qt 5.15.2
         id: install_qt_modern
@@ -70,13 +70,13 @@ jobs:
         if: ${{ matrix.qt_version == '5.15.2' }}
         shell: bash
 
-      - name: Configure for gcc and Qt 5.9.5
+      - name: Configure for gcc and Qt 5.12.8
         id: configure_for_gcc_and_qt_old
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ ..
-        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.9.5' }}
+        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.12.8' }}
       
       - name: Configure for gcc and Qt 5.15.2
         id: configure_for_gcc_and_qt_modern
@@ -86,13 +86,13 @@ jobs:
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_PREFIX_PATH=/opt/qt515 ..
         if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.15.2' }}
 
-      - name: Configure for clang and Qt 5.9.5
+      - name: Configure for clang and Qt 5.12.8
         id: configure_for_clang_and_qt_old
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ ..
-        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.9.5' }}
+        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.12.8' }}
 
       - name: Configure for clang and Qt 5.15.2
         id: configure_for_clang_and_qt_modern

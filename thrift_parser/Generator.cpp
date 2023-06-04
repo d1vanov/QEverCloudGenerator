@@ -6562,8 +6562,8 @@ void Generator::generateServiceHeader(
 
     QStringList additionalIncludes = QStringList()
         << QStringLiteral("<qevercloud/DurableService.h>")
-        << QStringLiteral("<qevercloud/RequestContext.h>")
         << QStringLiteral("<qevercloud/Constants.h>")
+        << QStringLiteral("<qevercloud/IRequestContext.h>")
         << QStringLiteral("<qevercloud/Types.h>")
         << QStringLiteral("<qevercloud/services/Fwd.h>")
         << QStringLiteral("<QFuture>");
@@ -6924,8 +6924,8 @@ void Generator::generateServerHeader(
         QStringLiteral("services"));
 
     QStringList additionalIncludes = QStringList()
-        << QStringLiteral("<qevercloud/RequestContext.h>")
         << QStringLiteral("<qevercloud/Constants.h>")
+        << QStringLiteral("<qevercloud/IRequestContext.h>")
         << QStringLiteral("<qevercloud/Types.h>")
         << QStringLiteral("<QObject>")
         << QStringLiteral("<exception>")
@@ -8454,7 +8454,7 @@ void Generator::generateServiceClassDefinition(
         ctx.m_out << "    QByteArray reply = askEvernote(" << ln
             << "        m_url," << ln
             << "        params," << ln
-            << "        ctx->requestTimeout()," << ln
+            << "        ctx->connectionTimeout()," << ln
             << "        ctx->cookies());" << ln << ln;
 
         ctx.m_out << "    QEC_DEBUG(\"" << logComponentName << "\", \""

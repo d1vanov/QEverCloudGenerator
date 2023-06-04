@@ -6698,8 +6698,8 @@ void Generator::generateServiceHeader(
 
     ctx.m_out << blockSeparator << ln << ln;
 
-    ctx.m_out << "QEVERCLOUD_EXPORT I" << service.m_name << "Ptr new"
-        << service.m_name << "(" << ln;
+    ctx.m_out << "[[nodiscard]] QEVERCLOUD_EXPORT I" << service.m_name
+        << "Ptr new" << service.m_name << "(" << ln;
 
     ctx.m_out << "    QString " << decapitalize(service.m_name)
         << "Url = {}," << ln;
@@ -6898,10 +6898,10 @@ void Generator::generateFwdHeader(const QString & outPath)
     ctx.m_out << "#include <memory>" << ln << ln;
 
     ctx.m_out << "namespace qevercloud {" << ln << ln
-        << "struct IInkNoteImageDownloader;" << ln
+        << "class IInkNoteImageDownloader;" << ln
         << "using IInkNoteImageDownloaderPtr = std::shared_ptr<IInkNoteImageDownloader>;" << ln
         << ln
-        << "struct INoteThumbnailDownloader;" << ln
+        << "class INoteThumbnailDownloader;" << ln
         << "using INoteThumbnailDownloaderPtr = std::shared_ptr<INoteThumbnailDownloader>;" << ln
         << ln
         << "class IRequestContext;" << ln
@@ -6969,9 +6969,7 @@ void Generator::generateServerCpp(
 void Generator::generateTestServerHeader(
     const Parser::Service & service, const QString & outPath)
 {
-    auto additionalIncludes = QStringList()
-        << QStringLiteral("../SocketHelpers.h") << QStringLiteral("<QObject>");
-
+    auto additionalIncludes = QStringList() << QStringLiteral("<QObject>");
     sortIncludes(additionalIncludes);
 
     if (!service.m_extends.isEmpty()) {
@@ -7052,9 +7050,10 @@ void Generator::generateTestServerCpp(
     Parser & parser)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../RandomDataGenerators.h")
-        << QStringLiteral("../SocketHelpers.h")
-        << QStringLiteral("../../src/Future.h");
+        << QStringLiteral("../../src/Future.h")
+        << QStringLiteral("../../src/HttpUtils.h")
+        << QStringLiteral("../ClearLocalFields.h")
+        << QStringLiteral("../RandomDataGenerators.h");
 
     additionalIncludes
         << (QStringLiteral("<qevercloud/services/I") + service.m_name +
@@ -7062,11 +7061,10 @@ void Generator::generateTestServerCpp(
         << (QStringLiteral("<qevercloud/services/") + service.m_name +
             QStringLiteral("Server.h>"));
 
-    additionalIncludes << QStringLiteral("QEventLoop")
+    additionalIncludes << QStringLiteral("<QEventLoop>")
         << QStringLiteral("<QFutureWatcher>")
         << QStringLiteral("<QTcpServer>")
-        << QStringLiteral("<QtTest/QtTest>")
-        << QStringLiteral("../ClearLocalFields.h");
+        << QStringLiteral("<QtTest/QtTest>");
 
     sortIncludes(additionalIncludes);
 

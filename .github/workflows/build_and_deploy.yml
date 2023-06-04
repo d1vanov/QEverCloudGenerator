@@ -18,25 +18,25 @@ on:
 jobs:
   build_linux:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         include:
-          - qt_version: '5.5.1'
+          - qt_version: '5.12.8'
             compiler_c: 'gcc'
             compiler_cpp: 'g++'
-          - qt_version: '5.5.1'
+          - qt_version: '5.12.8'
             compiler_c: 'clang'
             compiler_cpp: 'clang++'
-          - qt_version: '5.12.3'
+          - qt_version: '5.15.4'
             compiler_c: 'gcc'
             compiler_cpp: 'g++'
-          - qt_version: '5.12.3'
+          - qt_version: '5.15.4'
             compiler_c: 'clang'
             compiler_cpp: 'clang++'
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install non-Qt dependencies
         id: install_non_qt_deps
@@ -55,52 +55,52 @@ jobs:
           sudo apt-get -qq install clang
         if: ${{ matrix.compiler_cpp == 'clang++' }}
 
-      - name: Install Qt 5.5.1
+      - name: Install Qt 5.12.8
         id: install_qt_old
         run: |
           sudo apt-get -qq install qtbase5-dev qttools5-dev qttools5-dev-tools
-        if: ${{ matrix.qt_version == '5.5.1' }}
+        if: ${{ matrix.qt_version == '5.12.8' }}
 
-      - name: Install Qt 5.12.3
+      - name: Install Qt 5.15.4
         id: install_qt_modern
         run: |
-          sudo apt-add-repository -y ppa:beineri/opt-qt-5.12.3-xenial
+          sudo apt-add-repository -y ppa:beineri/opt-qt-5.15.4-focal
           sudo apt-get -qq update
-          sudo apt-get -qq install qt512tools qt512base mesa-common-dev libgl1-mesa-dev
-        if: ${{ matrix.qt_version == '5.12.3' }}
+          sudo apt-get -qq install qt515tools qt515base mesa-common-dev libgl1-mesa-dev
+        if: ${{ matrix.qt_version == '5.15.4' }}
         shell: bash
 
-      - name: Configure for gcc and Qt 5.5.1
+      - name: Configure for gcc and Qt 5.12.8
         id: configure_for_gcc_and_qt_old
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ ..
-        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.5.1' }}
+        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.12.8' }}
       
-      - name: Configure for gcc and Qt 5.12.3
+      - name: Configure for gcc and Qt 5.15.4
         id: configure_for_gcc_and_qt_modern
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_PREFIX_PATH=/opt/qt512 ..
-        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.12.3' }}
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_PREFIX_PATH=/opt/qt515 ..
+        if: ${{ matrix.compiler_cpp == 'g++' && matrix.qt_version == '5.15.4' }}
 
-      - name: Configure for clang and Qt 5.5.1
+      - name: Configure for clang and Qt 5.12.8
         id: configure_for_clang_and_qt_old
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
           cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ ..
-        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.5.1' }}
+        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.12.8' }}
 
-      - name: Configure for clang and Qt 5.12.3
+      - name: Configure for clang and Qt 5.15.4
         id: configure_for_clang_and_qt_modern
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=/opt/qt512 ..
-        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.12.3' }}
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=/opt/qt515 ..
+        if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '5.15.4' }}
 
       - name: Build and install
         id: build_and_install
@@ -111,41 +111,66 @@ jobs:
 
       - name: Upload QEverCloudGenerator artifact
         id: upload_artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: QEverCloudGenerator_linux
           path: '${{ github.workspace }}/build/installdir/bin/QEverCloudGenerator'
-        if: ${{ matrix.qt_version == '5.12.3' && matrix.compiler_cpp == 'g++' }}
+        if: ${{ matrix.qt_version == '5.15.4' && matrix.compiler_cpp == 'g++' }}
 
   build_macos:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
-    runs-on: macos-10.15
+    runs-on: macos-11
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - name: Install dependencies
-        id: install_deps
+      - name: Setup cmake
+        uses: jwlawson/actions-setup-cmake@v1.13
+
+      - name: Setup ninja
+        env:
+          RUNNER_WORKSPACE: ${{ runner.workspace }}
         run: |
-          brew update
-          brew unlink cmake
-          brew install cmake --force-bottle
-          brew link cmake
-          brew install ninja --force-bottle
-          brew install p7zip --force-bottle
-          brew install qt5 --force-bottle
+          mkdir -p $RUNNER_WORKSPACE/ninja
+          cd $RUNNER_WORKSPACE/ninja
+          curl -fsSL https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-mac.zip -o ninja-mac.zip
+          unzip ninja-mac.zip
+          echo "$RUNNER_WORKSPACE/ninja" >> $GITHUB_PATH
+
+      - name: Cache Qt 5.15.2
+        id: cache_qt5
+        uses: actions/cache@v3
+        with:
+          path: '${{ runner.workspace }}/Qt5'
+          key: ${{ runner.os }}-Qt5Cache
+
+      - name: Install Qt 5.15.2
+        id: install_qt5
+        uses: jurplel/install-qt-action@v3
+        with:
+          cache: true
+          cache-key-prefix: ${{ runner.os }}-Qt5Cache
+          version: 5.15.2
+          host: mac
+          target: desktop
+          install-deps: true
+          arch: clang_64
+          modules: 'qtwebengine'
+          dir: '${{ runner.workspace }}/Qt5'
 
       - name: Build and install
         id: build_and_install
+        env:
+          RUNNER_WORKSPACE: ${{ runner.workspace }}
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_PREFIX_PATH=/usr/local/opt/qt5 ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DCMAKE_PREFIX_PATH=$RUNNER_WORKSPACE/Qt5/Qt/5.15.2/clang_64 ..
           cmake --build . --target all
           cmake --build . --target install
 
       - name: Upload QEverCloudGenerator artifact
         id: upload_artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: QEverCloudGenerator_macos
           path: ${{ github.workspace }}/build/installdir/bin/QEverCloudGenerator
@@ -160,54 +185,56 @@ jobs:
           - target_arch: 'x64'
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - name: Cache Qt 5.12.9 x86
+      - name: Cache Qt 5.15.2 x86
         id: cache_qt_x86
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: '${{ runner.workspace }}/Qt_x86'
           key: ${{ runner.os }}-QtCache-x86
         if: ${{ matrix.target_arch == 'x86' }}
 
-      - name: Install Qt 5.12.9 x86
+      - name: Install Qt 5.15.2 x86
         id: install_qt_modern_x86
-        uses: jurplel/install-qt-action@v2
+        uses: jurplel/install-qt-action@v3
         with:
-          cached: ${{ steps.cache_qt_x86.outputs.cache-hit }}
-          version: 5.12.9
+          cache: true
+          cache-key-prefix: ${{ runner.os }}-QtCache-x86-1
+          version: 5.15.2
           host: windows
           target: desktop
           install-deps: true
-          arch: win32_msvc2017
+          arch: win32_msvc2019
           dir: '${{ runner.workspace }}/Qt_x86'
         if: ${{ matrix.target_arch == 'x86' }}
 
-      - name: Cache Qt 5.12.9 x64
+      - name: Cache Qt 5.15.2 x64
         id: cache_qt_x64
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: '${{ runner.workspace }}/Qt_x64'
           key: ${{ runner.os }}-QtCache-x64
         if: ${{ matrix.target_arch == 'x64' }}
 
-      - name: Install Qt 5.12.9 x64
+      - name: Install Qt 5.15.2 x64
         id: install_qt_modern_x64
-        uses: jurplel/install-qt-action@v2
+        uses: jurplel/install-qt-action@v3
         with:
-          cached: ${{ steps.cache_qt_x64.outputs.cache-hit }}
-          version: 5.12.9
+          cache: true
+          cache-key-prefix: ${{ runner.os }}-QtCache-x64-1
+          version: 5.15.2
           host: windows
           target: desktop
           install-deps: true
-          arch: win64_msvc2017_64
+          arch: win64_msvc2019_64
           dir: '${{ runner.workspace }}/Qt_x64'
         if: ${{ matrix.target_arch == 'x64' }}
 
       - name: Build and install x86
         id: build_and_install_x86
         run: |
-          set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x86\Qt\5.12.9\win32_msvc2017"
+          set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x86\Qt\5.15.2\win32_msvc2019"
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x86
           cd %GITHUB_WORKSPACE%
           md build
@@ -221,7 +248,7 @@ jobs:
       - name: Build and install x64
         id: build_and_install_x64
         run: |
-          set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x64\Qt\5.12.9\win64_msvc2017_x64"
+          set CMAKE_PREFIX_PATH="%RUNNER_WORKSPACE%\Qt_x64\Qt\5.15.2\win64_msvc2019_x64"
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd %GITHUB_WORKSPACE%
           md build
@@ -234,7 +261,7 @@ jobs:
 
       - name: Upload x86 QEverCloudGenerator
         id: upload_artifact_x86
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: QEverCloudGenerator_windows_x86
           path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator.exe'
@@ -242,7 +269,7 @@ jobs:
 
       - name: Upload x64 QEverCloudGenerator
         id: upload_artifact_x64
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: QEverCloudGenerator_windows_x64
           path: '${{ github.workspace }}\build\installdir\bin\QEverCloudGenerator.exe'
@@ -257,7 +284,11 @@ jobs:
         id: install_deps
         run: |
           sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 23F3D4EA75716059
+          type -p curl >/dev/null || sudo apt install curl -y
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
           sudo apt update
           sudo apt install -qq gh
           sudo apt install -qq jq

@@ -1419,7 +1419,8 @@ void Generator::generateTestServerHelperClassDefinition(
         if (responseType != QStringLiteral("void")) {
             ctx.m_out << "        " << responseType << " value," << ln;
         }
-        ctx.m_out << "        std::exception_ptr e);" << ln << ln;
+        ctx.m_out << "        std::exception_ptr e," << ln
+            << "        QUuid requestId" << ");" << ln << ln;
 
         ctx.m_out << "public Q_SLOTS:" << ln
             << "    void on" << funcName << "RequestReceived(" << ln;
@@ -1480,7 +1481,9 @@ void Generator::generateTestServerHelperClassDefinition(
         }
 
         ctx.m_out << "                "
-            << "std::exception_ptr{});" << ln
+            << "std::exception_ptr{}," << ln;
+
+        ctx.m_out << "                ctx->requestId());" << ln
             << "        }" << ln;
 
         ctx.m_out << "        catch(const std::exception &)" << ln
@@ -1494,7 +1497,8 @@ void Generator::generateTestServerHelperClassDefinition(
         }
 
         ctx.m_out << "                "
-            << "std::current_exception());" << ln
+            << "std::current_exception()," << ln;
+        ctx.m_out << "                ctx->requestId());" << ln
             << "        }" << ln;
 
         ctx.m_out << "    }" << ln << ln;
@@ -1954,7 +1958,7 @@ void Generator::generateTestServerSocketSetup(
         << "            }" << ln << ln
         << "            QByteArray requestData = "
         << "readRequestBodyFromSocket(*pSocket);" << ln
-        << "            server.onRequest(requestData);" << ln
+        << "            server.onRequest(requestData, QUuid::createUuid());" << ln
         << "        });" << ln << ln;
 
     ctx.m_out << "    QObject::connect(" << ln
@@ -1962,7 +1966,7 @@ void Generator::generateTestServerSocketSetup(
         << "        &" << service.m_name << "Server::" << func.m_name
         << "RequestReady," << ln
         << "        &server," << ln
-        << "        [&] (QByteArray responseData)" << ln
+        << "        [&] (QByteArray responseData, [[maybe_unused]] QUuid requestId)" << ln
         << "        {" << ln
         << "            QByteArray buffer;" << ln
         << "            buffer.append(\"HTTP/1.1 200 OK\\r\\n\");"
@@ -6948,7 +6952,8 @@ void Generator::generateServerCpp(
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
         << QStringLiteral("../Types_io.h")
-        << QStringLiteral("<qevercloud/utility/Log.h>");
+        << QStringLiteral("<qevercloud/utility/Log.h>")
+        << QStringLiteral("<qevercloud/RequestContextBuilder.h>");
 
     sortIncludes(additionalIncludes);
 
@@ -8847,12 +8852,12 @@ void Generator::generateServerClassDeclaration(
         }
 
         ctx.m_out << "    void " << func.m_name << "RequestReady(" << ln
-            << "        QByteArray data);" << ln << ln;
+            << "        QByteArray data, QUuid requestId);" << ln << ln;
     }
 
     ctx.m_out << "public Q_SLOTS:" << ln;
     ctx.m_out << "    // Slot used to deliver requests to the server" << ln
-        << "    void onRequest(QByteArray data);" << ln << ln;
+        << "    void onRequest(QByteArray data, QUuid requestId);" << ln << ln;
 
     ctx.m_out << "    // Slots for replies to requests" << ln;
     for(const auto & func: qAsConst(service.m_functions))
@@ -8867,7 +8872,8 @@ void Generator::generateServerClassDeclaration(
         if (responseType != QStringLiteral("void")) {
             ctx.m_out << "        " << responseType << " value," << ln;
         }
-        ctx.m_out << "        std::exception_ptr e);" << ln << ln;
+        ctx.m_out << "        std::exception_ptr e," << ln
+            << "        QUuid requestId);" << ln << ln;
     }
 
     ctx.m_out << "};" << ln << ln;
@@ -8887,7 +8893,8 @@ void Generator::generateServerClassDefinition(
         << "    QObject(parent)" << ln
         << "{}" << ln << ln;
 
-    ctx.m_out << "void " << service.m_name << "Server::onRequest(QByteArray data)"
+    ctx.m_out << "void " << service.m_name << "Server::onRequest("
+        << "QByteArray data, QUuid requestId)"
         << ln
         << "{" << ln
         << "    ThriftBinaryBufferReader reader(data);" << ln
@@ -8978,6 +8985,7 @@ void Generator::generateServerClassDefinition(
             ctx.m_out << "            " << param.m_name << "," << ln;
         }
 
+        ctx.m_out << "            requestId," << ln;
         ctx.m_out << "            ctx);" << ln << ln;
 
         ctx.m_out << "        Q_EMIT " << func.m_name << "Request(" << ln;
@@ -9014,8 +9022,8 @@ void Generator::generateServerClassDefinition(
         if (responseTypeName != QStringLiteral("void")) {
             ctx.m_out << "    " << responseTypeName << " value," << ln;
         }
-        ctx.m_out << "    std::exception_ptr e)"
-            << ln;
+        ctx.m_out << "    std::exception_ptr e," << ln
+            << "    QUuid requestId)" << ln;
 
         ctx.m_out << "{" << ln;
 
@@ -9038,7 +9046,7 @@ void Generator::generateServerClassDefinition(
             << "            writeThriftException(writer, exception);" << ln
             << "            writer.writeMessageEnd();" << ln << ln
             << "            Q_EMIT " << func.m_name << "RequestReady(" << ln
-            << "                writer.buffer());" << ln
+            << "                writer.buffer(), requestId);" << ln
             << "            return;" << ln
             << "        }" << ln
             << "        catch(...)" << ln
@@ -9087,12 +9095,19 @@ void Generator::generateServerClassDefinition(
                     << "            writer.writeMessageEnd();" << ln << ln
                     << "            Q_EMIT " << func.m_name << "RequestReady("
                     << ln
-                    << "                writer.buffer());" << ln
+                    << "                writer.buffer(), requestId);" << ln
                     << "            return;" << ln
                     << "        }" << ln;
             }
 
             ctx.m_out << "        catch(const std::exception & e)" << ln
+                << "        {" << ln
+                << "            // TODO: more proper error handling" << ln
+                << "            QEC_ERROR(\"server\", \"Unknown exception: \""
+                << " << e.what());" << ln
+                << "        }" << ln;
+
+            ctx.m_out << "        catch(const QException & e)" << ln
                 << "        {" << ln
                 << "            // TODO: more proper error handling" << ln
                 << "            QEC_ERROR(\"server\", \"Unknown exception: \""
@@ -9219,7 +9234,7 @@ void Generator::generateServerClassDefinition(
             << "    writer.writeMessageEnd();" << ln << ln;
 
         ctx.m_out << "    Q_EMIT " << func.m_name << "RequestReady(" << ln
-            << "        writer.buffer());" << ln;
+            << "        writer.buffer(), requestId);" << ln;
 
         ctx.m_out << "}" << ln << ln;
     }
@@ -9268,6 +9283,7 @@ void Generator::generateServerHelperFunctions(
                 << "," << ln;
         }
 
+        ctx.m_out << "    QUuid requestId," << ln;
         ctx.m_out << "    IRequestContextPtr & ctx)" << ln
             << "{" << ln;
 
@@ -9335,11 +9351,14 @@ void Generator::generateServerHelperFunctions(
             << "    reader.readStructEnd();" << ln
             << "    reader.readMessageEnd();" << ln << ln;
 
-        ctx.m_out << "    ctx = newRequestContext(";
+        ctx.m_out << "    ctx = RequestContextBuilder{}" << ln;
         if (hasAuthenticationToken) {
-            ctx.m_out << "authenticationToken";
+            ctx.m_out << "        .setAuthenticationToken("
+                << "std::move(authenticationToken))" << ln;
         }
-        ctx.m_out << ");" << ln << "}" << ln << ln;
+        ctx.m_out << "        .setRequestId(requestId)" << ln
+            << "        .build();" << ln;
+        ctx.m_out << "}" << ln << ln;
     }
 }
 

@@ -6952,6 +6952,7 @@ void Generator::generateServerCpp(
 
     auto additionalIncludes = QStringList() << QStringLiteral("../Thrift.h")
         << QStringLiteral("../Types_io.h")
+        << QStringLiteral("<qevercloud/exceptions/builders/EDAMSystemExceptionBuilder.h>")
         << QStringLiteral("<qevercloud/utility/Log.h>")
         << QStringLiteral("<qevercloud/RequestContextBuilder.h>");
 
@@ -9065,6 +9066,23 @@ void Generator::generateServerClassDefinition(
 
         if (!func.m_throws.isEmpty())
         {
+            int systemExceptionId = -1;
+            for(const auto & th: func.m_throws)
+            {
+                QString exceptionType = typeToStr(th.m_type, {});
+                if (exceptionType == QStringLiteral("EDAMSystemException")) {
+                    systemExceptionId = th.m_id;
+                    break;
+                }
+            }
+
+            if (systemExceptionId >= 0) {
+                ctx.m_out << "    bool caughtUnidentifiedException = false;"
+                    << ln
+                    << "    std::optional<QString> "
+                    << "unidentifiedExceptionMessage;" << ln << ln;
+            }
+
             ctx.m_out << "    if (e)" << ln
                 << "    {" << ln;
 
@@ -9102,26 +9120,67 @@ void Generator::generateServerClassDefinition(
 
             ctx.m_out << "        catch(const std::exception & e)" << ln
                 << "        {" << ln
-                << "            // TODO: more proper error handling" << ln
                 << "            QEC_ERROR(\"server\", \"Unknown exception: \""
-                << " << e.what());" << ln
-                << "        }" << ln;
+                << " << e.what());" << ln;
 
-            ctx.m_out << "        catch(const QException & e)" << ln
-                << "        {" << ln
-                << "            // TODO: more proper error handling" << ln
-                << "            QEC_ERROR(\"server\", \"Unknown exception: \""
-                << " << e.what());" << ln
-                << "        }" << ln;
+            if (systemExceptionId >= 0) {
+                ctx.m_out << "            caughtUnidentifiedException = true;"
+                    << ln
+                    << "            unidentifiedExceptionMessage = "
+                    << "QString::fromUtf8(e.what());" << ln;
+            }
+            else {
+                ctx.m_out << "            throw;" << ln;
+            }
+
+            ctx.m_out << "        }" << ln;
 
             ctx.m_out << "        catch(...)" << ln
                 << "        {" << ln
-                << "            // TODO: more proper error handling" << ln
                 << "            QEC_ERROR(\"server\", \"Unknown exception\");"
-                << ln
-                << "        }" << ln;
+                << ln;
+
+            if (systemExceptionId >= 0) {
+                ctx.m_out << "            caughtUnidentifiedException = true;"
+                    << ln;
+            }
+            else {
+                ctx.m_out << "            throw;" << ln;
+            }
+
+            ctx.m_out << "        }" << ln;
 
             ctx.m_out << "    }" << ln << ln;
+
+            if (systemExceptionId >= 0) {
+                ctx.m_out << "    if (caughtUnidentifiedException) {" << ln
+                    << "        writer.writeFieldBegin(" << ln
+                    << "            QStringLiteral(\"EDAMSystemException\"),"
+                    << ln
+                    << "            ThriftFieldType::T_STRUCT," << ln
+                    << "            " << systemExceptionId << ");" << ln << ln;
+
+                ctx.m_out << "        writeEDAMSystemException(" << ln
+                    << "            writer," << ln
+                    << "            EDAMSystemExceptionBuilder{}" << ln
+                    << "                .setErrorCode("
+                    << "EDAMErrorCode::INTERNAL_ERROR)" << ln
+                    << "                .setMessage("
+                    << "std::move(unidentifiedExceptionMessage))" << ln
+                    << "                .build());" << ln;
+
+                ctx.m_out << "        writer.writeFieldEnd();" << ln << ln;
+
+                ctx.m_out << "        // Finalize message and return immediately"
+                    << ln
+                    << "        writer.writeStructEnd();" << ln
+                    << "        writer.writeMessageEnd();" << ln << ln
+                    << "        Q_EMIT " << func.m_name << "RequestReady("
+                    << ln
+                    << "            writer.buffer(), requestId);" << ln
+                    << "        return;" << ln
+                    << "    }" << ln << ln;
+            }
         }
 
         ctx.m_out << "    writer.writeFieldBegin(" << ln

@@ -42,6 +42,7 @@
 #include <memory>
 #include <set>
 #include <stdexcept>
+#include <utility>
 
 namespace qevercloud_generator {
 
@@ -242,7 +243,7 @@ Generator::OutputFileContext::OutputFileContext(
 
 QString Generator::clearInclude(const QString & s) const
 {
-    for(const auto & inc: qAsConst(m_includeList)) {
+    for(const auto & inc: std::as_const(m_includeList)) {
         if (s.startsWith(inc)) {
             return s.mid(inc.length());
         }
@@ -423,7 +424,7 @@ QList<Parser::Field> Generator::loggableFields(
 
 bool Generator::structContainsLocalFields(const Parser::Structure & s) const
 {
-    for (const auto & f: qAsConst(s.m_fields))
+    for (const auto & f: std::as_const(s.m_fields))
     {
         if (f.m_affiliation == Parser::Field::Affiliation::Local) {
             return true;
@@ -497,7 +498,7 @@ bool Generator::structContainsLocalFieldsRecursive(
         }
 
         bool foundLocalField = false;
-        for (const auto & f: qAsConst(sit->m_fields))
+        for (const auto & f: std::as_const(sit->m_fields))
         {
             if (f.m_affiliation == Parser::Field::Affiliation::Local) {
                 foundLocalField = true;
@@ -519,7 +520,7 @@ bool Generator::structContainsLocalFieldsRecursive(
 
 bool Generator::structContainsLocalIdField(const Parser::Structure & s) const
 {
-    for (const auto & f: qAsConst(s.m_fields))
+    for (const auto & f: std::as_const(s.m_fields))
     {
         if ((f.m_affiliation == Parser::Field::Affiliation::Local) &&
             (f.m_name == QStringLiteral("localId")) &&
@@ -537,7 +538,7 @@ Parser::Structures Generator::collectStructsWithLocalFields(
 {
     Parser::Structures relevantStructs;
     const auto & structs = parser.structures();
-    for (const auto & s: qAsConst(structs))
+    for (const auto & s: std::as_const(structs))
     {
         if (structContainsLocalFieldsRecursive(s, structs)) {
             relevantStructs.push_back(s);
@@ -726,28 +727,16 @@ void Generator::generateGetRandomValueExpression(
     {
         verifyTypeIsValueOrIdentifier(listType->m_valueType);
 
-        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-            const auto valueType = typeToStr(
-                listType->m_valueType,
-                {},
-                MethodType::TypeName);
+        const auto valueType = typeToStr(
+            listType->m_valueType,
+            {},
+            MethodType::TypeName);
 
-            out << prefix << fieldSetterName(field) << "(QList<"
-                << valueType << ">());" << ln;
-        }
-
+        out << indent << "{" << ln;
+        out << indent << indent << "QList<" << valueType << "> a;" << ln;
         for(size_t i = 0; i < 3; ++i)
         {
-            out << prefix << "mutable" << capitalize(field.m_name) << "()";
-
-            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-                out << "->";
-            }
-            else {
-                out << ".";
-            }
-
-            out << "push_back(";
+            out << indent << indent << "a.push_back(";
 
             Parser::Field pseudoField;
             pseudoField.m_type = listType->m_valueType;
@@ -757,6 +746,9 @@ void Generator::generateGetRandomValueExpression(
                 pseudoField, {}, parser, out, QStringLiteral(");\n"));
         }
 
+        out << indent << prefix << fieldSetterName(field)
+            << "(std::move(a));" << ln;
+        out << indent << "}" << ln << ln;
         return;
     }
 
@@ -766,28 +758,16 @@ void Generator::generateGetRandomValueExpression(
     {
         verifyTypeIsValueOrIdentifier(setType->m_valueType);
 
-        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-            const auto valueType = typeToStr(
-                setType->m_valueType,
-                {},
-                MethodType::TypeName);
+        const auto valueType = typeToStr(
+            setType->m_valueType,
+            {},
+            MethodType::TypeName);
 
-            out << prefix << fieldSetterName(field) << "(QSet<"
-                << valueType << ">());" << ln;
-        }
-
+        out << indent << "{" << ln;
+        out << indent << indent << "QSet<" << valueType << "> a;" << ln;
         for(size_t i = 0; i < 3; ++i)
         {
-            out << prefix << "mutable" << capitalize(field.m_name) << "()";
-
-            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-                out << "->";
-            }
-            else {
-                out << ".";
-            }
-
-            out << "insert(";
+            out << indent << indent << "a.insert(";
 
             Parser::Field pseudoField;
             pseudoField.m_type = setType->m_valueType;
@@ -797,6 +777,9 @@ void Generator::generateGetRandomValueExpression(
                 pseudoField, {}, parser, out, QStringLiteral(");\n"));
         }
 
+        out << indent << prefix << fieldSetterName(field)
+            << "(std::move(a));" << ln;
+        out << indent << "}" << ln << ln;
         return;
     }
 
@@ -817,41 +800,30 @@ void Generator::generateGetRandomValueExpression(
         verifyTypeIsValueOrIdentifier(keyType);
         verifyTypeIsValueOrIdentifier(valueType);
 
-        if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-            const auto keyTypeName = typeToStr(
-                keyType,
-                {},
-                MethodType::TypeName);
+        const auto keyTypeName = typeToStr(
+            keyType,
+            {},
+            MethodType::TypeName);
 
-            const auto valueTypeName = typeToStr(
-                valueType,
-                {},
-                MethodType::TypeName);
+        const auto valueTypeName = typeToStr(
+            valueType,
+            {},
+            MethodType::TypeName);
 
-            out << prefix << fieldSetterName(field) << "(";
-            if (mapType) {
-                out << "QMap";
-            }
-            else {
-                out << "QHash";
-            }
-
-            out << "<"
-                << keyTypeName << ", " << valueTypeName << ">());" << ln;
+        out << indent << "{" << ln;
+        out << indent << indent;
+        if (mapType) {
+            out << "QMap";
         }
+        else {
+            out << "QHash";
+        }
+        out << "<"
+            << keyTypeName << ", " << valueTypeName << "> a;" << ln;
 
         for(size_t i = 0; i < 3; ++i)
         {
-            out << prefix << "mutable" << capitalize(field.m_name) << "()";
-
-            if (field.m_required == Parser::Field::RequiredFlag::Optional) {
-                out << "->";
-            }
-            else {
-                out << ".";
-            }
-
-            out << "insert(";
+            out << indent << indent << "a.insert(";
 
             Parser::Field pseudoKeyField;
             pseudoKeyField.m_type = keyType;
@@ -871,6 +843,9 @@ void Generator::generateGetRandomValueExpression(
                 pseudoValueField, {}, parser, out, QStringLiteral(");\n"));
         }
 
+        out << indent << prefix << fieldSetterName(field)
+            << "(std::move(a));" << ln;
+        out << indent << "}" << ln << ln;
         return;
     }
 
@@ -964,6 +939,23 @@ bool Generator::isFieldOfPrimitiveType(
     }
 
     return isPrimitiveType;
+}
+
+bool Generator::isFieldMovable(
+    const Parser::Field & field, const QString & fieldTypeName) const
+{
+    bool isMovable = true;
+    if (m_allEnums.contains(fieldTypeName)) {
+        isMovable = false;
+    }
+    else if (m_primitiveTypeAliases.contains(fieldTypeName)) {
+        isMovable = false;
+    }
+    else if (dynamic_cast<Parser::PrimitiveType*>(field.m_type.get())) {
+        isMovable = false;
+    }
+
+    return isMovable;
 }
 
 void Generator::writeTypeProperties(
@@ -2256,7 +2248,7 @@ void Generator::writeHeaderHeader(
         ctx.m_out << "#include <qevercloud/Export.h>" << ln << ln;
     }
 
-    for(const auto & include: qAsConst(additionalIncludes))
+    for(const auto & include: std::as_const(additionalIncludes))
     {
         if (include.startsWith(QChar::fromLatin1('<'))) {
             ctx.m_out << "#include " << include << ln;
@@ -2270,7 +2262,7 @@ void Generator::writeHeaderHeader(
         ctx.m_out << ln;
     }
 
-    for (const auto & fwd: qAsConst(forwardDeclarationsOutsideNamespace)) {
+    for (const auto & fwd: std::as_const(forwardDeclarationsOutsideNamespace)) {
         ctx.m_out << fwd << ln;
     }
 
@@ -2892,7 +2884,7 @@ QString Generator::valueToStr(
         QString nextOffset = offset + QStringLiteral("    ");
         QTextStream strm(&result, QIODevice::Append);
         strm << ln;
-        for(const auto & v: qAsConst(listValue->m_values)) {
+        for(const auto & v: std::as_const(listValue->m_values)) {
             strm << offset << "<< "
                 << valueToStr(v, std::shared_ptr<Parser::Type>(nullptr),
                               identifier, nextOffset)
@@ -3052,7 +3044,7 @@ void Generator::writeThriftWriteFields(
                 << (isOptional ? "->" : ".") << "length());" << ln;
 
             out << indentStr
-                << "    for(const auto & value: qAsConst("
+                << "    for(const auto & value: std::as_const("
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
                 << fieldSuffix << ")) {" << ln;
 
@@ -3081,7 +3073,7 @@ void Generator::writeThriftWriteFields(
                 << ", " << fieldPrefix << field.m_name << "()"
                 << (isOptional ? "->" : ".") << "count());" << ln;
 
-            out << indentStr << "    for(const auto & value: qAsConst("
+            out << indentStr << "    for(const auto & value: std::as_const("
                 << (isOptional ? "*" : "") << fieldPrefix << field.m_name
                 << fieldSuffix << ")) {" << ln;
 
@@ -3500,7 +3492,7 @@ void Generator::generateTypesIOHeader(Parser & parser, const QString & outPath)
     lists << &parser.structures();
     lists << &parser.exceptions();
 
-    for(const auto & pList: qAsConst(lists))
+    for(const auto & pList: std::as_const(lists))
     {
         for(const auto & s: *pList) {
             ctx.m_out << "void write" << s.m_name
@@ -3536,7 +3528,7 @@ void Generator::generateTypesIOCpp(Parser & parser, const QString & outPath)
         << QStringLiteral("<qevercloud/exceptions/All.h>")
         << QStringLiteral("<qevercloud/types/All.h>")
         << QStringLiteral("<QUuid>") << QStringLiteral("<QDebug>")
-        << QStringLiteral("<optional>");
+        << QStringLiteral("<optional>") << QStringLiteral("<utility>");
 
     sortIncludes(additionalIncludes);
 
@@ -3580,7 +3572,7 @@ void Generator::generateTypesIOCpp(Parser & parser, const QString & outPath)
     auto structsAndExceptions = parser.structures();
     structsAndExceptions << parser.exceptions();
 
-    for(const auto & s: qAsConst(structsAndExceptions))
+    for(const auto & s: std::as_const(structsAndExceptions))
     {
         ctx.m_out << "void write" << s.m_name
             << "(" << ln << "    ThriftBinaryBufferWriter & writer," << ln
@@ -3718,7 +3710,7 @@ void Generator::generateAllExceptionsHeader(
 
     std::sort(exceptionIncludes.begin(), exceptionIncludes.end());
 
-    for (const auto & include: qAsConst(exceptionIncludes)) {
+    for (const auto & include: std::as_const(exceptionIncludes)) {
         ctx.m_out << "#include \"" << include << ".h\"" << ln;
     }
 
@@ -3757,7 +3749,7 @@ void Generator::generateExceptionsFwdHeader(
 
     std::sort(exceptionClasses.begin(), exceptionClasses.end());
 
-    for (const auto & exceptionClass: qAsConst(exceptionClasses)) {
+    for (const auto & exceptionClass: std::as_const(exceptionClasses)) {
         ctx.m_out << "class " << exceptionClass << ";" << ln;
     }
 
@@ -3789,7 +3781,7 @@ void Generator::generateAllTypesHeader(Parser & parser, const QString & outPath)
 
     std::sort(typesIncludes.begin(), typesIncludes.end());
 
-    for (const auto & include: qAsConst(typesIncludes)) {
+    for (const auto & include: std::as_const(typesIncludes)) {
         ctx.m_out << "#include \"" << include << ".h\"" << ln;
     }
 
@@ -3819,7 +3811,7 @@ void Generator::generateTypesFwdHeader(Parser & parser, const QString & outPath)
 
     std::sort(types.begin(), types.end());
 
-    for (const auto & type: qAsConst(types)) {
+    for (const auto & type: std::as_const(types)) {
         ctx.m_out << "class " << type << ";" << ln;
     }
 
@@ -3910,7 +3902,7 @@ void Generator::generateTypeHeader(
     }
 
     const auto deps = dependentTypeNames(s);
-    for (const auto & dep: qAsConst(deps)) {
+    for (const auto & dep: std::as_const(deps)) {
         if (dep == QStringLiteral("QString")) {
             continue;
         }
@@ -3958,6 +3950,27 @@ void Generator::generateTypeHeader(
 
     ctx.m_out << indent << s.m_name << "();" << ln;
 
+    if (isExceptionsSection && !s.m_fields.isEmpty()) {
+        ctx.m_out << indent << s.m_name << "(" << ln;
+        for (const auto & f: std::as_const(s.m_fields))
+        {
+            ctx.m_out << indent << indent << fieldTypeToStr(f)
+                << " " << f.m_name;
+
+            if (f.m_setterDefaultValue) {
+                ctx.m_out << " = " << f.m_setterDefaultValue->m_value;
+            }
+
+            if (&f != &s.m_fields.constLast()) {
+                ctx.m_out << "," << ln;
+            }
+            else {
+                ctx.m_out << ");" << ln;
+            }
+        }
+        ctx.m_out << ln;
+    }
+
     ctx.m_out << indent << s.m_name << "(const "
         << s.m_name << " & other);" << ln;
 
@@ -3974,13 +3987,13 @@ void Generator::generateTypeHeader(
     ctx.m_out << indent << s.m_name << " & operator=(" << s.m_name
         << " && other) noexcept;" << ln << ln;
 
-    for(const auto & f: qAsConst(s.m_fields))
+    for(const auto & f: std::as_const(s.m_fields))
     {
         if (const auto cit = s.m_fieldComments.constFind(f.m_name);
             cit != s.m_fieldComments.constEnd())
         {
             const auto lines = cit.value().split(QChar::fromLatin1('\n'));
-            for(const auto & line: qAsConst(lines))
+            for(const auto & line: std::as_const(lines))
             {
                 if (&line != &lines.front() && &line != &lines.back())
                 {
@@ -4005,7 +4018,7 @@ void Generator::generateTypeHeader(
             }
         }
 
-        generateClassAccessoryMethodsForFieldDeclarations(f, ctx);
+        generateClassAccessoryMethodsForFieldDeclarations(s, f, ctx);
         ctx.m_out << ln;
     }
 
@@ -4077,10 +4090,67 @@ void Generator::generateTypeCpp(
 
     const bool isException = m_allExceptions.contains(s.m_name);
     if (isException) {
+        if (!s.m_fields.isEmpty()) {
+            ctx.m_out << "#include <QTextStream>" << ln << ln;
+        }
         ctx.m_out << "#include <memory>" << ln << ln;
     }
 
     writeNamespaceBegin(ctx);
+
+    if (isException && !s.m_fields.isEmpty()) {
+        ctx.m_out << "namespace {" << ln << ln
+            << "[[nodiscard]] std::string composeExceptionMessage(" << ln;
+        for (const auto & f: std::as_const(s.m_fields)) {
+            ctx.m_out << indent << "const " << fieldTypeToStr(f) << " & "
+                << f.m_name;
+            if (&f != &s.m_fields.constLast()) {
+                ctx.m_out << "," << ln;
+            }
+            else {
+                ctx.m_out << ")" << ln;
+            }
+        }
+
+        ctx.m_out << "{" << ln;
+        ctx.m_out << indent << "QString res;" << ln
+            << indent << "QTextStream strm{&res};" << ln << ln
+            << indent << "strm << \"" << s.m_name << ": \";" << ln;
+        for (const auto & f: std::as_const(s.m_fields)) {
+            // TODO: support values of list, map and set types
+            if (dynamic_cast<const Parser::ListType*>(f.m_type.get()) ||
+                dynamic_cast<const Parser::MapType*>(f.m_type.get()) ||
+                dynamic_cast<const Parser::SetType*>(f.m_type.get()))
+            {
+                ctx.m_out << indent << "Q_UNUSED(" << f.m_name << ");" << ln;
+                continue;
+            }
+
+            ctx.m_out << indent << "strm << \"" << f.m_name << " = \"";
+            if (f.m_required == Parser::Field::RequiredFlag::Optional) {
+                ctx.m_out << ";" << ln;
+                ctx.m_out << indent << "if (" << f.m_name << ") {" << ln
+                    << indent << indent << "strm << *" << f.m_name
+                    << ";" << ln
+                    << indent << "}" << ln
+                    << indent << "else {" << ln
+                    << indent << indent << "strm << \"<none>\";" << ln
+                    << indent << "}" << ln;
+            }
+            else {
+                ctx.m_out << " << " << f.m_name << ";" << ln;
+            }
+
+            if (&f != &s.m_fields.constLast()) {
+                ctx.m_out << indent << "strm << \", \";" << ln << ln;
+            }
+        }
+        ctx.m_out << indent << "strm.flush();" << ln
+            << indent << "return res.toStdString();" << ln
+            << "}" << ln << ln;
+
+        ctx.m_out << "} // namespace" << ln << ln;
+    }
 
     ctx.m_out << s.m_name << "::" << s.m_name << "() :" << ln;
 
@@ -4093,6 +4163,55 @@ void Generator::generateTypeCpp(
         << "::Impl)" << ln;
 
     ctx.m_out << "{}" << ln << ln;
+
+    if (isException && !s.m_fields.isEmpty()) {
+        ctx.m_out << s.m_name << "::" << s.m_name << "(" << ln;
+        for (const auto & f: std::as_const(s.m_fields)) {
+            ctx.m_out << indent << fieldTypeToStr(f) << " " << f.m_name;
+            if (&f != &s.m_fields.constLast()) {
+                ctx.m_out << "," << ln;
+            }
+            else {
+                ctx.m_out << ") :" << ln;
+            }
+        }
+
+        ctx.m_out << indent << "EvernoteException(QStringLiteral(\""
+            << s.m_name << "\"))," << ln;
+        ctx.m_out << indent << "d(new " << s.m_name
+            << "::Impl)" << ln;
+        ctx.m_out << "{" << ln;
+
+        for (const auto & f: std::as_const(s.m_fields)) {
+            const QString fieldTypeName = fieldTypeToStr(f);
+            const bool isPrimitiveType =
+                isFieldOfPrimitiveType(f, fieldTypeName);
+
+            ctx.m_out << indent << "d->m_" << f.m_name << " = ";
+            if (isPrimitiveType) {
+                ctx.m_out << f.m_name;
+            }
+            else {
+                ctx.m_out << "std::move(" << f.m_name << ")";
+            }
+            ctx.m_out << ";" << ln;
+        }
+
+        ctx.m_out << indent << "d->m_strMessage = composeExceptionMessage("
+            << ln;
+
+        for (const auto & f: std::as_const(s.m_fields)) {
+            ctx.m_out << indent << indent << "d->m_" << f.m_name;
+            if (&f != &s.m_fields.constLast()) {
+                ctx.m_out << "," << ln;
+            }
+            else {
+                ctx.m_out << ");" << ln;
+            }
+        }
+
+        ctx.m_out << "}" << ln << ln;
+    }
 
     ctx.m_out << s.m_name << "::" << s.m_name << "(const " << s.m_name
         << " & other) :" << ln
@@ -4124,7 +4243,7 @@ void Generator::generateTypeCpp(
         << indent << "return *this;" << ln
         << "}" << ln << ln;
 
-    for(const auto & f: qAsConst(s.m_fields)) {
+    for(const auto & f: std::as_const(s.m_fields)) {
         generateClassAccessoryMethodsForFieldDefinitions(s, f, ctx);
     }
 
@@ -4175,7 +4294,7 @@ void Generator::generateTypeCpp(
 
     ctx.m_out << indent << "return" << ln;
 
-    for(const auto & f: qAsConst(s.m_fields))
+    for(const auto & f: std::as_const(s.m_fields))
     {
         ctx.m_out << indent << indent << "lhs." << f.m_name << "() == rhs."
             << f.m_name << "()";
@@ -4203,6 +4322,7 @@ void Generator::generateTypeImplHeader(
     const Parser::Structure & s, const Parser::Enumerations & enumerations,
     const QString & outPath, const QString & fileSection)
 {
+    const bool isException = m_allExceptions.contains(s.m_name);
     const QString fileName = s.m_name + QStringLiteral("Impl.h");
 
     OutputFileContext ctx(
@@ -4219,6 +4339,10 @@ void Generator::generateTypeImplHeader(
     if (structContainsLocalFields(s)) {
         additionalIncludes << QStringLiteral("<QHash>")
             << QStringLiteral("<QVariant>");
+    }
+
+    if (isException) {
+        additionalIncludes << QStringLiteral("<string>");
     }
 
     sortIncludes(additionalIncludes);
@@ -4256,7 +4380,7 @@ void Generator::generateTypeImplHeader(
         << indent << "void print(QTextStream & strm) const override;" << ln
         << ln;
 
-    for(const auto & f: qAsConst(s.m_fields))
+    for(const auto & f: std::as_const(s.m_fields))
     {
         const auto typeName = typeToStr(f.m_type, {}, MethodType::TypeName);
 
@@ -4309,6 +4433,10 @@ void Generator::generateTypeImplHeader(
         }
 
         ctx.m_out << ";" << ln;
+    }
+
+    if (isException) {
+        ctx.m_out << indent << "std::string m_strMessage;" << ln;
     }
 
     ctx.m_out << "};" << ln << ln;
@@ -4426,7 +4554,7 @@ void Generator::generateSerializationJsonCpp(
         dependentQEverCloudTypeNames.begin(),
         dependentQEverCloudTypeNames.end());
 
-    for (const auto & typeName: qAsConst(dependentQEverCloudTypeNames))
+    for (const auto & typeName: std::as_const(dependentQEverCloudTypeNames))
     {
         ctx.m_out << "#include <qevercloud/serialization/json/" << typeName
             << ".h>" << ln;
@@ -4443,7 +4571,7 @@ void Generator::generateSerializationJsonCpp(
                 return true;
             }
 
-            for (const auto & field: s.m_fields)
+            for (const auto & field: std::as_const(s.m_fields))
             {
                 if (dynamic_cast<Parser::MapType*>(field.m_type.get())) {
                     return true;
@@ -4458,7 +4586,34 @@ void Generator::generateSerializationJsonCpp(
     }
 
     ctx.m_out << "#include <QJsonArray>" << ln << ln;
-    ctx.m_out << "#include <limits>" << ln << ln;
+    ctx.m_out << "#include <limits>" << ln;
+
+    // Utility header is included in order to make use of std::as_const
+    // which in Qt case is relevant for lists, maps and sets
+    const bool needsUtilityHeader =
+        [&]
+        {
+            if (needsToRangeHeader) {
+                return true;
+            }
+
+            for (const auto & field: std::as_const(s.m_fields)) {
+                if (dynamic_cast<Parser::ListType*>(field.m_type.get())) {
+                    return true;
+                }
+
+                if (dynamic_cast<Parser::SetType*>(field.m_type.get())) {
+                    return true;
+                }
+            }
+
+            return false;
+        }();
+
+    if (needsUtilityHeader) {
+        ctx.m_out << "#include <utility>" << ln;
+    }
+    ctx.m_out << ln;
 
     writeNamespaceBegin(ctx);
 
@@ -4515,7 +4670,7 @@ void Generator::generateSerializationJsonCpp(
     {
         ctx.m_out << "namespace {" << ln << ln;
 
-        for (const auto & e: qAsConst(enums)) {
+        for (const auto & e: std::as_const(enums)) {
             generateSerializationJsonEnumSafeCastMethod(e, ctx);
         }
 
@@ -4629,7 +4784,7 @@ void Generator::generateSerializeToJsonMethod(
             ctx.m_out << indent << "{" << ln;
             ctx.m_out << indent << indent << "QJsonArray array;" << ln;
 
-            ctx.m_out << indent << indent << "for (const auto & v: qAsConst(";
+            ctx.m_out << indent << indent << "for (const auto & v: std::as_const(";
 
             if (field.m_required == Parser::Field::RequiredFlag::Optional) {
                 ctx.m_out << "*";
@@ -4675,7 +4830,7 @@ void Generator::generateSerializeToJsonMethod(
             ctx.m_out << indent << indent << "QJsonObject subobject;" << ln;
 
             ctx.m_out << indent << indent << "for (auto it: toRange("
-                << "qAsConst(";
+                << "std::as_const(";
 
             if (field.m_required == Parser::Field::RequiredFlag::Optional) {
                 ctx.m_out << "*";
@@ -5066,7 +5221,7 @@ void Generator::generateDeserializeFromJsonMethod(
                 << typeToStr(field.m_type, {}) << " values;" << ln;
 
             ctx.m_out << indent << indent << indent
-                << "for (const auto & item: qAsConst(a)) {" << ln;
+                << "for (const auto & item: std::as_const(a)) {" << ln;
 
             const QString indentStr = [&]
             {
@@ -5189,7 +5344,7 @@ void Generator::generateDeserializeFromJsonMethod(
                 << mapTypeName << " map;" << ln;
 
             ctx.m_out << indent << indent << indent
-                << "for (auto it: toRange(qAsConst(o))) {" << ln;
+                << "for (auto it: toRange(std::as_const(o))) {" << ln;
 
             const QString indentStr = [&]
             {
@@ -5363,7 +5518,7 @@ void Generator::generateSerializationJsonTestHeader(
     ctx.m_out << "private Q_SLOTS:" << ln;
 
     const auto structsAndExceptions = sortedStructsAndExceptions(parser);
-    for (const auto & s: qAsConst(structsAndExceptions))
+    for (const auto & s: std::as_const(structsAndExceptions))
     {
         ctx.m_out << "    void shouldSerializeAndDeserialize" << s.m_name
             << "();" << ln;
@@ -5382,7 +5537,7 @@ void Generator::generateSerializationJsonTestCpp(
         << QStringLiteral("<QtTest/QtTest>");
 
     const auto structsAndExceptions = sortedStructsAndExceptions(parser);
-    for (const auto & s: qAsConst(structsAndExceptions)) {
+    for (const auto & s: std::as_const(structsAndExceptions)) {
         additionalIncludes << QStringLiteral("<qevercloud/serialization/json/")
             + s.m_name + QStringLiteral(".h>");
     }
@@ -5403,7 +5558,7 @@ void Generator::generateSerializationJsonTestCpp(
         << "    QObject(parent)" << ln
         << "{}" << ln << ln;
 
-    for (const auto & s: qAsConst(structsAndExceptions))
+    for (const auto & s: std::as_const(structsAndExceptions))
     {
         ctx.m_out << "void SerializationJsonTester::"
             << "shouldSerializeAndDeserialize" << s.m_name
@@ -5438,9 +5593,16 @@ void Generator::generateExceptionClassWhatMethodDefinition(
     const Parser::Structure & s, OutputFileContext & ctx)
 {
     ctx.m_out << "const char * " << s.m_name << "::what() const noexcept"
-        << ln << "{" << ln
-        << indent << "return EvernoteException::what();" << ln
-        << "}" << ln << ln;
+        << ln << "{" << ln;
+
+    if (m_allExceptions.contains(s.m_name) && !s.m_fields.isEmpty()) {
+        ctx.m_out << indent << "return d->m_strMessage.data();" << ln;
+    }
+    else {
+        ctx.m_out << indent << "return EvernoteException::what();" << ln;
+    }
+
+    ctx.m_out << "}" << ln << ln;
 }
 
 void Generator::generateExceptionClassRaiseMethodDefinition(
@@ -5492,7 +5654,7 @@ void Generator::generateAllTypeBuildersHeader(
 
     std::sort(typeBuilders.begin(), typeBuilders.end());
 
-    for (const auto & typeBuilder: qAsConst(typeBuilders)) {
+    for (const auto & typeBuilder: std::as_const(typeBuilders)) {
         ctx.m_out << "#include <qevercloud/types/builders/" << typeBuilder
             << ".h>" << ln;
     }
@@ -5526,7 +5688,7 @@ void Generator::generateTypeBuildersFwdHeader(
 
     std::sort(typeBuilderClasses.begin(), typeBuilderClasses.end());
 
-    for (const auto & typeBuilderClass: qAsConst(typeBuilderClasses)) {
+    for (const auto & typeBuilderClass: std::as_const(typeBuilderClasses)) {
         ctx.m_out << "class " << typeBuilderClass << ";" << ln;
     }
 
@@ -5581,7 +5743,7 @@ void Generator::generateTypeBuilderHeader(
     }
 
     const auto deps = dependentTypeNames(s);
-    for (const auto & dep: qAsConst(deps)) {
+    for (const auto & dep: std::as_const(deps)) {
         if (dep == QStringLiteral("QString")) {
             continue;
         }
@@ -5624,7 +5786,7 @@ void Generator::generateTypeBuilderHeader(
     ctx.m_out << indent << s.m_name << "Builder & operator=(" << s.m_name
         << "Builder && other) noexcept;" << ln << ln;
 
-    for(const auto & field: qAsConst(s.m_fields))
+    for(const auto & field: std::as_const(s.m_fields))
     {
         const QString fieldTypeName = fieldTypeToStr(field);
 
@@ -5672,7 +5834,7 @@ void Generator::generateTypeBuilderCpp(
         << "{" << ln
         << "public:" << ln;
 
-    for (const auto & field: qAsConst(s.m_fields))
+    for (const auto & field: std::as_const(s.m_fields))
     {
         const QString fieldTypeName = fieldTypeToStr(field);
 
@@ -5749,7 +5911,7 @@ void Generator::generateTypeBuilderCpp(
         << indent << "return *this;" << ln
         << "}" << ln << ln;
 
-    for (const auto & field: qAsConst(s.m_fields))
+    for (const auto & field: std::as_const(s.m_fields))
     {
         const QString fieldTypeName = fieldTypeToStr(field);
 
@@ -5776,7 +5938,7 @@ void Generator::generateTypeBuilderCpp(
 
     ctx.m_out << indent << s.m_name << " result;" << ln << ln;
 
-    for(const auto & field: qAsConst(s.m_fields))
+    for(const auto & field: std::as_const(s.m_fields))
     {
         ctx.m_out << indent << "result." << fieldSetterName(field)
             << "(";
@@ -5798,7 +5960,7 @@ void Generator::generateTypeBuilderCpp(
 
     ctx.m_out << ln;
 
-    for (const auto & field: qAsConst(s.m_fields))
+    for (const auto & field: std::as_const(s.m_fields))
     {
         ctx.m_out << indent << "d->m_" << field.m_name;
 
@@ -5897,7 +6059,7 @@ void Generator::generateAllExceptionBuildersHeader(
 
     std::sort(exceptionBuilders.begin(), exceptionBuilders.end());
 
-    for (const auto & exceptionBuilder: qAsConst(exceptionBuilders)) {
+    for (const auto & exceptionBuilder: std::as_const(exceptionBuilders)) {
         ctx.m_out << "#include <qevercloud/exceptions/builders/"
             << exceptionBuilder << ".h>" << ln;
     }
@@ -5932,7 +6094,8 @@ void Generator::generateExceptionBuildersFwdHeader(
 
     std::sort(exceptionBuilderClasses.begin(), exceptionBuilderClasses.end());
 
-    for (const auto & exceptionBuilderClass: qAsConst(exceptionBuilderClasses))
+    for (const auto & exceptionBuilderClass:
+         std::as_const(exceptionBuilderClasses))
     {
         ctx.m_out << "class " << exceptionBuilderClass << ";" << ln;
     }
@@ -6020,11 +6183,11 @@ void Generator::generateTypeBuildersTestCpp(
 
     const auto & enumerations = parser.enumerations();
 
-    for (const auto & s: qAsConst(parser.structures())) {
+    for (const auto & s: std::as_const(parser.structures())) {
         generateTypeBuildersTestMethod(s, enumerations, ctx, false);
     }
 
-    for (const auto & s: qAsConst(parser.exceptions())) {
+    for (const auto & s: std::as_const(parser.exceptions())) {
         generateTypeBuildersTestMethod(s, enumerations, ctx, true);
     }
 
@@ -6219,7 +6382,7 @@ void Generator::generateTypeBuildersTestMethod(
     ctx.m_out << ln;
     ctx.m_out << indent << s.m_name << "Builder builder;" << ln;
 
-    for (const auto & field: qAsConst(s.m_fields)) {
+    for (const auto & field: std::as_const(s.m_fields)) {
         ctx.m_out << indent << "builder." << fieldSetterName(field)
             << "(value." << field.m_name << "());" << ln;
     }
@@ -6288,9 +6451,9 @@ void Generator::generateMetaTypesHeader(
 
     std::map<QString, MapType> dependentOptionalMapTypes;
 
-    for (const auto & s: qAsConst(structsAndExceptions))
+    for (const auto & s: std::as_const(structsAndExceptions))
     {
-        for (const auto & f: qAsConst(s.m_fields))
+        for (const auto & f: std::as_const(s.m_fields))
         {
             if (f.m_required != Parser::Field::RequiredFlag::Optional) {
                 continue;
@@ -6350,7 +6513,7 @@ void Generator::generateMetaTypesHeader(
             dependentOptionalTypeNames.size() +
             dependentOptionalMapTypes.size() * 3 + 1));
 
-    for (const auto & typeName: qAsConst(dependentOptionalTypeNames))
+    for (const auto & typeName: std::as_const(dependentOptionalTypeNames))
     {
         QString line;
         QTextStream strm{&line};
@@ -6452,7 +6615,7 @@ void Generator::generateMetaTypesCpp(
         ctx.m_out << indent << "qRegisterMetaType<"
             << s.m_name << ">(\"qevercloud::" << s.m_name << "\");" << ln;
 
-        for (const auto & f: qAsConst(s.m_fields))
+        for (const auto & f: std::as_const(s.m_fields))
         {
             if (f.m_required != Parser::Field::RequiredFlag::Optional) {
                 continue;
@@ -6522,7 +6685,7 @@ void Generator::generateMetaTypesCpp(
     const auto processStructures = [&](Parser::Structures structures)
     {
         std::sort(structures.begin(), structures.end(), structureLessByName);
-        for (const auto & s: qAsConst(structures))
+        for (const auto & s: std::as_const(structures))
         {
             processStruct(s);
         }
@@ -6533,7 +6696,7 @@ void Generator::generateMetaTypesCpp(
     processStructures(parser.exceptions());
     processStructures(parser.structures());
 
-    for (const auto & typeAlias: qAsConst(parser.typeAliases()))
+    for (const auto & typeAlias: std::as_const(parser.typeAliases()))
     {
         ctx.m_out << indent << "qRegisterMetaType<"
             << typeAlias.m_name << ">(\"qevercloud::" << typeAlias.m_name
@@ -6542,7 +6705,7 @@ void Generator::generateMetaTypesCpp(
 
     ctx.m_out << ln;
 
-    for (const auto & typeNames: qAsConst(dependentOptionalTypeNames))
+    for (const auto & typeNames: std::as_const(dependentOptionalTypeNames))
     {
         ctx.m_out << indent << "qRegisterMetaType<std::optional<"
             << typeNames.first << ">>(\"std::optional<" << typeNames.second
@@ -6610,7 +6773,7 @@ void Generator::generateServiceHeader(
             << ln << ln;
     }
 
-    for(const auto & func: qAsConst(service.m_functions))
+    for(const auto & func: std::as_const(service.m_functions))
     {
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
@@ -6621,7 +6784,7 @@ void Generator::generateServiceHeader(
             const QStringList lines = func.m_docComment.split(
                 QChar::fromLatin1('\n'));
 
-            for(const auto & line: qAsConst(lines)) {
+            for(const auto & line: std::as_const(lines)) {
                 ctx.m_out << "    " << line << ln;
             }
         }
@@ -6640,7 +6803,7 @@ void Generator::generateServiceHeader(
             ctx.m_out << ln;
         }
 
-        for(const auto & param: qAsConst(func.m_params))
+        for(const auto & param: std::as_const(func.m_params))
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
                 // Auth token is a part of IRequestContext interface
@@ -6672,7 +6835,7 @@ void Generator::generateServiceHeader(
         ctx.m_out << "    [[nodiscard]] virtual QFuture<" << funcReturnTypeName
             << "> " << func.m_name << "Async(" << ln;
 
-        for(const auto & param: qAsConst(func.m_params))
+        for(const auto & param: std::as_const(func.m_params))
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
                 // Auth token is a part of IRequestContext interface
@@ -6823,12 +6986,12 @@ void Generator::generateAllServicesHeader(
     ctx.m_out << ln;
 
     const auto & services = parser.services();
-    for (const auto & service: qAsConst(services)) {
+    for (const auto & service: std::as_const(services)) {
         ctx.m_out << "#include <qevercloud/services/I"
             << service.m_name << ".h>" << ln;
     }
 
-    for (const auto & service: qAsConst(services)) {
+    for (const auto & service: std::as_const(services)) {
         ctx.m_out << "#include <qevercloud/services/"
             << service.m_name << "Server.h>" << ln;
     }
@@ -6861,14 +7024,14 @@ void Generator::generateServicesFwdHeader(
     const auto & services = parser.services();
     QStringList serviceClasses;
     serviceClasses.reserve(services.size() * 2);
-    for (const auto & service: qAsConst(services)) {
+    for (const auto & service: std::as_const(services)) {
         serviceClasses << (QStringLiteral("I") + service.m_name);
         serviceClasses << (service.m_name + QStringLiteral("Server"));
     }
 
     std::sort(serviceClasses.begin(), serviceClasses.end());
 
-    for (const auto & serviceClass: qAsConst(serviceClasses)) {
+    for (const auto & serviceClass: std::as_const(serviceClasses)) {
         ctx.m_out << "class " << serviceClass << ";" << ln;
 
         if (!serviceClass.endsWith(QStringLiteral("Server"))) {
@@ -6954,7 +7117,8 @@ void Generator::generateServerCpp(
         << QStringLiteral("../Types_io.h")
         << QStringLiteral("<qevercloud/exceptions/builders/EDAMSystemExceptionBuilder.h>")
         << QStringLiteral("<qevercloud/utility/Log.h>")
-        << QStringLiteral("<qevercloud/RequestContextBuilder.h>");
+        << QStringLiteral("<qevercloud/RequestContextBuilder.h>")
+        << QStringLiteral("<utility>");
 
     sortIncludes(additionalIncludes);
 
@@ -7363,7 +7527,7 @@ void Generator::generateTestRandomDataGeneratorsHeader(
     auto structsAndExceptions = parser.structures();
     structsAndExceptions << parser.exceptions();
 
-    for(const auto & s: qAsConst(structsAndExceptions))
+    for(const auto & s: std::as_const(structsAndExceptions))
     {
         ctx.m_out << "[[nodiscard]] " << s.m_name << " generateRandom"
             << s.m_name << "();" << ln << ln;
@@ -7498,7 +7662,7 @@ void Generator::generateTestRandomDataGeneratorsCpp(
     auto structsAndExceptions = parser.structures();
     structsAndExceptions << parser.exceptions();
 
-    for(const auto & s: qAsConst(structsAndExceptions))
+    for(const auto & s: std::as_const(structsAndExceptions))
     {
         ctx.m_out << s.m_name << " generateRandom" << s.m_name << "()" << ln
             << "{" << ln;
@@ -7531,7 +7695,7 @@ void Generator::generateTestClearLocalFieldsHeader(
     writeHeaderHeader(ctx, fileName, additionalIncludes, HeaderKind::Private);
 
     const auto relevantStructs = collectStructsWithLocalFields(parser);
-    for (const auto & s: qAsConst(relevantStructs))
+    for (const auto & s: std::as_const(relevantStructs))
     {
         ctx.m_out << "void clearLocalFields(" << s.m_name << " & v);" << ln;
     }
@@ -7557,12 +7721,12 @@ void Generator::generateTestClearLocalFieldsCpp(
 
     const auto & structs = parser.structures();
     const auto relevantStructs = collectStructsWithLocalFields(parser);
-    for (const auto & s: qAsConst(relevantStructs))
+    for (const auto & s: std::as_const(relevantStructs))
     {
         ctx.m_out << "void clearLocalFields(" << s.m_name << " & v)" << ln
             << "{" << ln;
 
-        for (const auto & f: qAsConst(s.m_fields))
+        for (const auto & f: std::as_const(s.m_fields))
         {
             const auto * listType =
                 dynamic_cast<Parser::ListType*>(f.m_type.get());
@@ -7834,7 +7998,8 @@ void Generator::generateTestClearLocalFieldsCpp(
 }
 
 void Generator::generateClassAccessoryMethodsForFieldDeclarations(
-    const Parser::Field & field, OutputFileContext & ctx)
+    const Parser::Structure & s, const Parser::Field & field,
+    OutputFileContext & ctx)
 {
     const QString fieldTypeName = fieldTypeToStr(field);
     const bool isPrimitiveType = isFieldOfPrimitiveType(field, fieldTypeName);
@@ -7855,6 +8020,7 @@ void Generator::generateClassAccessoryMethodsForFieldDeclarations(
     // a non-const mutable value getter with name explicitly reflecting its
     // nature
     if (!isPrimitiveType &&
+        !m_allExceptions.contains(s.m_name) &&
         !dynamic_cast<Parser::StringType*>(field.m_type.get()) &&
         !dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()))
     {
@@ -7896,8 +8062,11 @@ void Generator::generateClassAccessoryMethodsForFieldDefinitions(
         << indent << "return d->m_" << field.m_name << ";" << ln
         << "}" << ln << ln;
 
+    const bool isException = m_allExceptions.contains(s.m_name);
+
     // Non-const getter
     if (!isPrimitiveType &&
+        !isException &&
         !dynamic_cast<Parser::StringType*>(field.m_type.get()) &&
         !dynamic_cast<Parser::ByteArrayType*>(field.m_type.get()))
     {
@@ -7913,10 +8082,58 @@ void Generator::generateClassAccessoryMethodsForFieldDefinitions(
     ctx.m_out << "void " << s.m_name << "::" << fieldSetterName(field);
 
     ctx.m_out << "(" << fieldTypeName << " " << field.m_name << ")" << ln
-        << "{" << ln
-        << indent << "d->m_" << field.m_name << " = " << field.m_name << ";"
-        << ln
-        << "}" << ln << ln;
+        << "{" << ln;
+
+    const QString nonOptionalFieldTypeName =
+        [&]
+        {
+            if (field.m_required != Parser::Field::RequiredFlag::Optional) {
+                return fieldTypeName;
+            }
+
+            auto fieldCopy = field;
+            fieldCopy.m_required = Parser::Field::RequiredFlag::Required;
+            return fieldTypeToStr(fieldCopy);
+        }();
+
+    if (isException) {
+        ctx.m_out << indent << "if (d->m_" << field.m_name << " != "
+            << field.m_name << ") {" << ln
+            << indent << indent << "d->m_" << field.m_name << " = ";
+        if (isFieldMovable(field, nonOptionalFieldTypeName)) {
+            ctx.m_out << "std::move(" << field.m_name << ");" << ln;
+        }
+        else {
+            ctx.m_out << field.m_name << ";" << ln;
+        }
+
+        if (!s.m_fields.isEmpty()) {
+            ctx.m_out << indent << indent
+                << "d->m_strMessage = composeExceptionMessage(" << ln;
+            for (const auto & f: std::as_const(s.m_fields)) {
+                ctx.m_out << indent << indent << indent << "d->m_" << f.m_name;
+                if (&f != &s.m_fields.constLast()) {
+                    ctx.m_out << "," << ln;
+                }
+                else {
+                    ctx.m_out << ");" << ln;
+                }
+            }
+        }
+
+        ctx.m_out << indent << "}" << ln;
+    }
+    else {
+        ctx.m_out << indent << "d->m_" << field.m_name << " = ";
+        if (isFieldMovable(field, nonOptionalFieldTypeName)) {
+            ctx.m_out << "std::move(" << field.m_name << ");" << ln;
+        }
+        else {
+            ctx.m_out << field.m_name << ";" << ln;
+        }
+    }
+
+    ctx.m_out << "}" << ln << ln;
 }
 
 void Generator::generateServiceClassDeclaration(
@@ -8089,7 +8306,7 @@ void Generator::generateServiceClassDeclaration(
         }
     }
 
-    for(const auto & func: qAsConst(service.m_functions))
+    for(const auto & func: std::as_const(service.m_functions))
     {
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
@@ -8134,7 +8351,7 @@ void Generator::generateServiceClassDeclaration(
 
         ctx.m_out << "    QFuture<" << funcReturnTypeName << "> " << func.m_name
             << "Async(" << ln;
-        for(const auto & param: qAsConst(func.m_params))
+        for(const auto & param: std::as_const(func.m_params))
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
                 // Auth token is a part of IRequestContext interface
@@ -8425,7 +8642,7 @@ void Generator::generateServiceClassDefinition(
             ctx.m_out << "    QEC_TRACE(\"" << logComponentName
                 << "\", \"Parameters:\\n\"" << ln;
             auto lastLoggableParamId = loggableParams.last().m_id;
-            for(const auto & param: qAsConst(loggableParams))
+            for(const auto & param: std::as_const(loggableParams))
             {
                 ctx.m_out << "        << \"    " << param.m_name << " = \" << "
                     << param.m_name;
@@ -8505,7 +8722,7 @@ void Generator::generateServiceClassDefinition(
             ctx.m_out << "    QEC_TRACE(\"" << logComponentName
                 << "\", \"Parameters:\\n\"" << ln;
             auto lastLoggableParamId = loggableParams.last().m_id;
-            for(const auto & param: qAsConst(loggableParams))
+            for(const auto & param: std::as_const(loggableParams))
             {
                 ctx.m_out << "        << \"    " << param.m_name << " = \" << "
                     << param.m_name;
@@ -8556,7 +8773,7 @@ void Generator::generateServiceClassDefinition(
 void Generator::generateDurableServiceClassDefinition(
     const Parser::Service & service, OutputFileContext & ctx)
 {
-    for(const auto & func: qAsConst(service.m_functions))
+    for(const auto & func: std::as_const(service.m_functions))
     {
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
@@ -8607,7 +8824,7 @@ void Generator::generateDurableServiceClassDefinition(
             ctx.m_out << ln;
         }
 
-        for(const auto & param: qAsConst(func.m_params))
+        for(const auto & param: std::as_const(func.m_params))
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
                 // Auth token is a part of IRequestContext interface
@@ -8644,7 +8861,7 @@ void Generator::generateDurableServiceClassDefinition(
             ctx.m_out << "    if (logger()->shouldLog(LogLevel::Trace, "
                 << "\"durable_service\")) {" << ln;
 
-            for(const auto & param: qAsConst(loggableParams))
+            for(const auto & param: std::as_const(loggableParams))
             {
                 ctx.m_out << "        strm << \"" << param.m_name << " = \" << "
                           << param.m_name << " << \"\\n\";" << ln;
@@ -8748,7 +8965,7 @@ void Generator::generateDurableServiceClassDefinition(
             ctx.m_out << "    if (logger()->shouldLog(LogLevel::Trace, "
                 << "\"durable_service\")) {" << ln;
 
-            for(const auto & param: qAsConst(loggableParams))
+            for(const auto & param: std::as_const(loggableParams))
             {
                 ctx.m_out << "        strm << \"" << param.m_name << " = \" << "
                           << param.m_name << " << \"\\n\";" << ln;
@@ -8806,7 +9023,7 @@ void Generator::generateServerClassDeclaration(
     ctx.m_out << "Q_SIGNALS:" << ln;
     ctx.m_out << "    // Signals notifying listeners about incoming requests"
         << ln;
-    for(const auto & func: qAsConst(service.m_functions))
+    for(const auto & func: std::as_const(service.m_functions))
     {
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
@@ -8817,7 +9034,7 @@ void Generator::generateServerClassDeclaration(
             ctx.m_out << ln;
         }
 
-        for(const auto & param: qAsConst(func.m_params))
+        for(const auto & param: std::as_const(func.m_params))
         {
             if (param.m_name == QStringLiteral("authenticationToken")) {
                 // Auth token is a part of IRequestContext interface
@@ -8846,7 +9063,7 @@ void Generator::generateServerClassDeclaration(
     }
 
     ctx.m_out << "    // Signals used to send encoded response data" << ln;
-    for(const auto & func: qAsConst(service.m_functions))
+    for(const auto & func: std::as_const(service.m_functions))
     {
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
@@ -8861,7 +9078,7 @@ void Generator::generateServerClassDeclaration(
         << "    void onRequest(QByteArray data, QUuid requestId);" << ln << ln;
 
     ctx.m_out << "    // Slots for replies to requests" << ln;
-    for(const auto & func: qAsConst(service.m_functions))
+    for(const auto & func: std::as_const(service.m_functions))
     {
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
@@ -8912,7 +9129,7 @@ void Generator::generateServerClassDefinition(
         << "    }" << ln << ln;
 
     bool firstFunc = true;
-    for (const auto & func: qAsConst(service.m_functions))
+    for (const auto & func: std::as_const(service.m_functions))
     {
         ctx.m_out << "    ";
 
@@ -9010,7 +9227,7 @@ void Generator::generateServerClassDefinition(
 
     ctx.m_out << "}" << ln << ln;
 
-    for(const auto & func: qAsConst(service.m_functions))
+    for(const auto & func: std::as_const(service.m_functions))
     {
         if (func.m_isOneway) {
             throw std::runtime_error("oneway functions are not supported");
@@ -9216,7 +9433,7 @@ void Generator::generateServerClassDefinition(
                     MethodType::ThriftFieldType);
                 ctx.m_out << ", value.size());" << ln;
 
-                ctx.m_out << "    for(const auto & v: qAsConst(value)) {"
+                ctx.m_out << "    for(const auto & v: std::as_const(value)) {"
                     << ln << "        ";
 
                 ctx.m_out << typeToStr(
@@ -9235,7 +9452,7 @@ void Generator::generateServerClassDefinition(
                     MethodType::ThriftFieldType);
                 ctx.m_out << ", value.size());" << ln;
 
-                ctx.m_out << "    for(const auto & v: qAsConst(value)) {"
+                ctx.m_out << "    for(const auto & v: std::as_const(value)) {"
                     << ln << "        ";
 
                 ctx.m_out << typeToStr(
@@ -9259,7 +9476,8 @@ void Generator::generateServerClassDefinition(
                     MethodType::ThriftFieldType);
                 ctx.m_out << ", value);" << ln;
 
-                ctx.m_out << "    for(const auto & it: toRange(qAsConst(value))) {"
+                ctx.m_out << "    for(const auto & it: "
+                    << "toRange(std::as_const(value))) {"
                     << ln << "        ";
 
                 ctx.m_out << typeToStr(

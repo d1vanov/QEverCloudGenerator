@@ -209,7 +209,8 @@ private:
         Parser & parser, const QString & outPath);
 
     void generateClassAccessoryMethodsForFieldDeclarations(
-        const Parser::Field & field, OutputFileContext & ctx);
+        const Parser::Structure & s, const Parser::Field & field,
+        OutputFileContext & ctx);
 
     void generateClassAccessoryMethodsForFieldDefinitions(
         const Parser::Structure & s, const Parser::Field & field,
@@ -454,6 +455,9 @@ private:
     [[nodiscard]] QString fieldTypeToStr(const Parser::Field & field) const;
 
     [[nodiscard]] bool isFieldOfPrimitiveType(
+        const Parser::Field & field, const QString & fieldTypeName) const;
+
+    [[nodiscard]] bool isFieldMovable(
         const Parser::Field & field, const QString & fieldTypeName) const;
 
     // Write methods for particular parsed fields

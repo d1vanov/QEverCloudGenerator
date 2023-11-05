@@ -47,9 +47,6 @@ else()
   target_link_libraries(QEverCloudGenerator Qt5::Core)
 endif()
 
-target_compile_features(QEverCloudGenerator PRIVATE
-  cxx_std_17)
-
 target_compile_definitions(QEverCloudGenerator PRIVATE
   "-DQT_NO_CAST_FROM_ASCII"
   "-DQT_NO_CAST_TO_ASCII"

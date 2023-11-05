@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2019 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2023 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,7 @@
 
 #include <cstdlib>
 #include <stdexcept>
+#include <utility>
 
 int main(int argc, char *argv[])
 {
@@ -69,7 +70,7 @@ int main(int argc, char *argv[])
         }
 
         Parser parser{&app};
-        for (const auto & term: qAsConst(lexer.terminals()))
+        for (const auto & term: std::as_const(lexer.terminals()))
         {
             parser.setFileName(term.m_fileName);
             parser.feed(term.m_type, term.m_data);

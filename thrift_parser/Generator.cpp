@@ -5534,7 +5534,8 @@ void Generator::generateSerializationJsonTestCpp(
 {
     auto additionalIncludes = QStringList{}
         << QStringLiteral("RandomDataGenerators.h")
-        << QStringLiteral("<QtTest/QtTest>");
+        << QStringLiteral("<QJsonDocument>")
+        << QStringLiteral("<QTest>");
 
     const auto structsAndExceptions = sortedStructsAndExceptions(parser);
     for (const auto & s: std::as_const(structsAndExceptions)) {
@@ -6151,7 +6152,7 @@ void Generator::generateTypeBuildersTestCpp(
 {
     auto additionalIncludes = QStringList{}
         << QStringLiteral("RandomDataGenerators.h")
-        << QStringLiteral("<QtTest/QtTest>");
+        << QStringLiteral("<QTest>");
 
     for (const auto & s: parser.structures()) {
         additionalIncludes << QStringLiteral("<qevercloud/types/builders/") +
@@ -7234,7 +7235,7 @@ void Generator::generateTestServerCpp(
     additionalIncludes << QStringLiteral("<QEventLoop>")
         << QStringLiteral("<QFutureWatcher>")
         << QStringLiteral("<QTcpServer>")
-        << QStringLiteral("<QtTest/QtTest>");
+        << QStringLiteral("<QTest>");
 
     sortIncludes(additionalIncludes);
 

@@ -650,11 +650,11 @@ void Generator::writeStructPrintDefinition(
             }
 
             out << "    if (" << f.m_name << ".isSet()) {" << ln
-                << "        strm << \"    " << f.m_name << " = \"" << ln;
+                << "        strm << \"    " << f.m_name << " = \"";
 
             if (mapType)
             {
-                out << "            << \"QMap<"
+                out << ln << "            << \"QMap<"
                     << typeToStr(mapType->m_keyType, {}) << ", "
                     << typeToStr(mapType->m_valueType, {})
                     << "> {\";" << ln;
@@ -667,7 +667,7 @@ void Generator::writeStructPrintDefinition(
             }
             else if (setType)
             {
-                out << "            << \"QSet<"
+                out << ln << "            << \"QSet<"
                     << typeToStr(setType->m_valueType, {}) << "> {\";" << ln;
                 out << "        for(const auto & v: " << f.m_name
                     << ".ref()) {" << ln;
@@ -677,7 +677,7 @@ void Generator::writeStructPrintDefinition(
             }
             else if (listType)
             {
-                out << "            << \"QList<"
+                out << ln << "            << \"QList<"
                     << typeToStr(listType->m_valueType, {}) << "> {\";" << ln;
                 out << "        for(const auto & v: " << f.m_name
                     << ".ref()) {" << ln;
@@ -685,9 +685,24 @@ void Generator::writeStructPrintDefinition(
                 out << "        }" << ln;
                 out << "        strm << \"    }\\n\";" << ln;
             }
+            else if (s.m_name == QStringLiteral("Data") &&
+                     f.m_name == QStringLiteral("body"))
+            {
+                out << ";" << ln
+                    << "        if (" << f.m_name
+                    << ".ref().size() <= 1024) {" << ln
+                    << "            strm << "
+                    << f.m_name << ".ref().toHex() << \"\\n\";" << ln
+                    << "        }" << ln
+                    << "        else {" << ln
+                    << "            "
+                    << "strm << \"<binary data, \" << " << f.m_name
+                    << ".ref().size() << \" bytes>\" << \"\\n\";" << ln
+                    << "        }" << ln;
+            }
             else
             {
-                out << "            << "
+                out << ln << "            << "
                     << f.m_name << ".ref() << \"\\n\";" << ln;
             }
 
@@ -3538,7 +3553,7 @@ void Generator::generateTestServerHeaders(
 void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
 {
     auto additionalIncludes = QStringList()
-        << QStringLiteral("../../Http.h")
+        << QStringLiteral("../../HttpUtils.h")
         << QStringLiteral("RandomDataGenerators.h")
         << QStringLiteral("<generated/Servers.h>")
         << QStringLiteral("<generated/Services.h>")

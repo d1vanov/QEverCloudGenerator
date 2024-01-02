@@ -1,17 +1,14 @@
-cmake_minimum_required(VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.16.3)
 
 include(QEverCloudGeneratorCMakePolicies)
 SET_POLICIES()
 
 project(lemon)
 
-set(SOURCES
-    main.c)
-
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(${PROJECT_NAME} main.c)
 
 if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE "/wd4311")
+  target_compile_options(${PROJECT_NAME} PRIVATE "/wd4311")
 endif()
 
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/lempar.c"

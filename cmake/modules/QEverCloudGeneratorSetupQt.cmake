@@ -1,10 +1,7 @@
 if (BUILD_WITH_QT6)
-  find_package(Qt6 6.0.0 COMPONENTS Core ${QEVERCLOUD_FIND_QT_ARGS})
+  find_package(Qt6 6.0.0 COMPONENTS Core)
 else()
-  find_package(Qt5Core REQUIRED)
-  if (Qt5Core_VERSION VERSION_LESS 5.5.0)
-    message(FATAL_ERROR "Minimum supported Qt version is 5.5.0")
-  endif()
+  find_package(Qt5 5.12.0 COMPONENTS Core)
 endif()
 
 set(CMAKE_AUTOMOC ON)

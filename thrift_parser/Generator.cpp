@@ -1324,6 +1324,21 @@ void Generator::writeTypeImplPrintDefinition(
                     << indent << "}" << ln
                     << indent << "strm << \"}\\n\";" << ln;
             }
+            else if (s.m_name == QStringLiteral("Note") &&
+                     f.m_name == QStringLiteral("thumbnailData"))
+            {
+                out << ";" << ln
+                    << indent << indent << "if (m_" << f.m_name
+                    << ".size() <= 1024) {" << ln
+                    << indent << indent << indent << "strm << m_"
+                    << f.m_name << ".toHex() << \"\\n\";" << ln
+                    << indent << indent << "}" << ln
+                    << indent << indent << "else {" << ln
+                    << indent << indent << indent
+                    << "strm << \"<binary data, \" << m_" << f.m_name
+                    << ".size() << \" bytes>\" << \"\\n\";" << ln
+                    << indent << indent << "}" << ln;
+            }
             else if (const auto * primitiveType =
                      dynamic_cast<Parser::PrimitiveType*>(f.m_type.get());
                      primitiveType &&

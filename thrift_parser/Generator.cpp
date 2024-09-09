@@ -1249,8 +1249,7 @@ void Generator::writeTypeImplPrintDefinition(
         }
         else
         {
-            out << indent << "strm << \"" << indent << f.m_name << " = \""
-                << ln;
+            out << indent << "strm << \"" << indent << f.m_name << " = \"";
 
             if (mapType || hashType)
             {
@@ -1260,7 +1259,7 @@ void Generator::writeTypeImplPrintDefinition(
                 const auto & valueType =
                     (mapType ? mapType->m_valueType : hashType->m_valueType);
 
-                out << indent << indent << "<< \"";
+                out << ln << indent << indent << "<< \"";
                 if (mapType) {
                     out << "QMap";
                 }
@@ -1304,7 +1303,7 @@ void Generator::writeTypeImplPrintDefinition(
             }
             else if (setType)
             {
-                out << indent << indent << "<< \"QSet<"
+                out << ln << indent << indent << "<< \"QSet<"
                     << typeToStr(setType->m_valueType, {}) << "> {\";" << ln
                     << indent << "for(const auto & v: m_" << f.m_name << ") {"
                     << ln
@@ -1315,7 +1314,7 @@ void Generator::writeTypeImplPrintDefinition(
             }
             else if (listType)
             {
-                out << indent << indent << "<< \"QList<"
+                out << ln << indent << indent << "<< \"QList<"
                     << typeToStr(listType->m_valueType, {}) << "> {\";" << ln
                     << indent << "for(const auto & v: m_" << f.m_name << ") {"
                     << ln
@@ -1328,29 +1327,29 @@ void Generator::writeTypeImplPrintDefinition(
                      f.m_name == QStringLiteral("thumbnailData"))
             {
                 out << ";" << ln
-                    << indent << indent << "if (m_" << f.m_name
+                    << indent << "if (m_" << f.m_name
                     << ".size() <= 1024) {" << ln
-                    << indent << indent << indent << "strm << m_"
+                    << indent << indent << "strm << m_"
                     << f.m_name << ".toHex() << \"\\n\";" << ln
-                    << indent << indent << "}" << ln
-                    << indent << indent << "else {" << ln
-                    << indent << indent << indent
+                    << indent << "}" << ln
+                    << indent << "else {" << ln
+                    << indent << indent
                     << "strm << \"<binary data, \" << m_" << f.m_name
                     << ".size() << \" bytes>\" << \"\\n\";" << ln
-                    << indent << indent << "}" << ln;
+                    << indent << "}" << ln;
             }
             else if (const auto * primitiveType =
                      dynamic_cast<Parser::PrimitiveType*>(f.m_type.get());
                      primitiveType &&
                      primitiveType->m_type == Parser::PrimitiveType::Type::Bool)
             {
-                out << indent << indent << "<< (m_"
+                out << ln << indent << indent << "<< (m_"
                     << f.m_name << " ? \"true\" : \"false\") << \"\\n\";" << ln;
             }
             else if (const auto * variantType =
                      dynamic_cast<Parser::VariantType*>(f.m_type.get()))
             {
-                out << ";" << ln;
+                out << ln << ";" << ln;
                 out << indent << indent << "QString debugStr;" << ln;
                 out << indent << indent << "QDebug dbg{&debugStr};" << ln;
                 out << indent << indent << "dbg << m_" << f.m_name << ";"
@@ -1359,7 +1358,7 @@ void Generator::writeTypeImplPrintDefinition(
             }
             else
             {
-                out << indent << indent << "<< m_"
+                out << ln << indent << indent << "<< m_"
                     << f.m_name << " << \"\\n\";" << ln;
             }
 

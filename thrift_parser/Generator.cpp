@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2020 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2025 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ constexpr const char * ln = "\n";
 static const char * disclaimer =
     "/**\n"
     " * Original work: Copyright (c) 2014 Sergey Skoblikov\n"
-    " * Modified work: Copyright (c) 2015-2020 Dmitry Ivanov\n"
+    " * Modified work: Copyright (c) 2015-2025 Dmitry Ivanov\n"
     " *\n"
     " * This file is a part of QEverCloud project and is distributed under "
     "the terms\n"
@@ -3558,7 +3558,7 @@ void Generator::generateTestServerCpps(Parser * parser, const QString & outPath)
         << QStringLiteral("<generated/Servers.h>")
         << QStringLiteral("<generated/Services.h>")
         << QStringLiteral("<QTcpServer>")
-        << QStringLiteral("<QtTest/QtTest>");
+        << QStringLiteral("<QTest>");
     sortIncludes(additionalIncludes);
 
     const auto & enumerations = parser->enumerations();

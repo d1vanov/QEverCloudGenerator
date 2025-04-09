@@ -75,8 +75,7 @@ jobs:
           host: linux
           target: desktop
           install-deps: true
-          arch: linux_gcc_64
-          modules: 'qtwebengine qtwebchannel qtwebsockets qtpositioning'
+          arch: gcc_64
           dir: '${{ runner.workspace }}/Qt5'
         if: ${{ matrix.qt_version == '5.15.2' }}
 
@@ -91,7 +90,6 @@ jobs:
           target: desktop
           install-deps: true
           arch: linux_gcc_64
-          modules: 'qtwebengine qtwebchannel qtwebsockets qtpositioning'
           dir: '${{ runner.workspace }}/Qt6'
         if: ${{ matrix.qt_version == '6.8.3' }}
 
@@ -124,7 +122,7 @@ jobs:
         run: |
           mkdir $GITHUB_WORKSPACE/build
           cd $GITHUB_WORKSPACE/build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DBUILD_WITH_QT6=OFF -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=$RUNNER_WORKSPACE/Qt6/Qt/6.8.3/gcc_64 -DCMAKE_C_COMPILER_LAUNCHER=$GITHUB_WORKSPACE/ccache-4.11.2-linux-x86_64/ccache -DCMAKE_CXX_COMPILER_LAUNCHER=$GITHUB_WORKSPACE/ccache-4.11.2-linux-x86_64/ccache ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$(pwd)/installdir -DBUILD_WITH_QT6=ON -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DCMAKE_PREFIX_PATH=$RUNNER_WORKSPACE/Qt6/Qt/6.8.3/gcc_64 -DCMAKE_C_COMPILER_LAUNCHER=$GITHUB_WORKSPACE/ccache-4.11.2-linux-x86_64/ccache -DCMAKE_CXX_COMPILER_LAUNCHER=$GITHUB_WORKSPACE/ccache-4.11.2-linux-x86_64/ccache ..
         if: ${{ matrix.compiler_cpp == 'clang++' && matrix.qt_version == '6.8.3' }}
 
       - name: Build and install
@@ -133,6 +131,10 @@ jobs:
           cd $GITHUB_WORKSPACE/build
           cmake --build . --target all
           cmake --build . --target install
+
+      - name: Show ccache stats
+        run: |
+          $GITHUB_WORKSPACE/ccache-4.11.2-linux-x86_64/ccache --show-stats
 
       - name: Archive installed Qt5 binary
         id: archive_linux_qt5
@@ -215,6 +217,10 @@ jobs:
           cmake --build . --target all
           cmake --build . --target install
 
+      - name: Show ccache stats
+        run: |
+          ccache --show-stats
+
       - name: Archive installed binary
         id: archive_mac
         run: |
@@ -275,7 +281,7 @@ jobs:
           host: windows
           target: desktop
           install-deps: true
-          arch: win64_msvc2019_64
+          arch: win64_msvc2022_64
           dir: '${{ runner.workspace }}/Qt6'
         if: ${{ matrix.qt_version == '6.8.3' }}
 
@@ -305,6 +311,11 @@ jobs:
           cmake --build . --target all
           cmake --build . --target install
         if: ${{ matrix.qt_version == '6.8.3' }}
+        shell: cmd
+
+      - name: Show ccache stats
+        run: |
+          %USERPROFILE%\.cargo\bin\ccache.exe --show-stats
         shell: cmd
 
       - name: Archive installed Qt5 binary

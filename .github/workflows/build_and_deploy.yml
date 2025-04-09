@@ -461,7 +461,7 @@ jobs:
         id: download_windows_qt6_artifact
         uses: actions/download-artifact@v4
         with:
-          name: QEverCloudGenerator_windows_x64
+          name: QEverCloudGenerator_windows_qt6
           path: '${{ github.workspace }}/artifacts'
 
       - name: Upload Linux Qt5 artifact to continuous master release

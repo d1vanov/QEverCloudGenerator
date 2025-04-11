@@ -60,7 +60,7 @@ jobs:
 
       - name: Install Qt 5.15.2
         id: install_qt5
-        uses: jdpurcell/install-qt-action@v5
+        uses: jurplel/install-qt-action@v4
         with:
           cache: true
           cache-key-prefix: ${{ runner.os }}-Qt5Cache
@@ -142,7 +142,7 @@ jobs:
 
       - name: Install Qt 5.15.2
         id: install_qt5
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           cache: true
           cache-key-prefix: ${{ runner.os }}-Qt5Cache
@@ -201,7 +201,7 @@ jobs:
 
       - name: Install Qt 5.15.2
         id: install_qt5
-        uses: jdpurcell/install-qt-action@v5
+        uses: jurplel/install-qt-action@v4
         with:
           cache: true
           cache-key-prefix: ${{ runner.os }}-Qt5Cache

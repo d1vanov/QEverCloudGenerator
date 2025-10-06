@@ -153,6 +153,13 @@ jobs:
           arch: clang_64
           dir: '${{ runner.workspace }}/Qt5'
 
+      - name: Install gsed
+        id: install_gsed
+        env:
+          RUNNER_WORKSPACE: ${{ runner.workspace }}
+        run: |
+          brew install gsed
+
       - name: Build and install
         id: build_and_install
         env:

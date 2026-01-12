@@ -36,6 +36,8 @@
 
 #include <memory>
 
+namespace qevercloud_generator {
+
 using Term = QString;
 
 class Parser : public QObject
@@ -49,11 +51,15 @@ public:
         QString m_name;
     };
 
+    using Namespaces = QList<Namespace>;
+
     struct Include
     {
         QString m_fileName;
         QString m_name;
     };
+
+    using Includes = QList<Include>;
 
     class Type
     {
@@ -61,18 +67,49 @@ public:
         virtual ~Type() = 0;
     };
 
-    class VoidType: public Type
+    class VoidType final: public Type
     {
     public:
-        ~VoidType() override {}
+        ~VoidType() override {};
     };
 
-    class BaseType: public Type
+    class PrimitiveType final: public Type
     {
     public:
-        QString m_baseType;
+        enum class Type
+        {
+            Bool,
+            Byte,
+            Int16,
+            Int32,
+            Int64,
+            Double
+        };
 
-        ~BaseType() override {}
+        PrimitiveType(Type type) : m_type(type) {}
+        ~PrimitiveType() override {};
+
+        static QString nativeTypeName(Type type);
+
+        Type m_type;
+    };
+
+    class StringType final: public Type
+    {
+    public:
+        ~StringType() override {}
+    };
+
+    class ByteArrayType final: public Type
+    {
+    public:
+        ~ByteArrayType() override {}
+    };
+
+    class VariantType final: public Type
+    {
+    public:
+        ~VariantType() override {}
     };
 
     class IdentifierType: public Type
@@ -108,13 +145,24 @@ public:
         ~ListType() override {}
     };
 
-    struct TypeDefinition
+    class HashType: public Type
+    {
+    public:
+        std::shared_ptr<Type> m_keyType;
+        std::shared_ptr<Type> m_valueType;
+
+        ~HashType() override {}
+    };
+
+    struct TypeAlias
     {
         QString m_fileName;
         QString m_name;
         QString m_docComment;
         std::shared_ptr<Type> m_type;
     };
+
+    using TypeAliases = QList<TypeAlias>;
 
     class ConstValue
     {
@@ -179,12 +227,23 @@ public:
             Required
         };
 
+        enum class Affiliation {
+            Evernote,
+            Local
+        };
+
         int m_id;
         RequiredFlag m_required;
+        Affiliation m_affiliation;
 
         std::shared_ptr<Type> m_type;
         QString m_name;
         std::shared_ptr<ConstValue> m_initializer;
+        std::shared_ptr<LiteralValue> m_setterDefaultValue;
+
+        // If not empty, overrides the name assigned to field's corresponding
+        // Q_PROPERTY
+        QString m_overridePropertyName;
     };
 
     struct Structure
@@ -198,6 +257,8 @@ public:
         void parseStructComment(QString rawComment);
     };
 
+    using Structures = QList<Structure>;
+
     struct Enumeration
     {
         QString m_fileName;
@@ -205,6 +266,8 @@ public:
         QString m_docComment;
         QList<std::pair<QString, QString>> m_values;
     };
+
+    using Enumerations = QList<Enumeration>;
 
     struct Function
     {
@@ -216,6 +279,8 @@ public:
         QString m_docComment;
     };
 
+    using Functions = QList<Function>;
+
     struct Service
     {
         QString m_fileName;
@@ -225,6 +290,8 @@ public:
         QList<Function> m_functions;
     };
 
+    using Services = QList<Service>;
+
     struct Constant
     {
         QString m_fileName;
@@ -233,6 +300,8 @@ public:
         std::shared_ptr<ConstValue> m_value;
         QString m_docComment;
     };
+
+    using Constants = QList<Constant>;
 
 public:
     explicit Parser(QObject * parent = nullptr);
@@ -256,32 +325,32 @@ public:
         return m_fileNames;
     }
 
-    const QList<Namespace> & namespaces() const
+    const Namespaces & namespaces() const
     {
         return m_namespaces;
     }
 
-    const QList<Include> & includes() const
+    const Includes & includes() const
     {
         return m_includes;
     }
 
-    const QList<TypeDefinition> & typedefs() const
+    const TypeAliases & typeAliases() const
     {
-        return m_typedefs;
+        return m_typeAliases;
     }
 
-    const QList<Structure> & structures() const
+    const Structures & structures() const
     {
         return m_structures;
     }
 
-    const QList<Enumeration> & enumerations() const
+    const Enumerations & enumerations() const
     {
         return m_enumerations;
     }
 
-    const QList<Structure> & exceptions() const
+    const Structures & exceptions() const
     {
         return m_exceptions;
     }
@@ -296,7 +365,7 @@ public:
         return m_constants;
     }
 
-    const QList<Structure> & unions() const
+    const Structures & unions() const
     {
         return m_unions;
     }
@@ -350,7 +419,7 @@ private:
 
     QList<Namespace> m_namespaces;
     QList<Include> m_includes;
-    QList<TypeDefinition> m_typedefs;
+    QList<TypeAlias> m_typeAliases;
     QList<Structure> m_structures;
     QList<Enumeration> m_enumerations;
     QList<Structure> m_exceptions;
@@ -364,5 +433,7 @@ private:
 
 inline Parser::Type::~Type() {}
 inline Parser::ConstValue::~ConstValue() {}
+
+} // namespace qevercloud_generator
 
 #endif // QEVERCLOUD_GENERATOR_PARSER_H

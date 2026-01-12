@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2019 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2022 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,8 +29,13 @@
 #include "Parser.h"
 
 #include <QFile>
+#include <QHash>
+#include <QSet>
 
 #include <memory>
+#include <optional>
+
+namespace qevercloud_generator {
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +51,7 @@ enum class OutputFileType
 class Generator
 {
 public:
-    void generateSources(Parser * parser, const QString & outPath);
+    void generateSources(Parser & parser, const QString & outPath);
 
 private:
     struct OutputFileContext
@@ -54,43 +59,161 @@ private:
         OutputFileContext(
             const QString & fileName,
             const QString & outPath,
-            const OutputFileType type);
+            const OutputFileType type,
+            const QString & section = {});
 
         QFile m_file;
         OutputFileType m_type;
         QTextStream m_out;
     };
 
-    void generateConstantsHeader(Parser * parser, const QString & outPath);
-    void generateConstantsCpp(Parser * parser, const QString & outPath);
+    void generateConstantsHeader(Parser & parser, const QString & outPath);
+    void generateConstantsCpp(Parser & parser, const QString & outPath);
 
-    void generateErrorsHeader(Parser * parser, const QString & outPath);
-    void generateErrorsCpp(Parser * parser, const QString & outPath);
+    void generateErrorsHeader(Parser & parser, const QString & outPath);
+    void generateErrorsCpp(Parser & parser, const QString & outPath);
 
-    void generateTypesIOHeader(Parser * parser, const QString & outPath);
+    void generateTypesIOHeader(Parser & parser, const QString & outPath);
+    void generateTypesIOCpp(Parser & parser, const QString & outPath);
 
-    void generateTypesHeader(Parser * parser, const QString & outPath);
-    void generateTypesCpp(Parser * parser, const QString & outPath);
+    void generateAllExceptionsHeader(Parser & parser, const QString & outPath);
+    void generateExceptionsFwdHeader(Parser & parser, const QString & outPath);
 
-    void generateServicesHeader(Parser * parser, const QString & outPath);
-    void generateServicesCpp(Parser * parser, const QString & outPath);
+    void generateAllTypesHeader(Parser & parser, const QString & outPath);
+    void generateTypesFwdHeader(Parser & parser, const QString & outPath);
 
-    void generateServerHeader(Parser * parser, const QString & outPath);
-    void generateServerCpp(Parser * parser, const QString & outPath);
+    void generateTypeAliasesHeader(
+        const Parser::TypeAliases & typeAliases, const QString & outPath);
 
-    void generateTestServerHeaders(Parser * parser, const QString & outPath);
-    void generateTestServerCpps(Parser * parser, const QString & outPath);
+    void generateTypeHeader(
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
+
+    void generateTypeCpp(
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
+
+    void generateTypeImplHeader(
+        const Parser::Structure & s, const Parser::Enumerations & enumerations,
+        const QString & outPath, const QString & fileSection);
+
+    void generateTypeImplCpp(
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
+
+    void generateSerializationJsonHeader(
+        const Parser::Structure & s, const QString & outPath);
+
+    void generateSerializationJsonCpp(
+        const Parser::Structure & s, const Parser::Enumerations & enumerations,
+        const QString & outPath);
+
+    void generateSerializationJsonEnumSafeCastMethod(
+        const Parser::Enumeration & e, OutputFileContext & ctx);
+
+    void generateSerializeToJsonMethod(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateDeserializeFromJsonMethod(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateSerializationJsonTestHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateSerializationJsonTestCpp(
+        const Parser & parser, const QString & outPath);
+
+    void generateExceptionClassWhatMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateExceptionClassRaiseMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateExceptionClassCloneMethodDefinition(
+        const Parser::Structure & s, OutputFileContext & ctx);
+
+    void generateAllTypeBuildersHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateTypeBuildersFwdHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateTypeBuilderHeader(
+        const Parser::Structure & s, const QString & outPath,
+        const QString & fileSection);
+
+    void generateTypeBuilderCpp(
+        const Parser::Structure & s, const Parser::Enumerations & enumerations,
+        const QString & outPath, const QString & fileSection);
+
+    void generateAllExceptionBuildersHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateExceptionBuildersFwdHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateTypeBuildersTestHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateTypeBuildersTestCpp(
+        const Parser & parser, const QString & outPath);
+
+    void generateTypeBuildersTestMethod(
+        const Parser::Structure & s,
+        const QList<Parser::Enumeration> & enumerations,
+        OutputFileContext & ctx, bool isException);
+
+    void generateMetaTypesHeader(
+        const Parser & parser, const QString & outPath);
+
+    void generateMetaTypesCpp(
+        const Parser & parser, const QString & outPath);
+
+    void generateServiceHeader(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateServiceCpp(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateAllServicesHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateServicesFwdHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateFwdHeader(const QString & outPath);
+
+    void generateServerHeader(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateServerCpp(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateTestServerHeader(
+        const Parser::Service & service, const QString & outPath);
+
+    void generateTestServerCpp(
+        const Parser::Service & service, const QString & outPath,
+        Parser & parser);
 
     void generateTestRandomDataGeneratorsHeader(
-        Parser * parser, const QString & outPath);
+        Parser & parser, const QString & outPath);
 
     void generateTestRandomDataGeneratorsCpp(
-        Parser * parser, const QString & outPath);
+        Parser & parser, const QString & outPath);
 
-    void generateLocalDataClassDeclaration(
+    void generateTestClearLocalFieldsHeader(
+        Parser & parser, const QString & outPath);
+
+    void generateTestClearLocalFieldsCpp(
+        Parser & parser, const QString & outPath);
+
+    void generateClassAccessoryMethodsForFieldDeclarations(
+        const Parser::Structure & s, const Parser::Field & field,
         OutputFileContext & ctx);
 
-    void generateLocalDataClassDefinition(
+    void generateClassAccessoryMethodsForFieldDefinitions(
+        const Parser::Structure & s, const Parser::Field & field,
         OutputFileContext & ctx);
 
     enum class ServiceClassType
@@ -120,9 +243,6 @@ private:
         const Parser::Service & service, OutputFileContext & ctx);
 
     void generateTestServerHelperClassDefinition(
-        const Parser::Service & service, OutputFileContext & ctx);
-
-    void generateTestServerAsyncValueFetcherClassDefinition(
         const Parser::Service & service, OutputFileContext & ctx);
 
     void generateTestServerPrepareRequestParams(
@@ -159,6 +279,7 @@ private:
     };
 
     void generateTestServerServiceCall(
+        Parser & parser,
         const Parser::Service & service,
         const Parser::Function & func,
         const ServiceCallKind callKind,
@@ -173,20 +294,11 @@ private:
         QTextStream & out,
         const QString & end = QStringLiteral(";\n"));
 
-    void verifyTypeIsBaseOrIdentifier(
+    void verifyTypeIsValueOrIdentifier(
         const std::shared_ptr<Parser::Type> & type) const;
 
-    void generateGetRandomExceptionExpression(
-        const Parser::Field & field,
-        const Parser::Structure & e,
-        const QString & prefix,
-        const Parser & parser,
-        QTextStream & out);
-
-    void generateGetThriftExceptionExpression(
-        QTextStream & out);
-
-    QString getGenerateRandomValueFunction(const QString & typeName) const;
+    [[nodiscard]] QString getGenerateRandomValueFunction(
+        const QString & typeName) const;
 
     // Methods for writing header and source files
 
@@ -199,39 +311,41 @@ private:
 
     void writeHeaderHeader(
         OutputFileContext & ctx, const QString & fileName,
-        const QStringList & additionalIncludes = QStringList(),
-        const HeaderKind headerKind = HeaderKind::Public);
+        const QStringList & additionalIncludes = {},
+        const HeaderKind headerKind = HeaderKind::Public,
+        const QString & section = {},
+        const QStringList & forwardDeclarationsOutsideNamespace = {});
 
     void writeHeaderBody(
         OutputFileContext & ctx, const QString & headerFileName,
-        const QStringList & additionalIncludes = QStringList(),
-        const HeaderKind headerKind = HeaderKind::Public);
+        const QStringList & additionalIncludes = {},
+        const HeaderKind headerKind = HeaderKind::Public,
+        const int depth = 0);
 
     void writeHeaderFooter(
         QTextStream & out, const QString & fileName,
-        const QStringList & extraLinesInsideNamespace = QStringList(),
-        const QStringList & extraLinesOutsideNamespace = QStringList());
+        const QStringList & extraLinesInsideNamespace = {},
+        const QStringList & extraLinesOutsideNamespace = {},
+        const QString & section = {});
 
     void writeThriftWriteFields(
         QTextStream & out, const QList<Parser::Field> & fields,
-        const QString & identPrefix, const QString & fieldPrefix);
+        const QString & indentPrefix, const QString & fieldPrefix);
 
     void writeThriftReadField(
         QTextStream & out, const Parser::Field & field,
-        const QString & identPrefix,
+        const QString & indentPrefix,
         const QString & fieldParent);
 
     void sortIncludes(QStringList & includes) const;
 
     // Methods for taking a string representation of things
 
-    QString valueToStr(
+    [[nodiscard]] QString valueToStr(
         std::shared_ptr<Parser::ConstValue> value,
         std::shared_ptr<Parser::Type> type,
         const QString & identifier,
-        const QString & offset = QString());
-
-    QString fieldDeclarationToStr(const Parser::Field & field);
+        const QString & offset = {});
 
     enum class MethodType
     {
@@ -243,32 +357,113 @@ private:
         FuncParamType
     };
 
-    QString typeToStr(
-        std::shared_ptr<Parser::Type> type, const QString & identifier,
+    [[nodiscard]] QString typeToStr(
+        std::shared_ptr<Parser::Type> type,
+        const QString & identifier = QString{},
         const MethodType methodType = MethodType::TypeName) const;
 
     // Other auxiliary methods
 
-    QString getIdentifier(const std::shared_ptr<Parser::Type> & type);
+    [[nodiscard]] QString getIncludeGuard(
+        const QString & fileName, const QString & section) const;
 
-    QString clearInclude(const QString & s) const;
-    QString clearTypedef(const QString & s) const;
+    [[nodiscard]] QString getIdentifier(
+        const std::shared_ptr<Parser::Type> & type);
+
+    [[nodiscard]] QString clearInclude(const QString & s) const;
+
+    [[nodiscard]] std::optional<Parser::PrimitiveType::Type> aliasedPrimitiveType(
+        const QString & primitiveTypeAlias) const;
+
+    [[nodiscard]] QString aliasedTypeName(const QString & s) const;
 
     /**
-     * @brief loggableFields - filters out fields like authentication token,
-     * consumer key, consumer secret etc which should not be present in the log
-     * @param fields - fields to be filtered for logging
-     * @return the list of non-secret fields which can be put into a log entry
+     * @brief additionalIncludesForFields examines the passed in structure and
+     *        returns the list containing some stdlib's or Qt's headers which
+     *        need to be included to satisfy the structure's requirements.
+     *
+     * @param s     Structure for which additional includes are computed
      */
-    QList<Parser::Field> loggableFields(const QList<Parser::Field> & fields) const;
+    [[nodiscard]] QStringList additionalIncludesForFields(
+        const Parser::Structure & s) const;
 
-    QString camelCaseToSnakeCase(const QString & input) const;
+    /**
+     * @brief dependentTypeNames provides a list of singular types (i.e.
+     *        non-list/map/set ones) which are contained within the members of
+     *        the passed in structure, members of structure members and so on
+     *        recursively.
+     *
+     * @param s     Structure which fields' dependent type names are computed
+     */
+    [[nodiscard]] QStringList dependentTypeNames(
+        const Parser::Structure & s) const;
 
-    QString capitalize(const QString & input) const;
+    /**
+     * @brief loggableFields filters out fields like authentication token,
+     *        consumer key, consumer secret etc which should not be present in
+     *        the log
+     *
+     * @param fields            Fields to be filtered for logging
+     * @return                  The list of non-secret fields which can be put
+     *                          into a log entry
+     */
+    [[nodiscard]] QList<Parser::Field> loggableFields(
+        const QList<Parser::Field> & fields) const;
 
-    QString decapitalize(const QString & input) const;
+    /**
+     * @brief checks whether passed in struct contains fields with local
+     *        affiliation
+     * @return true if the passed in struct contains fields with local
+     *         affiliation, false otherwise
+     */
+    [[nodiscard]] bool structContainsLocalFields(
+        const Parser::Structure & s) const;
+
+    /**
+     * @brief checks recursively whether struct contains fields with local
+     *        affiliation or fields which are themselves structs containing
+     *        fields with local affiliation or if those fields are themselves
+     *        structs containing such fields etc.
+     * @return true if the passed in struct contains local data inside it
+     *         somehow, false otherwise
+     */
+    [[nodiscard]] bool structContainsLocalFieldsRecursive(
+        const Parser::Structure & s, const Parser::Structures & structs) const;
+
+    /**
+     * @brief checks whether the passed in struct contains local id field
+     * @return true if the passed in struct contains local id field, false
+     *         otherwise
+     */
+    [[nodiscard]] bool structContainsLocalIdField(
+        const Parser::Structure & s) const;
+
+    /**
+     * @return                  The list of structs which either contain local
+     *                          fields themselves or have fields of types which
+     *                          contain local fields.
+     */
+    [[nodiscard]] Parser::Structures collectStructsWithLocalFields(
+        Parser & parser) const;
+
+    [[nodiscard]] std::optional<Parser::Structure> structForType(
+        const std::shared_ptr<Parser::Type> & type,
+        const Parser & parser) const;
+
+    [[nodiscard]] QString camelCaseToSnakeCase(const QString & input) const;
+
+    [[nodiscard]] QString fieldTypeToStr(const Parser::Field & field) const;
+
+    [[nodiscard]] bool isFieldOfPrimitiveType(
+        const Parser::Field & field, const QString & fieldTypeName) const;
+
+    [[nodiscard]] bool isFieldMovable(
+        const Parser::Field & field, const QString & fieldTypeName) const;
 
     // Write methods for particular parsed fields
+
+    void writeTypeProperties(
+        const Parser::Structure & s, OutputFileContext & ctx);
 
     void writeNamespaceBegin(OutputFileContext & ctx);
 
@@ -285,17 +480,22 @@ private:
         QTextStream & out, const Parser::Enumeration & e,
         const char * printer) const;
 
-    void writeStructPrintDefinition(
-        QTextStream & out, const Parser::Structure & s,
-        const Parser & parser) const;
+    void writeTypeImplPrintDefinition(
+        QTextStream & out, const Parser::Structure & s) const;
 
 private:
     QStringList m_includeList;
-    QMap<QString, QString> m_typedefMap;
+
+    QHash<QString, Parser::PrimitiveType::Type> m_primitiveTypeAliases;
+    QSet<QString> m_stringTypeAliases;
+    QSet<QString> m_byteArrayTypeAliases;
+
     QStringList m_baseTypes;
     QSet<QString> m_allStructs;
     QSet<QString> m_allExceptions;
     QSet<QString> m_allEnums;
 };
+
+} // namespace qevercloud_generator
 
 #endif // QEVERCLOUD_GENERATOR_THRIFT_PARSER_GENERATOR_H

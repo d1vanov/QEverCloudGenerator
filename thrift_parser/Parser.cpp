@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 
+#include "LocalFields.h"
 #include "Parser.h"
 
 #include <QMap>
@@ -36,7 +37,159 @@ void * ParseAlloc(void *(*mallocProc)(std::size_t));
 
 void ParseFree(void *p, void (*freeProc)(void*));
 
-void Parse(void * lemon, int yymajor, Term * yyminor, Parser * m_parser);
+void Parse(
+    void * lemon, int yymajor, qevercloud_generator::Term * yyminor,
+    qevercloud_generator::Parser * m_parser);
+
+namespace qevercloud_generator {
+
+namespace {
+
+void addLocalFields(Parser::Structures & structures)
+{
+    for (auto & s: structures)
+    {
+        if (shouldGenerateLocalDataFields(s))
+        {
+            // TODO: add fields for particular types i.e. noteLocalId for Resource
+            if (s.m_name == QStringLiteral("Notebook"))
+            {
+                // std::optional<Guid> linkedNotebookGuid
+                {
+                    auto [linkedNotebookGuidField, docComment] =
+                        generateLinkedNotebookGuidField();
+
+                    s.m_fields.push_front(linkedNotebookGuidField);
+                    s.m_fieldComments[linkedNotebookGuidField.m_name] =
+                        std::move(docComment);
+                }
+            }
+            else if (s.m_name == QStringLiteral("Tag"))
+            {
+                // QString parentTagLocalId
+                {
+                    auto [parentTagLocalIdField, docComment] =
+                        generateParentTagLocalIdField();
+
+                    s.m_fields.push_front(parentTagLocalIdField);
+                    s.m_fieldComments[parentTagLocalIdField.m_name] =
+                        std::move(docComment);
+                }
+
+                // std::optional<Guid> linkedNotebookGuid
+                {
+                    auto [linkedNotebookGuidField, docComment] =
+                        generateLinkedNotebookGuidField();
+
+                    s.m_fields.push_front(linkedNotebookGuidField);
+                    s.m_fieldComments[linkedNotebookGuidField.m_name] =
+                        std::move(docComment);
+                }
+            }
+            else if (s.m_name == QStringLiteral("Note"))
+            {
+                // QByteArray thumbnailData
+                {
+                    auto [thumbnailDataField, docComment] =
+                        generateThumbnailDataField();
+
+                    s.m_fields.push_front(thumbnailDataField);
+                    s.m_fieldComments[thumbnailDataField.m_name] =
+                        std::move(docComment);
+                }
+
+                // QStringList tagLocalIds
+                {
+                    auto [tagLocalIdsField, docComment] =
+                        generateTagLocalIdsField();
+
+                    s.m_fields.push_front(tagLocalIdsField);
+                    s.m_fieldComments[tagLocalIdsField.m_name] =
+                        std::move(docComment);
+                }
+
+                // QString notebookLocalId
+                {
+                    auto [notebookLocalIdField, docComment] =
+                        generateNotebookLocalIdField();
+
+                    s.m_fields.push_front(notebookLocalIdField);
+                    s.m_fieldComments[notebookLocalIdField.m_name] =
+                        std::move(docComment);
+                }
+            }
+            else if (s.m_name == QStringLiteral("Resource"))
+            {
+                // QString noteLocalId
+                {
+                    auto [noteLocalIdField, docComment] =
+                        generateNoteLocalIdField();
+
+                    s.m_fields.push_front(noteLocalIdField);
+                    s.m_fieldComments[noteLocalIdField.m_name] =
+                        std::move(docComment);
+                }
+            }
+            else if (s.m_name == QStringLiteral("SharedNote"))
+            {
+                // std::optional<Guid> noteGuid
+                {
+                    auto [noteGuidField, docComment] =
+                        generateNoteGuidField();
+
+                    s.m_fields.push_front(noteGuidField);
+                    s.m_fieldComments[noteGuidField.m_name] =
+                        std::move(docComment);
+                }
+            }
+
+            // QHash<QString, QVariant> localData;
+            {
+                auto [localDataField, docComment] = generateLocalDataField();
+                s.m_fields.push_front(localDataField);
+                s.m_fieldComments[localDataField.m_name] =
+                    std::move(docComment);
+            }
+
+            // bool isLocallyFavorited = false;
+            {
+                auto [isLocallyFavoritedField, docComment] =
+                    generateLocallyFavoritedField();
+
+                s.m_fields.push_front(isLocallyFavoritedField);
+                s.m_fieldComments[isLocallyFavoritedField.m_name] =
+                    std::move(docComment);
+            }
+
+            // bool isLocalOnly = false;
+            {
+                auto [isLocalOnlyField, docComment] = generateLocalOnlyField();
+                s.m_fields.push_front(isLocalOnlyField);
+                s.m_fieldComments[isLocalOnlyField.m_name] =
+                    std::move(docComment);
+            }
+
+            // bool isLocallyModified = false;
+            {
+                auto [isLocallyModifiedField, docComment] =
+                    generateLocallyModifiedField();
+
+                s.m_fields.push_front(isLocallyModifiedField);
+                s.m_fieldComments[isLocallyModifiedField.m_name] =
+                    std::move(docComment);
+            }
+
+            if (shouldGenerateLocalId(s))
+            {
+                auto [localIdField, docComment] = generateLocalIdField();
+                s.m_fields.push_front(localIdField);
+                s.m_fieldComments[localIdField.m_name] = std::move(docComment);
+            }
+        }
+    }
+}
+
+} // namespace
 
 Parser::Parser(QObject *parent) :
     QObject(parent)
@@ -147,17 +300,18 @@ void Parser::feed(Lexer::TerminalSymbolType type, const QString & value)
 void Parser::complete()
 {
     Parse(m_parser, TERM_END_OF_FILE, nullptr, this);
+    addLocalFields(m_structures);
 }
 
 void Parser::addTypedef(
     QString name, std::shared_ptr<Type> type, QString docComment)
 {
-    TypeDefinition td;
-    td.m_fileName = m_fileName;
-    td.m_name = name;
-    td.m_type = type;
-    td.m_docComment = docComment;
-    m_typedefs.append(td);
+    TypeAlias ta;
+    ta.m_fileName = m_fileName;
+    ta.m_name = name;
+    ta.m_type = type;
+    ta.m_docComment = docComment;
+    m_typeAliases.append(ta);
 }
 
 void Parser::addNamespace(QString scope, QString name)
@@ -243,6 +397,30 @@ void Parser::addEnumeration(
     m_enumerations.append(e);
 }
 
+QString Parser::PrimitiveType::nativeTypeName(
+    const Parser::PrimitiveType::Type type)
+{
+    using Type = Parser::PrimitiveType::Type;
+
+    switch (type)
+    {
+    case Type::Bool:
+        return QStringLiteral("bool");
+    case Type::Byte:
+        return QStringLiteral("char");
+    case Type::Double:
+        return QStringLiteral("double");
+    case Type::Int16:
+        return QStringLiteral("qint16");
+    case Type::Int32:
+        return QStringLiteral("qint32");
+    case Type::Int64:
+        return QStringLiteral("qint64");
+    default:
+        return {};
+    }
+}
+
 void Parser::Structure::parseStructComment(QString rawComment)
 {
     int pos = rawComment.indexOf(QStringLiteral("<dl>"));
@@ -295,3 +473,5 @@ void Parser::Structure::parseStructComment(QString rawComment)
             QStringLiteral("/**\n") + fieldComment + QStringLiteral("\n*/");
     }
 }
+
+} // namespace qevercloud_generator

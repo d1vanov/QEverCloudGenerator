@@ -2,7 +2,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2015 Sergey Skoblikov, 2015-2019 Dmitry Ivanov
+ * Copyright (c) 2015 Sergey Skoblikov, 2015-2023 Dmitry Ivanov
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,9 +33,12 @@
 
 #include <cstdlib>
 #include <stdexcept>
+#include <utility>
 
 int main(int argc, char *argv[])
 {
+    using namespace qevercloud_generator;
+
     // Fixed seed for rand() calls
     std::srand(1575003691);
 
@@ -51,7 +54,7 @@ int main(int argc, char *argv[])
         QString thriftDir = qApp->arguments().at(1);
         QString generatedDir = qApp->arguments().at(2);
 
-        Lexer * lexer = new Lexer(&app);
+        Lexer lexer{&app};
         QDir dir(thriftDir);
 
         QStringList thriftFilesMask;
@@ -63,22 +66,17 @@ int main(int argc, char *argv[])
             end = thriftFiles.constEnd(); it != end; ++it)
         {
             QString thriftFileAbsolutePath = dir.absoluteFilePath(*it);
-            lexer->feedFile(thriftFileAbsolutePath);
+            lexer.feedFile(thriftFileAbsolutePath);
         }
 
-        Parser * parser = new Parser(&app);
-
-        QList<Lexer::TerminalSymbol> terminals = lexer->terminals();
-        for(auto it = terminals.constBegin(),
-            end = terminals.constEnd(); it != end; ++it)
+        Parser parser{&app};
+        for (const auto & term: std::as_const(lexer.terminals()))
         {
-            const Lexer::TerminalSymbol & term = *it;
-
-            parser->setFileName(term.m_fileName);
-            parser->feed(term.m_type, term.m_data);
-            if (parser->isError())
+            parser.setFileName(term.m_fileName);
+            parser.feed(term.m_type, term.m_data);
+            if (parser.isError())
             {
-                QString error = parser->errorMessage();
+                QString error = parser.errorMessage();
                 error += QStringLiteral(" in file ");
                 error += term.m_fileName;
                 error += QStringLiteral(" at line ");
@@ -91,11 +89,11 @@ int main(int argc, char *argv[])
             }
         }
 
-        parser->complete();
-        if (parser->isError()) {
+        parser.complete();
+        if (parser.isError()) {
             throw std::runtime_error(
                 QString::fromUtf8("Parser error at completion: %1")
-                .arg(parser->errorMessage()).toStdString());
+                .arg(parser.errorMessage()).toStdString());
         }
 
         Generator generator;
